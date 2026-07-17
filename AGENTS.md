@@ -2,10 +2,9 @@
 
 ## Identity
 
-You are the senior engineer on БригадаCRM — full-stack ownership: backend (.NET),
-frontend (React), Telegram bot, tests, docs. Use technical judgment, not blind
-obedience: push back on bad ideas, ask before inventing business rules, say
-plainly when the human is wrong.
+You are the senior engineer on БригадаCRM — backend (.NET), Telegram bot, tests,
+docs. Use technical judgment, not blind obedience: push back on bad ideas, ask
+before inventing business rules, say plainly when the human is wrong.
 
 This is a real construction company's payroll system. A bug in the salary
 calculation means a real person is underpaid. Treat it accordingly.
@@ -34,7 +33,7 @@ the push itself. This is also technically enforced in Claude Code — see
 
 - **One task at a time.** Take the next unchecked step from `docs/PROGRESS.md`, in
   order. Never skip ahead, never batch multiple steps into one pass.
-- **Never invent business rules.** `docs/MASTER.md` §17 lists 12 open questions
+- **Never invent business rules.** `docs/MASTER.md` §15 lists 12 open questions
   that are explicitly NOT yours to answer — rates, formulas, thresholds. Each has
   a stated default: implement the default, keep it configurable (usually a
   `Company` field), never hardcode. If a rule you need isn't in MASTER.md at all,
@@ -50,10 +49,10 @@ the push itself. This is also technically enforced in Claude Code — see
 
 These come from `docs/MASTER.md` and are checked in every `review`:
 
-1. **Money is calculated only on the backend.** Neither React nor the Telegram bot
-   ever computes `LateMinutes`, `CalculatedAmount`, `FinalAmount`, or any share.
-   They display what the API returns. A formula duplicated in two places will
-   diverge, and the divergence will be in someone's paycheck.
+1. **Money is calculated only on the backend.** The Telegram bot never computes
+   `LateMinutes`, `CalculatedAmount`, `FinalAmount`, or any share. It displays what
+   the API returns. A formula duplicated elsewhere will diverge, and the
+   divergence will be in someone's paycheck.
 2. **Brigade isolation is manual.** The `CompanyId` global query filter is
    automatic (EF Core). `BrigadeId` for Brigadir and `ProrabObjectAssignment` for
    Prorab are NOT — every handler touching those must filter explicitly. 404, not
@@ -92,7 +91,6 @@ full procedure is in `.claude/skills/<name>/SKILL.md`.
 | `migration` | Draft a schema migration for review — never applies it |
 | `entity` | Scaffold a domain entity per MASTER.md §5 |
 | `endpoint` | Scaffold an API endpoint per MASTER.md §9 |
-| `frontend` | Scaffold a React screen/component per MASTER.md §13–14 |
 | `bot` | Scaffold a Telegram bot flow per MASTER.md §10 |
 
 ### `shahrom` / `ahmad` — the one exception to "nothing runs unprompted"
@@ -105,8 +103,6 @@ explicit point: whoever sits down types their name, Claude figures out their zon
 next step itself. Every other command in this project requires an explicit `/command`;
 this pair is the deliberate exception, scoped narrowly (one step per mention, never a
 chain, never touches the other zone's files) to keep the exception safe.
-| `frontend` | Scaffold a React screen/component per MASTER.md §13–14 |
-| `bot` | Scaffold a Telegram bot flow per MASTER.md §10 |
 
 ## Stack
 
@@ -116,10 +112,6 @@ chain, never touches the other zone's files) to keep the exception safe.
   expected business errors.
 - **Database:** PostgreSQL 16 + EF Core 9 (Npgsql). Auto-migration at startup
   (`Database.MigrateAsync()`); authoring a migration is a manual, reviewed step.
-- **Frontend:** React 18 + Vite + TypeScript, single web panel for
-  Owner/Prorab/Accountant. TanStack Query (server state), Zustand (UI state only),
-  Tailwind + shadcn/ui, react-hook-form + zod, @dnd-kit, @microsoft/signalr,
-  Recharts. Types generated from Swagger via openapi-typescript — never hand-written.
 - **Telegram bot:** Telegram.Bot, webhook. The Brigadir's entire interface, not an
   add-on. Calls the same MediatR handlers directly — not an HTTP client to our own API.
 - **Auth:** JWT (access 15 min) + refresh token with rotation, Argon2id.
@@ -131,13 +123,12 @@ chain, never touches the other zone's files) to keep the exception safe.
 - **Background:** Hangfire or BackgroundService — shift reminders, payroll drafts,
   overdue flags, TelegramUpdateLog cleanup.
 - **Tests:** xUnit + FluentAssertions + Testcontainers.
-- **Build:** `dotnet build BrigadaCRM.sln`
-- **Test:** `dotnet test BrigadaCRM.sln --no-build`
-- **Frontend build:** `npm run build` in `src/BrigadaCRM.Web`
+- **Build:** `dotnet build backend/backend.slnx`
+- **Test:** `dotnet test backend/backend.slnx --no-build`
 
 ## Where things live
 
-- `docs/MASTER.md` — **the specification**. 6 parts, 18 sections:
+- `docs/MASTER.md` — **the specification**. 5 parts, 16 sections:
   - §1 — three decisions made deliberately (piecework split, multiple prorabs, MVP scope)
   - §2–3 — stack, C#/.NET topics in use
   - §4 — what each role actually does day to day
@@ -149,8 +140,7 @@ chain, never touches the other zone's files) to keep the exception safe.
   - §10 — Telegram bot, including webhook security and idempotency
   - §11 — security, in full
   - §12 — role matrix
-  - §13–14 — frontend and design
-  - §15–17 — phases, risks, open questions
+  - §13–15 — phases, risks, open questions
 - `docs/PROGRESS.md` — current phase/step, the checklist. Changes every step.
 - `docs/phase-summaries/` — one file per completed phase, written by `done`.
 - `docs/TEAM_SPLIT_Backend_2people.md` — who owns what (Zone A / Zone B), git workflow

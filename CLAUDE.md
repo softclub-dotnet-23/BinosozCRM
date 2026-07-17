@@ -10,9 +10,9 @@
   those entries.
 - Auto memory is on. If you correct the same mistake twice in a session, it
   belongs in a rule here, in AGENTS.md, or in the relevant skill.
-- Three surfaces share one backend: when a change touches the API contract, check
-  callers in BOTH `frontend` (React) and the Telegram bot project before
-  assuming only one needs updating.
+- Two surfaces share one backend: when a change touches the API contract, check
+  callers in the Telegram bot project before assuming nothing else needs
+  updating.
 - `docs/MASTER.md` is 1000 lines. Read the sections the current step names, not
   the whole file — the step in `docs/PROGRESS.md` always says which.
 

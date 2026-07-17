@@ -16,7 +16,7 @@
   всю зарплатную математику единолично, не «немного каждый».
 - **Domain-слой теперь тоже один владелец** (обновление после первого запуска на
   практике) — см. §2.0. Раньше сущности были разбиты между зонами так же, как и
-  остальной код; теперь весь `src/BrigadaCRM.Domain/` и EF-конфигурации — у одного
+  остальной код; теперь весь `backend/Domain/` и EF-конфигурации — у одного
   человека, чтобы `ApplicationDbContext`/миграции вообще перестали быть местом
   конфликта, а не просто «редким» местом.
 
@@ -32,10 +32,10 @@
 Тимлид — **A** (мержит спорное, финальное слово при конфликте мнений). Роль
 техническая, не «главный» — оба código-owners в своих зонах.
 
-**Почему не «фронтенд/бэкенд» на двоих.** Соблазн простой: один — backend, другой —
-frontend. Не делайте так: тогда backend-человек 3 месяца работает не может ничего
-показать, а frontend-человек сидит без API. Оба ведут вертикальные срезы —
-сущность → API → (при необходимости) экран/бот-флоу.
+**Почему не «по слоям» на двоих.** Соблазн простой: один — Domain/EF, другой — всё
+остальное. Не делайте так: тогда один человек 3 месяца работает и не может ничего
+показать, а другой сидит без сущностей. Оба ведут вертикальные срезы —
+сущность → API → (при необходимости) бот-флоу.
 
 ---
 
@@ -50,15 +50,15 @@ frontend. Не делайте так: тогда backend-человек 3 мес
 опечатка в `decimal(18,2)` — и это баг в чужой зоне, который никто не увидит на
 ревью, потому что "это же файл того, другого").
 
-**Решение: весь `src/BrigadaCRM.Domain/` (все 26 сущностей) и
-`src/BrigadaCRM.Infrastructure/Persistence/` (конфигурации + сам
+**Решение: весь `backend/Domain/` (все 26 сущностей) и
+`backend/Infrastructure/Persistence/` (конфигурации + сам
 `ApplicationDbContext`) — у одного человека. Здесь — Ахмад**, потому что он уже
 тимлид и уже единолично ведёт миграции (§5) — это те же обязанности, просто
 явно названные, а не разделение работы заново.
 
 **Что это меняет для Шахрома:** он **не пишет** `.cs`-файлы сущностей и
 EF-конфигураций вообще. Если для зоны B нужна новая сущность или поле в
-существующей — Шахром **не редактирует** `Domain/Entities/Worker.cs` сам, а или (а)
+существующей — Шахром **не редактирует** `backend/Domain/Entities/Worker.cs` сам, а или (а)
 просит Ахмада добавить, или (б) сам пишет черновик и отдаёт на review-переносе —
 финальную правку в файл делает Ахмад. Это не бюрократия ради бюрократии: одна
 случайная правка чужого `decimal(18,3)` на `decimal(18,2)` в сущности зарплаты — и
@@ -87,21 +87,21 @@ WorkOrder, WorkOrderProgress, IndividualTask, TaskLog, AdminAuditLog
 
 **Папки:**
 ```
-src/BrigadaCRM.Domain/               ← весь каталог, включая Worker/Timesheet/
+backend/Domain/                      ← весь каталог, включая Worker/Timesheet/
                                         Payroll* — см. §2.0, не только "свои" 13
-src/BrigadaCRM.Infrastructure/Persistence/   ← весь каталог: DbContext + все конфигурации
-src/BrigadaCRM.Infrastructure/Auth/
-src/BrigadaCRM.Application/{Auth,Objects,Customers,WorkOrders,IndividualTasks}/
-src/BrigadaCRM.WebApi/Controllers/{Auth,Objects,Customers,WorkOrders,
-                                    IndividualTasks}Controller.cs
+backend/Infrastructure/Persistence/  ← весь каталог: DbContext + все конфигурации
+backend/Infrastructure/Auth/
+backend/Application/{Auth,Objects,Customers,WorkOrders,IndividualTasks}/
+backend/Api/Controllers/{Auth,Objects,Customers,WorkOrders,
+                          IndividualTasks}Controller.cs
 ```
 
 **Фазы (MASTER §15):** 0 (целиком), 1 (объекты, прорабы), 2 (наряды/задачи — ядро,
 кроме бот-хендлеров, см. §4 ниже), 6 (дашборд, health, бэкапы).
 
 **Отвечает дополнительно за:** solution/DI/CI-каркас, seed (§5.27 — Company+3 Owner),
-security-заголовки, rate limiting, React-каркас (роутинг, protected routes, логин) —
-всё, что нужно один раз на весь проект, не относится к конкретной фиче.
+security-заголовки, rate limiting — всё, что нужно один раз на весь проект, не
+относится к конкретной фиче.
 
 ### 2.2 B — Поле и касса (13 «фичевых» сущностей, Domain — не его файлы, см. §2.0)
 
@@ -114,16 +114,16 @@ TelegramLink, TelegramLinkCode, TelegramUpdateLog
 
 **Папки:**
 ```
-src/BrigadaCRM.Application/{Brigades,Workers,Timesheets,Absences,Materials,
-                            Payroll,PayoutShares}/
-src/BrigadaCRM.TelegramBot/
-src/BrigadaCRM.WebApi/Controllers/{Brigades,Workers,Timesheets,Absences,
-                                    Materials,Payroll}Controller.cs
+backend/Application/{Brigades,Workers,Timesheets,Absences,Materials,
+                      Payroll,PayoutShares}/
+backend/TelegramBot/
+backend/Api/Controllers/{Brigades,Workers,Timesheets,Absences,
+                          Materials,Payroll}Controller.cs
 ```
 
-**Не трогает** `Domain/Entities/{Brigade,Worker,Timesheet,AbsenceRecord,
+**Не трогает** `backend/Domain/Entities/{Brigade,Worker,Timesheet,AbsenceRecord,
 MaterialRequest,...,PayrollEntry,PayrollAdvance,TelegramLink*}.cs` и
-`Infrastructure/Persistence/Configurations/` — это у Ахмада, §2.0. Нужно поле,
+`backend/Infrastructure/Persistence/Configurations/` — это у Ахмада, §2.0. Нужно поле,
 нужен индекс, нужна связь — просит, не правит сам.
 
 **Фазы:** 1 (бригады, рабочие, 18+), 2 (Telegram-бот v1 — привязка, secret_token,
@@ -183,9 +183,6 @@ Telegram-бот (владелец B) вызывает Application-слой WorkO
   **вызывает**, не трогая файлы A.
 - Если контракт команды нужно поменять — правит **A**, предупредив B заранее (то же
   правило, что для миграций, см. §5).
-- Обратная сторона: React-панель (тоже зона A) показывает `PayrollEntry`/`Timesheet`
-  на дашборде объекта (MASTER §13.4, §8.10) — те же правила, зеркально: A вызывает
-  готовые query B, не пишет свою версию расчёта.
 
 ---
 
@@ -245,10 +242,10 @@ git push origin feat/b-attendance                  # → PR, ревьюер — 
                           без предупреждения
 
 Недели 10-11 [Фаза 3]  B: Timesheet/AbsenceRecord handlers, LateMinutes, увольнение
-                       A: React-панель по готовым API (Фазы 1-2), ревью B
+                       A: ревью B
 
 Недели 12-13 [Фаза 4]  B: материалы (не зависит от Фазы 3)
-                       A: доска статусов, дашборд
+                       A: ревью B (Фаза 4 — целиком зона B)
 
 Недели 14-17 [Фаза 5]  B: PayrollEntry handlers целиком — самая плотная часть
                           в одиночку (сущность и конфигурация уже готовы

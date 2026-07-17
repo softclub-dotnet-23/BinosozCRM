@@ -9,7 +9,7 @@ argument-hint: "[endpoint description]"
 2. Create:
    - Request DTO (record) + FluentValidation validator
    - Response DTO (record) — **role-aware**: if it exposes `PayRate` or `Document*`,
-     check §12 for who sees what, and mask in the DTO, not the frontend
+     check §12 for who sees what, and mask in the DTO, not the client
    - MediatR handler in Application: permission check + `BrigadeId`/`ProrabObjectAssignment`
      filter where applicable (§11.5 — this is manual, EF Core won't do it)
    - Controller action, thin — mapping only
@@ -17,7 +17,6 @@ argument-hint: "[endpoint description]"
 4. `Result<T>` for expected failures. 404 not 403 on ownership denial.
 5. Async with `CancellationToken`; pagination/sort allow-list per §9.3.
 6. Show a curl example.
-7. If the contract changed, check callers in BOTH `src/BrigadaCRM.Web` and
-   `src/BrigadaCRM.TelegramBot`.
+7. If the contract changed, check callers in `backend/TelegramBot`.
 
 Endpoint: $ARGUMENTS
