@@ -5,8 +5,8 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 3
-**Next step:** Phase 0, Step 4
+**Last completed:** Phase 0, Step 4
+**Next step:** Phase 0, Step 5
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 11)
 **Updated:** 2026-07-17
@@ -16,11 +16,29 @@ entities + all EF configurations written ahead of the sequential steps above,
 Zone B first, so Shahrom isn't blocked on entity availability once he starts.
 Company (Step 2) was fully satisfied as a side effect. Global query filters
 (`CompanyId` + soft-delete, via reflection in `ApplicationDbContext.OnModelCreating`)
-are now wired (Step 3) — verified with a throwaway EF InMemory check (two
-`ApplicationDbContext` instances, two companies, no leakage; unauthenticated
-access returns 0 rows, fails closed not open). Role-based **authorization**
-(policies, `[Authorize]`) is still pending — needs JWT (Step 4) to have claims
-to authorize on; `User.Role` itself already exists from the Domain block.
+are wired (Step 3) — verified with a throwaway EF InMemory check.
+
+**Auth (Step 4):** Argon2id password hashing (`Konscious.Security.Cryptography.Argon2`,
+random salt, `CryptographicOperations.FixedTimeEquals`), JWT access tokens
+(15 min, `company_id`/role claims — single-Company deployment, so the claim
+comes from the one seeded `Company` row, not a `User.CompanyId` that doesn't
+exist), `RefreshToken` rotation + reuse detection (`POST /auth/login`,
+`/auth/refresh`, `/auth/logout`). `Jwt:SecretKey` is deliberately **not** in
+any committed appsettings file (§11.1) — set it via user-secrets locally or
+`Jwt__SecretKey` env var in any environment, ≥32 bytes, or the app fails fast
+at startup (`ValidateOnStart`). Verified end-to-end with a throwaway handler-level
+check: wrong password / unknown phone both return `AUTH_INVALID_CREDENTIALS`
+(no user enumeration), rotation issues a new refresh token, reusing the
+rotated-away token returns `AUTH_REFRESH_TOKEN_REUSED` and revokes the whole
+chain, logout is idempotent. Found and fixed a real bug during this: the
+`CompanyId` global filter (Step 3) would have silently broken `/auth/refresh`
+lookups, since there's no authenticated context yet at that point in the flow —
+those specific queries now call `.IgnoreQueryFilters()` deliberately.
+
+Role-based HTTP **authorization** (`[Authorize(Roles=...)]` on non-auth
+endpoints) is still pending — no other endpoints exist yet to authorize.
+`ExceptionHandlingMiddleware`/full §9.2 error catalogue is Step 8; until then
+`Api/Common/ResultExtensions.cs` maps only the auth error codes.
 
 ---
 
@@ -30,7 +48,7 @@ to authorize on; `User.Role` itself already exists from the Domain block.
 - [x] Step 1 [BE] — solution (Domain/Application/Infrastructure/WebApi/TelegramBot), MediatR + FluentValidation + `Result<T>`, авто-миграция при старте, zero-warnings → MASTER §2, §3
 - [x] Step 2 [BE] — `Company` (первая сущность — от неё зависят все `CompanyId`), настройки: `PieceworkDistributionMode`, `LatenessGraceMinutes`, `LatenessNotifyThresholdMinutes`, `PayrollPeriodType` → MASTER §5.1
 - [x] Step 3 [BE] — `User` (+ `ForcePasswordChange`), роли, global query filters (soft-delete + `CompanyId`) через reflection → MASTER §5.2, §11.5
-- [ ] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
+- [x] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
 - [ ] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
 - [ ] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
 - [ ] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8

@@ -25,7 +25,7 @@ public sealed class ValidationBehavior<TRequest, TResponse>(IEnumerable<IValidat
             return await next();
 
         var error = new Error(
-            "Validation.Failed",
+            "VALIDATION_FAILED",
             string.Join("; ", failures.Select(f => f.ErrorMessage)));
 
         if (typeof(TResponse) == typeof(Result))

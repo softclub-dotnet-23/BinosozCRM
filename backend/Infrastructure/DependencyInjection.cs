@@ -1,4 +1,6 @@
+using System.Text;
 using Application.Common.Interfaces;
+using Application.Common.Options;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Interceptors;
@@ -6,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure;
 
@@ -27,6 +30,15 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .Validate(o => !string.IsNullOrEmpty(o.SecretKey) && Encoding.UTF8.GetByteCount(o.SecretKey) >= 32,
+                "Jwt:SecretKey must be set and at least 32 bytes (MASTER §11.1) — never in a committed appsettings.json, use ENV/user-secrets.")
+            .ValidateOnStart();
+
+        services.AddScoped<IPasswordHasher, Argon2PasswordHasher>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         return services;
     }

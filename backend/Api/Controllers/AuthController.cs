@@ -1,0 +1,39 @@
+using Api.Common;
+using Api.Contracts.Auth;
+using Application.Auth;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Api.Controllers;
+
+[ApiController]
+[Route("api/v1/auth")]
+public sealed class AuthController(ISender sender) : ControllerBase
+{
+    [HttpPost("login")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
+    {
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var result = await sender.Send(new LoginCommand(request.Phone, request.Password, ipAddress), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Refresh(RefreshTokenRequest request, CancellationToken cancellationToken)
+    {
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var result = await sender.Send(new RefreshTokenCommand(request.RefreshToken, ipAddress), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout(RefreshTokenRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new LogoutCommand(request.RefreshToken), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+}
