@@ -39,7 +39,7 @@ Read MASTER.md §11 before reviewing. Review $ARGUMENTS (blank = current diff).
 ## PII (§11.6)
 - `BirthDate`/`Document*`/`Phone` never logged — explicit Serilog destructuring policy
 - Document masked for Prorab (`****4567`), full only Owner/Accountant, invisible to Brigadir
-- Masking in the Response DTO, not the frontend
+- Masking in the Response DTO, not the client
 
 ## Telegram (§10.3)
 - `secret_token` verified, `FixedTimeEquals`
@@ -57,7 +57,6 @@ Read MASTER.md §11 before reviewing. Review $ARGUMENTS (blank = current diff).
 
 ## Dependencies (§11.8)
 - `dotnet list package --vulnerable` clean
-- `npm audit` clean for the React project
 
 Only real, specific findings with file + line and the exact fix. Nothing wrong →
 say so plainly.

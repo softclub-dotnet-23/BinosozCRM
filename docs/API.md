@@ -1,4 +1,4 @@
-# Api — БригадаCRM
+# API — БригадаCRM
 
 `/api/v1`, REST, JSON. Закрытая модель безопасности — **404, не 403** на чужую сущность. `Brigadir` изолирован по `BrigadeId` на уровне Application-handler'а.
 
@@ -57,4 +57,4 @@
 | POST | `/payroll/{id}/approve` \| `/pay` | Accountant, Owner | |
 | POST | `/telegram/link/generate` | Prorab+ (для Brigadir), сам User (для себя) | Одноразовый код для `/start CODE` в боте |
 
-SignalR-хаб `/hubs/work-orders`: `WorkOrderStatusChanged`, `AttendanceMarked` (LateMinutes > порога), `MaterialShortageReported`. Слушатели — React-клиент и Telegram-шлюз (`docs/TelegramBot.md`), один источник события.
+SignalR-хаб `/hubs/work-orders`: `WorkOrderStatusChanged`, `AttendanceMarked` (LateMinutes > порога), `MaterialShortageReported`. Слушатели — REST/SignalR-клиенты и Telegram-шлюз (`docs/TelegramBot.md`), один источник события.

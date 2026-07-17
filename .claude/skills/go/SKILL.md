@@ -9,9 +9,8 @@ argument-hint: "[step-number]"
 2. Read the `docs/MASTER.md` sections that step names — every step has them after `→ MASTER §`.
 3. Implement only that step:
    - `[BE]` — backend only
-   - `[FE]` — React only
    - `[BOT]` — Telegram bot only
-   - `[FULL]` — backend first, then the others; all must build clean
+   - `[FULL]` — backend first, then the bot; all must build clean
 4. If the step touches money (§8), re-read the worked numeric examples and make the
    implementation match them exactly — they're the spec, not illustrations.
 5. If anything is ambiguous or hits one of the 12 open questions (MASTER §17) — stop

@@ -8,7 +8,7 @@ argument-hint: "[only-critical]"
 1. Use the findings from the most recent `review`/`security` in this conversation.
    None → run `review` first.
 2. Fix every 🔴. Fix 🟡 too, unless the argument is `only-critical`.
-3. After each fix rebuild (`dotnet build BrigadaCRM.sln`). If a fix breaks something
+3. After each fix rebuild (`dotnet build backend/backend.slnx`). If a fix breaks something
    else, stop and report — don't paper over it.
 4. Don't fix anything that wasn't flagged — this isn't a free refactor pass.
 

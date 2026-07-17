@@ -20,7 +20,7 @@ This is a payroll system. A wrong number here means a real person is underpaid.
 - `FinalAmount = Calculated − Lateness + Bonus − Advance ± Adjustment` — negative allowed, never silently zeroed
 - Bonus never reaches payroll without `BonusApprovedByUserId`
 - Advance settled with `SettledInPayrollEntryId`, never double-counted
-- No money math in React or the bot — they display API output only
+- No money math in the bot — it displays API output only
 
 ## 2. Isolation / IDOR (MASTER §11.5) — three layers, only one is automatic
 - `CompanyId` — global query filter, automatic. Verify it's actually applied to new entities
@@ -46,9 +46,9 @@ This is a payroll system. A wrong number here means a real person is underpaid.
 
 ## 5. Architecture (MASTER §2)
 - Dependency direction: Domain(0 deps) ← Application ← Infrastructure ← WebApi/Bot
-- No business logic in controllers, React components, or bot handlers
+- No business logic in controllers or bot handlers
 - No EF entities across the API boundary — DTOs only
-- No rule duplicated between Application and React/bot
+- No rule duplicated between Application and the bot
 
 ## 6. Security (MASTER §11)
 - Secrets from env/secret store, never committed
@@ -72,17 +72,10 @@ This is a payroll system. A wrong number here means a real person is underpaid.
 - Pagination on list endpoints; sort/filter allow-listed
 - Error shape and codes match §9.1–9.2 exactly
 
-## 10. Frontend (MASTER §13) — if React files changed
-- Server state in TanStack Query, UI state in Zustand — no duplication
-- Accept/Reject absent from DOM outside `OnReview` (not CSS-hidden)
-- Optimistic drag&drop with rollback on rejected transition
-- `ru-RU` locale, tabular-nums on money columns
-- Types generated from Swagger, not hand-written
-
-## 11. Business rules not invented (MASTER §17)
+## 10. Business rules not invented (MASTER §15)
 - Nothing from the 12 open questions hardcoded — defaults implemented as `Company` config
 
-## 12. Tests
+## 11. Tests
 - New logic has a behavior test
 - Cross-brigade-denied test on brigade-scoped endpoints
 - Money formulas tested against the numeric examples in MASTER §8.0/§8.1/§8.8

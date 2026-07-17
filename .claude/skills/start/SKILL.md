@@ -14,8 +14,7 @@ disable-model-invocation: true
 !`git status --short`
 
 ## Build
-Run `dotnet build BrigadaCRM.sln`. If React files exist, also `npm run build` in
-`src/BrigadaCRM.Web`. Note pass/fail and warnings.
+Run `dotnet build backend/backend.slnx`. Note pass/fail and warnings.
 
 Report exactly this shape, then stop:
 
