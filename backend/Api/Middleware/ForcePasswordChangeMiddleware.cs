@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Api.Common;
 using Infrastructure.Auth;
 
 namespace Api.Middleware;
@@ -24,17 +25,11 @@ public sealed class ForcePasswordChangeMiddleware(RequestDelegate next)
 
             if (forcePasswordChange && !isAllowedPath)
             {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                context.Response.ContentType = "application/json";
-                await context.Response.WriteAsJsonAsync(new
-                {
-                    error = new
-                    {
-                        code = "PASSWORD_CHANGE_REQUIRED",
-                        message = "Password change is required before continuing.",
-                        traceId = context.TraceIdentifier
-                    }
-                });
+                await ErrorEnvelope.WriteAsync(
+                    context,
+                    StatusCodes.Status403Forbidden,
+                    "PASSWORD_CHANGE_REQUIRED",
+                    "Password change is required before continuing.");
                 return;
             }
         }

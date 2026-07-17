@@ -5,11 +5,28 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 5
-**Next step:** Phase 0, Step 6
+**Last completed:** Phase 0, Step 6
+**Next step:** Phase 0, Step 7
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 11)
 **Updated:** 2026-07-17
+
+**Rate limiting (Step 6):** `/auth/login` — 5 attempts / 15 minutes, partitioned
+by IP+phone (not IP alone — MASTER §11.4 wants each phone number to have its
+own budget, so brute-forcing one phone from many IPs is still caught).
+`LoginRateLimitKeyMiddleware` reads `phone` from a buffered request body
+before the built-in `Microsoft.AspNetCore.RateLimiting` fixed-window limiter
+partitions on it; rejection returns `429 RATE_LIMITED` in the §9.1 envelope
+(factored the envelope writer out to `Api/Common/ErrorEnvelope.cs`, now shared
+with `ForcePasswordChangeMiddleware`). **Found and fixed a real bug while
+verifying this**: `UseRateLimiter()` was originally called before
+`UseRouting()`/`MapControllers()`, so the endpoint-specific `auth-login`
+policy silently never applied — every request just passed straight through,
+no 429 ever, no error, no warning. Caught it with a throwaway TestServer
+check, not by reading the code; fixed by adding an explicit `app.UseRouting()`
+before `app.UseRateLimiter()`. Re-verified after the fix: 5 attempts for one
+phone succeed, the 6th is 429; a second phone number from the same IP still
+gets its own full budget.
 
 **Seed + forced password change (Step 5):** `SeedDataService` runs after
 `MigrateAsync`, before the host serves requests — creates the one `Company`
@@ -66,7 +83,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [x] Step 3 [BE] — `User` (+ `ForcePasswordChange`), роли, global query filters (soft-delete + `CompanyId`) через reflection → MASTER §5.2, §11.5
 - [x] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
 - [x] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
-- [ ] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
+- [x] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
 - [ ] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
 - [ ] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
 - [ ] Step 9 [FE] — React каркас (Vite/TS), protected routes по роли, страница логина, экран принудительной смены пароля, Axios + JWT-интерцептор → MASTER §13.1
