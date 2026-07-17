@@ -5,18 +5,18 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** —
-**Next step:** Phase 0, Step 1
-**Build:** —
-**Tests:** —
-**Updated:** —
+**Last completed:** Phase 0, Step 1
+**Next step:** Phase 0, Step 2
+**Build:** clean, 0 warnings (`dotnet build backend.slnx`)
+**Tests:** — (Step 11)
+**Updated:** 2026-07-17
 
 ---
 
 ## Phase 0 — Foundation
 **Goal:** авторизация, роли, безопасность с первого дня. Без этого остальное не имеет смысла.
 
-- [ ] Step 1 [BE] — solution (Domain/Application/Infrastructure/WebApi/TelegramBot), MediatR + FluentValidation + `Result<T>`, авто-миграция при старте, zero-warnings → MASTER §2, §3
+- [x] Step 1 [BE] — solution (Domain/Application/Infrastructure/WebApi/TelegramBot), MediatR + FluentValidation + `Result<T>`, авто-миграция при старте, zero-warnings → MASTER §2, §3
 - [ ] Step 2 [BE] — `Company` (первая сущность — от неё зависят все `CompanyId`), настройки: `PieceworkDistributionMode`, `LatenessGraceMinutes`, `LatenessNotifyThresholdMinutes`, `PayrollPeriodType` → MASTER §5.1
 - [ ] Step 3 [BE] — `User` (+ `ForcePasswordChange`), роли, global query filters (soft-delete + `CompanyId`) через reflection → MASTER §5.2, §11.5
 - [ ] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
