@@ -82,7 +82,7 @@ public sealed class WorkOrder : AuditableEntity, ICompanyOwned, ISoftDelete
             return Result.Failure(new Error("WORK_ORDER_NO_PROGRESS", "At least one progress report is required before submitting for review."));
 
         if (!payoutShareComplete)
-            return Result.Failure(new Error("WORK_ORDER_PAYOUT_SHARE_INCOMPLETE", "Payout shares must sum to 100% before submitting for review."));
+            return Result.Failure(new Error("WORK_ORDER_SHARES_INVALID", "Payout shares must sum to 100% before submitting for review."));
 
         Status = WorkOrderStatus.OnReview;
         return Result.Success();

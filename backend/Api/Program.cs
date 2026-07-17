@@ -11,9 +11,20 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// MASTER §2/§3: Serilog, structured, no PII. Reads the "Serilog" appsettings
+// section (MinimumLevel/WriteTo/Enrich) so log levels are config-driven, not
+// hardcoded. Column/field-level PII exclusion (Serilog.Destructure.ByTransforming,
+// §11.6) applies to DTOs that don't exist yet (Worker PII fields land in
+// Phase 1) — nothing to exclude from logs today, since nothing PII-bearing is
+// logged yet.
+builder.Host.UseSerilog((context, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .Enrich.FromLogContext());
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -96,6 +107,12 @@ using (var scope = app.Services.CreateScope())
     var seedDataService = scope.ServiceProvider.GetRequiredService<SeedDataService>();
     await seedDataService.SeedAsync(CancellationToken.None);
 }
+
+// Must be first: everything downstream can throw, and this is the only
+// place that's allowed to turn an unhandled exception into a response.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+app.UseSerilogRequestLogging();
 
 if (!app.Environment.IsDevelopment())
     app.UseHsts();

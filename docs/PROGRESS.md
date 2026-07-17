@@ -5,11 +5,51 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 7
-**Next step:** Phase 0, Step 8
+**Last completed:** Phase 0, Step 8
+**Next step:** Phase 0, Step 9 (React scaffold)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 11)
 **Updated:** 2026-07-17
+
+**Error handling (Step 8):** `ExceptionHandlingMiddleware` is first in the
+pipeline — catches anything unhandled anywhere downstream, logs full details
+server-side, returns generic `500 INTERNAL_ERROR` with a `traceId` and nothing
+else — no exception type, message, or stack trace ever reaches the client.
+`Api/Common/ErrorCodeCatalog.cs` now has the full §9.2 code→HTTP-status table
+(plus `PASSWORD_CHANGE_REQUIRED` from §5.27, which §9.2's table omits);
+`ResultExtensions` uses it instead of the old auth-only switch.
+`MATERIAL_REQUEST_OVERDELIVERY` is deliberately excluded — §9.2 marks it
+`200`, a UI warning, not a `Result.Failure` case. Unknown codes default to
+`400`, not a crash — §9.2 documents the interesting cases, not literally every
+transition guard on all 26 entities.
+
+**Serilog (MASTER §2/§3), wired within this step at explicit user request**
+(it wasn't itemized as its own PROGRESS step, and I'd initially flagged rather
+than silently deciding either way — resolved: do it now, as part of Step 8,
+since it's exactly what `ExceptionHandlingMiddleware`'s logging call needed
+anyway). `builder.Host.UseSerilog(...)` reads the `Serilog` appsettings
+section (`MinimumLevel`/`WriteTo`/`Enrich`, `appsettings.json`), console sink,
+`UseSerilogRequestLogging()` added for structured per-request logs. Code
+against `ILogger<T>` is unchanged — Serilog is a provider swap, not an API
+change, so `ExceptionHandlingMiddleware` didn't need editing. Column-level PII
+exclusion (`Serilog.Destructure.ByTransforming`, §11.6) has nothing to attach
+to yet — the PII-bearing DTOs (`Worker.BirthDate`/`DocumentType`/etc.) don't
+exist until Phase 1; noting this so it isn't forgotten once they do. Confirmed
+live, not just by reading config: running the app shows Serilog's own
+`[HH:mm:ss ERR] ...` console format on EF Core's internal connection-failure
+log, proving `UseSerilog()` actually replaced the default provider.
+
+**Found and fixed a reconciliation gap** while building the catalog:
+`WorkOrder.SubmitForReview`'s payout-share guard (written back in the Domain
+block, before this catalog existed) used `WORK_ORDER_PAYOUT_SHARE_INCOMPLETE`,
+which isn't in §9.2 — the spec's code for "Σ SharePercent ≠ 100" is
+`WORK_ORDER_SHARES_INVALID`. Renamed to match.
+
+Verified with a throwaway TestServer check: an endpoint that throws with a
+secret string in the exception message returns 500 with `INTERNAL_ERROR` and
+a `traceId`, and the response body contains neither the secret, the exception
+type name, nor a stack trace; a non-throwing endpoint is unaffected; catalog
+spot-checks (401/404/409/429/403/default-400) all match §9.2.
 
 **Health/CORS/security headers (Step 7):** `/health` = liveness only
 (`Predicate = _ => false`, no dependency checks run — just "is the process
@@ -105,7 +145,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [x] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
 - [x] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
 - [x] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
-- [ ] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
+- [x] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
 - [ ] Step 9 [FE] — React каркас (Vite/TS), protected routes по роли, страница логина, экран принудительной смены пароля, Axios + JWT-интерцептор → MASTER §13.1
 - [ ] Step 10 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
 - [ ] Step 11 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
