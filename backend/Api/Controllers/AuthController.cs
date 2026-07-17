@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Api.Common;
 using Api.Contracts.Auth;
 using Application.Auth;
@@ -34,6 +35,15 @@ public sealed class AuthController(ISender sender) : ControllerBase
     public async Task<IActionResult> Logout(RefreshTokenRequest request, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new LogoutCommand(request.RefreshToken), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPut("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await sender.Send(new ChangePasswordCommand(userId, request.CurrentPassword, request.NewPassword), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }

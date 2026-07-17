@@ -22,6 +22,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> jwtOptions) : IJwtToken
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(CurrentUserService.CompanyIdClaimType, companyId.ToString()),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim(CurrentUserService.ForcePasswordChangeClaimType, user.ForcePasswordChange ? "true" : "false"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

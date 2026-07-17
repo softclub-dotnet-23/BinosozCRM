@@ -1,6 +1,8 @@
 using System.Text;
+using Api.Middleware;
 using Application;
 using Application.Common.Options;
+using Application.Seed;
 using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -42,10 +44,14 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await dbContext.Database.MigrateAsync();
+
+    var seedDataService = scope.ServiceProvider.GetRequiredService<SeedDataService>();
+    await seedDataService.SeedAsync(CancellationToken.None);
 }
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<ForcePasswordChangeMiddleware>();
 
 app.MapControllers();
 

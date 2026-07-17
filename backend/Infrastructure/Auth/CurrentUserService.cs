@@ -8,6 +8,7 @@ namespace Infrastructure.Auth;
 public sealed class CurrentUserService(IHttpContextAccessor httpContextAccessor) : ICurrentUserService
 {
     public const string CompanyIdClaimType = "company_id";
+    public const string ForcePasswordChangeClaimType = "force_password_change";
 
     private ClaimsPrincipal? User => httpContextAccessor.HttpContext?.User;
 

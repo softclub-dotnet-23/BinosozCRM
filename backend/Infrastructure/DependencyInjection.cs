@@ -1,6 +1,7 @@
 using System.Text;
 using Application.Common.Interfaces;
 using Application.Common.Options;
+using Application.Seed;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Interceptors;
@@ -39,6 +40,9 @@ public static class DependencyInjection
 
         services.AddScoped<IPasswordHasher, Argon2PasswordHasher>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
+        services.AddScoped<SeedDataService>();
 
         return services;
     }

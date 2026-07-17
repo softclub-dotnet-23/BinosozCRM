@@ -5,11 +5,27 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 4
-**Next step:** Phase 0, Step 5
+**Last completed:** Phase 0, Step 5
+**Next step:** Phase 0, Step 6
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 11)
 **Updated:** 2026-07-17
+
+**Seed + forced password change (Step 5):** `SeedDataService` runs after
+`MigrateAsync`, before the host serves requests — creates the one `Company`
+row and 3 seed `Owner`s from `Seed` config (`appsettings.json`, non-secret
+placeholders) + `SEED_OWNER_{1,2,3}_PASSWORD` env vars (flat naming per §5.27,
+deliberately not nested under `Seed`). Idempotent: re-running is a silent
+no-op once any `Owner` exists. `PUT /auth/change-password` clears
+`ForcePasswordChange`; `ForcePasswordChangeMiddleware` rejects every other
+authenticated request with `403 PASSWORD_CHANGE_REQUIRED` while it's set,
+reading a `force_password_change` JWT claim (not a DB read per request) —
+`change-password` and `logout` are the only exempt paths. Verified end-to-end
+with a throwaway check: seed run twice creates exactly 1 company / 3 owners
+both times, each seeded owner's token carries `force_password_change=true`,
+wrong current password is rejected, correct change clears the flag and a
+freshly issued token afterward carries `force_password_change=false`, old
+password stops working.
 
 **Domain layer (Ahmad, `docs/TEAM_SPLIT_Backend_2people.md` §2.0/§3):** all 26
 entities + all EF configurations written ahead of the sequential steps above,
@@ -49,7 +65,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [x] Step 2 [BE] — `Company` (первая сущность — от неё зависят все `CompanyId`), настройки: `PieceworkDistributionMode`, `LatenessGraceMinutes`, `LatenessNotifyThresholdMinutes`, `PayrollPeriodType` → MASTER §5.1
 - [x] Step 3 [BE] — `User` (+ `ForcePasswordChange`), роли, global query filters (soft-delete + `CompanyId`) через reflection → MASTER §5.2, §11.5
 - [x] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
-- [ ] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
+- [x] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
 - [ ] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
 - [ ] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
 - [ ] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
