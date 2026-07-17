@@ -5,11 +5,31 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 6
-**Next step:** Phase 0, Step 7
+**Last completed:** Phase 0, Step 7
+**Next step:** Phase 0, Step 8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 11)
 **Updated:** 2026-07-17
+
+**Health/CORS/security headers (Step 7):** `/health` = liveness only
+(`Predicate = _ => false`, no dependency checks run — just "is the process
+alive"); `/health/ready` runs everything currently registered, which today is
+just `AddDbContextCheck<ApplicationDbContext>()`, so it's 503 exactly when
+Postgres is unreachable. `SecurityHeadersMiddleware` sets
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`,
+`Content-Security-Policy: default-src 'self'; frame-ancestors 'none'` on every
+response; `UseHsts()` (non-Development only) + `UseHttpsRedirection()` cover
+the rest of §11.3. CORS is an explicit allow-list from `Cors:AllowedOrigins`
+config (empty by default, not a wildcard) — `appsettings.json` has a
+`CHANGE_ME` placeholder for the real panel origin, `appsettings.Development.json`
+allows `http://localhost:5173` (Vite dev server) so local frontend dev isn't
+blocked. Verified with a throwaway TestServer check standing in a fake failing
+health check for Postgres: `/health` stays 200 while it's failing,
+`/health/ready` correctly returns 503; an allowed `Origin` gets
+`Access-Control-Allow-Origin` echoed back, a disallowed one gets no CORS
+header at all (browser blocks it client-side); all four security headers
+present on a plain response.
 
 **Rate limiting (Step 6):** `/auth/login` — 5 attempts / 15 minutes, partitioned
 by IP+phone (not IP alone — MASTER §11.4 wants each phone number to have its
@@ -84,7 +104,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [x] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
 - [x] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
 - [x] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
-- [ ] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
+- [x] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
 - [ ] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
 - [ ] Step 9 [FE] — React каркас (Vite/TS), protected routes по роли, страница логина, экран принудительной смены пароля, Axios + JWT-интерцептор → MASTER §13.1
 - [ ] Step 10 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8

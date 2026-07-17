@@ -8,7 +8,7 @@ using Application.Seed;
 using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Threading.RateLimiting;
@@ -68,6 +68,24 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
+// MASTER §11.3: allow-list exactly the panel's origin(s), never AllowAnyOrigin
+// together with credentials. No fallback default — an empty/missing config
+// means an empty allow-list, not "allow everything".
+const string corsPolicyName = "panel";
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicyName, policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
+});
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>();
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -79,6 +97,16 @@ using (var scope = app.Services.CreateScope())
     await seedDataService.SeedAsync(CancellationToken.None);
 }
 
+if (!app.Environment.IsDevelopment())
+    app.UseHsts();
+
+app.UseHttpsRedirection();
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
+app.UseRouting();
+
+app.UseCors(corsPolicyName);
+
 app.UseMiddleware<LoginRateLimitKeyMiddleware>();
 
 // UseRateLimiter() must come after UseRouting() — endpoint-specific policies
@@ -86,7 +114,6 @@ app.UseMiddleware<LoginRateLimitKeyMiddleware>();
 // metadata, which doesn't exist yet if the rate limiter runs first. Confirmed
 // with a throwaway TestServer check: with the wrong order, the "auth-login"
 // policy silently never applied and nothing was ever rate-limited.
-app.UseRouting();
 app.UseRateLimiter();
 
 app.UseAuthentication();
@@ -94,5 +121,14 @@ app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 
 app.MapControllers();
+
+// /health = liveness only, no dependency checks (Predicate excludes all
+// registered checks) — orchestrator just wants "is the process alive".
+// /health/ready runs everything, i.e. the DB check, for "can it serve traffic".
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => false
+});
+app.MapHealthChecks("/health/ready");
 
 app.Run();
