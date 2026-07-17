@@ -1,6 +1,13 @@
-import type { BudgetLineStatus, EstimateStatus } from "../types";
+import type { AssignmentStatus, BudgetLineStatus, EstimateStatus } from "../types";
 
 type Tone = "red" | "orange" | "blue" | "green" | "purple";
+
+export const ASSIGNMENT_STATUS_CONFIG: Record<AssignmentStatus, { label: string; tone: Tone }> = {
+  active: { label: "В работе", tone: "orange" },
+  completed: { label: "Завершено", tone: "green" },
+  cancelled: { label: "Отменено", tone: "red" },
+  overdue: { label: "Просрочено", tone: "red" },
+};
 
 export const ESTIMATE_STATUS_CONFIG: Record<EstimateStatus, { label: string; tone: Tone }> = {
   draft: { label: "Черновик", tone: "blue" },

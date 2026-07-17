@@ -175,3 +175,32 @@ export interface BudgetOperation {
   amount: number | null;
   responsible: string;
 }
+
+export interface Brigade {
+  id: string;
+  name: string;
+  specialization: string;
+  foremanName: string;
+  membersCount: number;
+}
+
+export type AssignmentStatus = "active" | "completed" | "cancelled" | "overdue";
+
+export interface Assignment {
+  id: string;
+  number: number;
+  objectId: string;
+  objectName: string;
+  objectType: ObjectType;
+  imageUrl: string;
+  workTitle: string;
+  brigadeId: string;
+  brigadeName: string;
+  foremanName: string;
+  foremanRole: string;
+  periodStart: string;
+  periodEnd: string;
+  amount: number;
+  status: AssignmentStatus;
+  progress: number;
+}
