@@ -5,8 +5,8 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 2 (+ full Domain layer, see note below)
-**Next step:** Phase 0, Step 3 (entity done — still needs roles + global query filters)
+**Last completed:** Phase 0, Step 3
+**Next step:** Phase 0, Step 4
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 11)
 **Updated:** 2026-07-17
@@ -14,9 +14,13 @@
 **Domain layer (Ahmad, `docs/TEAM_SPLIT_Backend_2people.md` §2.0/§3):** all 26
 entities + all EF configurations written ahead of the sequential steps above,
 Zone B first, so Shahrom isn't blocked on entity availability once he starts.
-Company (Step 2) is fully satisfied as a side effect — entity + settings fields
-match MASTER §5.1 exactly. Global query filters (`CompanyId` + soft-delete via
-reflection) are **not** wired yet — that's still Step 3.
+Company (Step 2) was fully satisfied as a side effect. Global query filters
+(`CompanyId` + soft-delete, via reflection in `ApplicationDbContext.OnModelCreating`)
+are now wired (Step 3) — verified with a throwaway EF InMemory check (two
+`ApplicationDbContext` instances, two companies, no leakage; unauthenticated
+access returns 0 rows, fails closed not open). Role-based **authorization**
+(policies, `[Authorize]`) is still pending — needs JWT (Step 4) to have claims
+to authorize on; `User.Role` itself already exists from the Domain block.
 
 ---
 
@@ -25,7 +29,7 @@ reflection) are **not** wired yet — that's still Step 3.
 
 - [x] Step 1 [BE] — solution (Domain/Application/Infrastructure/WebApi/TelegramBot), MediatR + FluentValidation + `Result<T>`, авто-миграция при старте, zero-warnings → MASTER §2, §3
 - [x] Step 2 [BE] — `Company` (первая сущность — от неё зависят все `CompanyId`), настройки: `PieceworkDistributionMode`, `LatenessGraceMinutes`, `LatenessNotifyThresholdMinutes`, `PayrollPeriodType` → MASTER §5.1
-- [ ] Step 3 [BE] — `User` (+ `ForcePasswordChange`), роли, global query filters (soft-delete + `CompanyId`) через reflection → MASTER §5.2, §11.5
+- [x] Step 3 [BE] — `User` (+ `ForcePasswordChange`), роли, global query filters (soft-delete + `CompanyId`) через reflection → MASTER §5.2, §11.5
 - [ ] Step 4 [BE] — Argon2id, JWT (access 15 мин), `RefreshToken` с **ротацией и обнаружением повторного использования** → MASTER §5.3, §11.1
 - [ ] Step 5 [BE] — **`SeedData`**: `Company` + 3 × `Owner` из конфига/ENV, идемпотентно, `ForcePasswordChange = true`. `PUT /auth/change-password` + middleware, блокирующий остальные запросы, пока флаг не снят → MASTER §5.27
 - [ ] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
