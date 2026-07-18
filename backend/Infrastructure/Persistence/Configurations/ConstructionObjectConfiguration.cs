@@ -21,5 +21,8 @@ public sealed class ConstructionObjectConfiguration : IEntityTypeConfiguration<C
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => new { x.CompanyId, x.Status });
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
     }
 }

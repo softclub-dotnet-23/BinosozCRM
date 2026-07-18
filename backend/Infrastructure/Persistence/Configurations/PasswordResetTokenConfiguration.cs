@@ -18,5 +18,8 @@ public sealed class PasswordResetTokenConfiguration : IEntityTypeConfiguration<P
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => x.TokenHash).IsUnique();
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

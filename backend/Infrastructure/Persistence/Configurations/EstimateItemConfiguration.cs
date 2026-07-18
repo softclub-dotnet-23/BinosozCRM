@@ -18,5 +18,8 @@ public sealed class EstimateItemConfiguration : IEntityTypeConfiguration<Estimat
         builder.Property(x => x.PlannedUnitPrice).HasColumnType("decimal(18,2)");
         builder.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ConstructionObject>().WithMany().HasForeignKey(x => x.ObjectId).OnDelete(DeleteBehavior.Restrict);
     }
 }

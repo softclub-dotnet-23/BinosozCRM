@@ -14,5 +14,8 @@ public sealed class BrigadeConfiguration : IEntityTypeConfiguration<Brigade>
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.BrigadirUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

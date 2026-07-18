@@ -28,5 +28,8 @@ public sealed class PayrollEntryConfiguration : IEntityTypeConfiguration<Payroll
         builder.HasIndex(x => new { x.WorkerId, x.PeriodStart, x.PeriodEnd }).IsUnique();
 
         builder.Property<uint>("xmin").HasColumnName("xmin").HasColumnType("xid").IsRowVersion();
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Worker>().WithMany().HasForeignKey(x => x.WorkerId).OnDelete(DeleteBehavior.Restrict);
     }
 }

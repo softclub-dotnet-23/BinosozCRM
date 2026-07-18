@@ -18,5 +18,10 @@ public sealed class AdminAuditLogConfiguration : IEntityTypeConfiguration<AdminA
 
         builder.HasIndex(x => new { x.CompanyId, x.At });
         builder.HasIndex(x => new { x.ActorUserId, x.At });
+
+        // TargetEntityId is deliberately NOT an FK — polymorphic, discriminated by
+        // TargetEntityType, target table varies per row.
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

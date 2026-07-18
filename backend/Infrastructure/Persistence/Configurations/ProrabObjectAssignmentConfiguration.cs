@@ -16,5 +16,10 @@ public sealed class ProrabObjectAssignmentConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => new { x.ProrabUserId, x.ObjectId }).IsUnique();
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ProrabUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ConstructionObject>().WithMany().HasForeignKey(x => x.ObjectId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.AssignedByUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

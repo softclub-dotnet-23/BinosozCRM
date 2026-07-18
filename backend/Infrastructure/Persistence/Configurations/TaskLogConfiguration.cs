@@ -17,5 +17,10 @@ public sealed class TaskLogConfiguration : IEntityTypeConfiguration<TaskLog>
         builder.Property(x => x.ChangedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => new { x.EntityType, x.EntityId, x.ChangedAt });
+
+        // EntityId is deliberately NOT an FK — polymorphic, discriminated by
+        // EntityType, target table varies per row.
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ChangedByUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

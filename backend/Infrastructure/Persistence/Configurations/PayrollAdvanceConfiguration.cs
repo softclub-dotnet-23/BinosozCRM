@@ -18,5 +18,10 @@ public sealed class PayrollAdvanceConfiguration : IEntityTypeConfiguration<Payro
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => new { x.WorkerId, x.SettledInPayrollEntryId });
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Worker>().WithMany().HasForeignKey(x => x.WorkerId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.IssuedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<PayrollEntry>().WithMany().HasForeignKey(x => x.SettledInPayrollEntryId).OnDelete(DeleteBehavior.Restrict);
     }
 }
