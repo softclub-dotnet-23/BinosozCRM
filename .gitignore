@@ -1,4 +1,18 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
 
-# .NET generated files
-**/bin/
-**/obj/
+# Node / frontend
+node_modules/
+dist/
+.env
+.env.local
+
+# IDE
+.idea/
+*.swp
+
+# OS
+.DS_Store

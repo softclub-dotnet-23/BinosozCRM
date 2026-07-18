@@ -4,15 +4,16 @@
 
 - Use plan mode for any change touching more than one project, or anything under
   `backend/Infrastructure/Migrations/`.
-- Full command set lives in `.claude/skills/` — type `/` to see them.
+- Full command set lives in `.claude/skills/` — type `/` to see them. 
 - The technical backstop for the git rule in AGENTS.md is `.claude/settings.json`
   (`permissions.deny`). Don't rely on the written rule alone, and don't weaken
   those entries.
 - Auto memory is on. If you correct the same mistake twice in a session, it
   belongs in a rule here, in AGENTS.md, or in the relevant skill.
 - Two surfaces share one backend: when a change touches the API contract, check
-  callers in the Telegram bot project before assuming nothing else needs
-  updating.
+  callers in the Telegram bot project — Owner/Prorab/Accountant call the API
+  directly (no web panel, see MASTER §0), so there's no frontend project to
+  check alongside it.
 - `docs/MASTER.md` is 1000 lines. Read the sections the current step names, not
   the whole file — the step in `docs/PROGRESS.md` always says which.
 

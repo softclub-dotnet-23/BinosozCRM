@@ -3,4 +3,6 @@
   <Project Path="Application/Application.csproj" />
   <Project Path="Domain/Domain.csproj" />
   <Project Path="Infrastructure/Infrastructure.csproj" />
+  <Project Path="TelegramBot/TelegramBot.csproj" />
+  <Project Path="Tests/Api.IntegrationTests/Api.IntegrationTests.csproj" />
 </Solution>
