@@ -36,6 +36,10 @@ public sealed class CreateEstimateItemCommandHandler(IApplicationDbContext conte
         if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
             return Result.Failure<EstimateItemDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
 
+        var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+        if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId))
+            return Result.Failure<EstimateItemDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
+
         var item = EstimateItem.Create(
             currentUser.CompanyId!.Value,
             request.ObjectId,

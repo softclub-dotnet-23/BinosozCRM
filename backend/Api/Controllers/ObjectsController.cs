@@ -8,8 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Api.Controllers;
 
 // MASTER §9.4: GET,POST /objects, GET,PUT /objects/{id}, GET,POST
-// /objects/{id}/estimate-items — all Prorab+. No ProrabObjectAssignment
-// filtering on the list endpoint yet — Phase 1 Step 4's scope.
+// /objects/{id}/estimate-items — Prorab+, filtered by ProrabObjectAssignment
+// (§1.2: no assignments = sees all, one row = strict allow-list).
+// GET,POST /objects/{id}/prorabs — Owner only, overriding the controller
+// default.
 [ApiController]
 [Route("api/v1/objects")]
 [Authorize(Roles = "Owner,Prorab")]
@@ -86,6 +88,25 @@ public sealed class ObjectsController(ISender sender) : ControllerBase
         var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
 
         var result = await sender.Send(new ListEstimateItemsQuery(objectId, clampedPage, clampedPageSize), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{objectId:guid}/prorabs")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> AssignProrab(Guid objectId, AssignProrabRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new AssignProrabCommand(objectId, request.ProrabUserId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpGet("{objectId:guid}/prorabs")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> ListProrabs(Guid objectId, [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
+        var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
+
+        var result = await sender.Send(new ListObjectProrabsQuery(objectId, clampedPage, clampedPageSize), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }

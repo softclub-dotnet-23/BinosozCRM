@@ -5,13 +5,64 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 1 (Zone A)
-**Next step:** Phase 1, Step 4 [BE] Zone A — `ProrabObjectAssignment` + фильтрация
-объектов по прорабу (Steps 1-3 now done — Zone A's Step 1, Zone B's Steps 2-3;
-Steps 5/6 also Zone A/shared, Step 7 is the joint test step)
+**Last completed:** Phase 1, Step 4 (Zone A)
+**Next step:** Phase 1, Step 5 [BE] Zone A — `AdminAuditLog` + interceptor
+(Steps 1-4 now done — Zone A's 1 and 4, Zone B's 2-3; Step 6 is the shared
+masking pass, Step 7 is the joint test step)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 4 (Zone A) — `ProrabObjectAssignment` + фильтрация объектов по прорабу.**
+`Application/Objects/AssignProrabCommand.cs` + `ListObjectProrabsQuery.cs`
+(`POST,GET /objects/{id}/prorabs`, Owner only, overriding the controller's
+default `Owner,Prorab` gate) plus a new `ProrabObjectAccess` helper used by
+every object-scoped handler from Step 1: `ListConstructionObjectsQuery`
+(filters), `GetConstructionObjectQuery`, `UpdateConstructionObjectCommand`,
+`CreateEstimateItemCommand`, `ListEstimateItemsQuery` (all reject access to
+an unassigned object). One shared helper instead of duplicating the
+assignment lookup five times — a missed copy would have been exactly the
+"🔴, not a suggestion" isolation gap AGENTS.md warns about.
+
+Implements MASTER §1.2's default literally: `GetAllowedObjectIdsAsync`
+returns `null` (no restriction) for Owner, or for a Prorab with **zero**
+`ProrabObjectAssignment` rows — the "one prorab, no setup needed" case.
+Once a Prorab has even one assignment, it returns the allow-list and
+everything outside it is rejected.
+
+**Corrected my own first draft**: initially returned `OBJECT_NOT_FOUND` for
+the isolation-guard failures, reusing Step 1's genuine-not-found code. MASTER
+§9.2 already defines a dedicated code for exactly this case —
+`PRORAB_NOT_ASSIGNED_TO_OBJECT`, 404 — which existed in `ErrorCodeCatalog`
+since Step 10 but had no caller until now. Fixed before committing: `OBJECT_NOT_FOUND`
+stays for a genuinely missing/wrong-company object, `PRORAB_NOT_ASSIGNED_TO_OBJECT`
+for "exists, but not yours." Both 404 — the closed-model rule (§9's "404, not
+403, don't confirm existence") is about not distinguishing 403 vs. 404, not
+about hiding which 404 sub-reason applies, and MASTER's own dedicated code
+confirms that reading.
+
+New `PRORAB_ALREADY_ASSIGNED` (409) — the unique `(ProrabUserId, ObjectId)`
+constraint on `ProrabObjectAssignment` (§5.8) means a repeat assignment is
+checked explicitly before insert rather than left to bubble up as a raw
+DB unique-violation. No check that the assigned user actually has
+`Role == Prorab` — not a stated MASTER invariant, same call as
+`AssignBrigadirCommand` (Step 3) and `Worker.UserId` (Step 2).
+
+**`CreateConstructionObjectCommand` is deliberately NOT gated by
+assignment** — §1.2's wording is about visibility ("видит"/sees), and
+there's no existing object yet to scope a fresh `Create` against; the role
+matrix's plain "C" (no "назначенные" qualifier, unlike the R) reads the same
+way.
+
+Verified with a throwaway EF InMemory check (written, run, deleted — no
+`Directory.Packages.props`/csproj trace left): a fresh Prorab with zero
+assignments sees both test objects; after the Owner assigns them to one,
+the list narrows to exactly that one; `Get`/`CreateEstimateItem` on the
+unassigned object both return `PRORAB_NOT_ASSIGNED_TO_OBJECT`, on the
+assigned one both succeed; duplicate assignment → `PRORAB_ALREADY_ASSIGNED`;
+assigning a nonexistent user → `USER_NOT_FOUND`. Docker still unavailable
+here — suite count unchanged by this step (15 total, 5 pass, 10 need
+Docker); xUnit tests for this step are Step 7's job.
 
 **Step 1 (Zone A) — `Customer`, `ConstructionObject`, `EstimateItem`.**
 `Application/Customers/` (`CreateCustomerCommand`, `ListCustomersQuery`),
@@ -413,7 +464,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
 - [x] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
-- [ ] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
+- [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [ ] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
 - [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2

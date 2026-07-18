@@ -13,6 +13,7 @@ public interface IApplicationDbContext
     DbSet<Customer> Customers { get; }
     DbSet<ConstructionObject> ConstructionObjects { get; }
     DbSet<EstimateItem> EstimateItems { get; }
+    DbSet<ProrabObjectAssignment> ProrabObjectAssignments { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

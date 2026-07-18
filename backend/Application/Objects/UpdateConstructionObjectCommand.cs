@@ -29,7 +29,7 @@ public sealed class UpdateConstructionObjectCommandValidator : AbstractValidator
     }
 }
 
-public sealed class UpdateConstructionObjectCommandHandler(IApplicationDbContext context)
+public sealed class UpdateConstructionObjectCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     : IRequestHandler<UpdateConstructionObjectCommand, Result<ConstructionObjectDto>>
 {
     public async Task<Result<ConstructionObjectDto>> Handle(UpdateConstructionObjectCommand request, CancellationToken cancellationToken)
@@ -37,6 +37,10 @@ public sealed class UpdateConstructionObjectCommandHandler(IApplicationDbContext
         var obj = await context.ConstructionObjects.FirstOrDefaultAsync(o => o.Id == request.Id, cancellationToken);
         if (obj is null)
             return Result.Failure<ConstructionObjectDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
+
+        var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+        if (allowedObjectIds is not null && !allowedObjectIds.Contains(obj.Id))
+            return Result.Failure<ConstructionObjectDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         obj.Update(request.Name, request.Address, request.StartDate, request.PlannedEndDate, request.ActualEndDate, request.Budget);
 

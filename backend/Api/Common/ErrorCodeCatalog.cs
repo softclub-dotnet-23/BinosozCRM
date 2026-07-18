@@ -14,6 +14,12 @@ namespace Api.Common;
 // 400/403, per MASTER §11.5 rule 2. Not in §9.2's table either, same as
 // PASSWORD_CHANGE_REQUIRED above.
 //
+// PRORAB_ALREADY_ASSIGNED (Phase 1 Step 4): not in §9.2's table — the unique
+// (ProrabUserId, ObjectId) constraint on ProrabObjectAssignment (§5.8) means
+// a repeat assignment would otherwise be a raw DB unique-violation; surfaced
+// as a clean 409, same family as CONCURRENCY_CONFLICT (an existing-state
+// conflict, not a validation failure or a missing row).
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -47,6 +53,7 @@ public static class ErrorCodeCatalog
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
         ["PRORAB_NOT_ASSIGNED_TO_OBJECT"] = StatusCodes.Status404NotFound,
+        ["PRORAB_ALREADY_ASSIGNED"] = StatusCodes.Status409Conflict,
         ["CONCURRENCY_CONFLICT"] = StatusCodes.Status409Conflict,
         ["TELEGRAM_LINK_CODE_EXPIRED"] = StatusCodes.Status400BadRequest,
         ["TELEGRAM_LINK_CODE_INVALID"] = StatusCodes.Status400BadRequest,
