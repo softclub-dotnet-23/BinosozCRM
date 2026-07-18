@@ -4,13 +4,104 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 10
-**Next step:** Phase 0, Step 11 [BOT] отложен (см. §15) — переходим к Phase 1,
-Step 1 [BE] `Customer`/`ConstructionObject`/`EstimateItem`
+**Phase:** 1 — Объекты и бригады
+**Last completed:** Phase 1, Step 3 (Zone B)
+**Next step:** Phase 1, Step 4 [BE] Zone A — `ProrabObjectAssignment` + фильтрация
+объектов по прорабу (not a Zone B step — Zone B's own Phase 1 work, Steps 2-3,
+is complete; Steps 1/4/5/6 belong to Zone A or the shared masking pass, Step 7
+is the joint test step)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 14 tests written (5 pass locally, 9 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 12 tests written (5 pass locally, 7 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 3 (Zone B) — `Brigade`, назначение бригадира.**
+`Application/Brigades/` (`CreateBrigadeCommand`, `ListBrigadesQuery`,
+`AssignBrigadirCommand`), `Api/Controllers/BrigadesController.cs`:
+`POST,GET /brigades` (Owner/Prorab), `PUT /brigades/{id}/brigadir` (Owner
+only). `AssignBrigadirCommand` allows `UserId: null` to clear an assignment —
+`Brigade.AssignBrigadir(Guid?)` was already written to support it. No check
+that the target user has `Role == Brigadir` — not a stated MASTER invariant,
+would have been inventing a rule (same call as `Worker.UserId` in Step 2). No
+`AdminAuditLog` entry written for the assignment yet — that's Zone A's Phase
+1 Step 5, not built yet; flagged so `BrigadirAssigned` isn't forgotten once
+it lands.
+
+**Resolved a self-contradiction in MASTER.md, decided by the user, not
+picked silently:** who can call `PUT /brigades/{id}/brigadir`? §9.4's
+endpoint table says **Owner** only; §13's Phase 1 DoD line ("прораб
+создаёт объект, бригаду, **назначает бригадира**...") explicitly describes
+**Prorab** doing it; §12's role matrix gives Prorab general `CRU` on
+`Brigade` with no stated carve-out for `BrigadirUserId` specifically (unlike
+`Worker.PayRate`, which *is* explicitly carved out). **Decided: Owner only**,
+per §9.4 literally — implemented that way. Worth Ahmad/the user squaring away
+in MASTER.md itself at some point so this doesn't need re-deciding.
+
+Verified with a throwaway EF InMemory check (7/7 passed, then deleted, no
+`Directory.Packages.props`/csproj trace left): create succeeds; assign and
+clear-assignment both work; brigade-not-found, user-not-found, and
+cross-company-brigade (global `CompanyId` filter hides it, doesn't leak it)
+all return the expected 404s; pagination works. No new error codes needed —
+`BRIGADE_NOT_FOUND`/`USER_NOT_FOUND` already existed from Step 2. Real xUnit
+tests for this step are Step 7's job, not written now.
+
+**Step 2 (Zone B) — `Worker`: 18+ on `HireDate`, `ShiftStartTime`, PII fields.**
+Application/Api layer only (`backend/Application/Workers/`,
+`backend/Api/Controllers/WorkersController.cs`) — `CreateWorkerCommand`,
+`ListBrigadeWorkersQuery` (first paginated endpoint in the project, §9.3 shape:
+`items/page/pageSize/totalCount`, page size clamped to max 100),
+`TerminateWorkerCommand`. Endpoints gated `[Authorize(Roles = "Owner,Prorab")]`
+per §9.4 "Prorab+"; `CompanyId` isolation is the automatic EF global filter,
+no manual `BrigadeId` scoping needed since Brigadir has no access to this
+endpoint yet (not enumerated in §9.4). `IApplicationDbContext` gained
+`Brigades`/`Workers` `DbSet`s (Ahmad's `ApplicationDbContext` already exposed
+them; the interface hadn't caught up). Full role-based field visibility
+(hiding `PayRate` from Prorab, masking `Document*`) is deliberately **not**
+done here — that's Step 6's explicit scope ("маскирование Document* по ролям
+— разные Response DTO"), and this step's own checklist line only asks for the
+fields to exist and the age guard to hold, not the masking pass.
+
+**Found and flagged for Ahmad, not fixed (Domain/Persistence are his files):**
+1. `Worker.Create()` throws `ArgumentException` for the 18+ guard instead of
+   returning `Result<Worker>` — the only factory in Domain that does this
+   (`WorkOrder`/`IndividualTask`/`MaterialRequest` all return `Result` from
+   every guarded method). Without a workaround, hitting this guard would
+   bubble as an unhandled exception → generic `500 INTERNAL_ERROR`, not the
+   hard `400 WORKER_UNDERAGE` §8.3 requires (and which was already sitting in
+   `ErrorCodeCatalog.cs`, unreachable). Stopgapped in
+   `CreateWorkerCommandHandler` with a narrow
+   `catch (ArgumentException ex) when (ex.ParamName == "birthDate")` mapping
+   to `Result.Failure(WORKER_UNDERAGE)`. Recommend Ahmad align `Worker.Create`
+   to the `Result` pattern when he next touches that file.
+2. The **zero-FK-constraints gap flagged at the end of Step 10** is still
+   open — no dedicated step was ever inserted for it, and this step is the
+   first to actually exercise it: `Worker.BrigadeId`/`Worker.UserId` are
+   exactly the "real cross-entity writes" that note warned about. Mitigated
+   here at the Application layer only — `CreateWorkerCommandHandler` checks
+   `Brigades`/`Users` existence before insert (→ `BRIGADE_NOT_FOUND` /
+   `USER_NOT_FOUND`, both new codes, same "404, not in §9.2's table, real
+   anyway" pattern as `PASSWORD_CHANGE_REQUIRED`) — but there's still no
+   DB-level referential integrity. Needs a dedicated step (Ahmad: entities +
+   configs + migration) before Phase 2 adds more of these.
+
+Verified with a throwaway EF InMemory check (written, run — 6/6 passed,
+then deleted, no `Directory.Packages.props`/csproj trace left): create
+succeeds for a valid brigade; underage returns `WORKER_UNDERAGE` as a
+`Result`, confirmed *not* an unhandled exception; brigade-not-found and
+cross-company-brigade (another company's `Brigade.Id` guessed) both return
+`BRIGADE_NOT_FOUND` — confirming the global `CompanyId` filter actually hides
+the row rather than leaking it; terminate flips `IsActive`/sets
+`TerminationDate`; list pagination scopes correctly to one brigade and
+excludes another's workers. Docker unavailable on this machine (see Step 10)
+— no Postgres-backed run possible here; xUnit tests for this step itself are
+Step 7's job, not written now, per "one task at a time".
+
+**Test count corrected**: PROGRESS.md previously said "14 tests" for Step 10;
+running the actual suite now shows 12 (5 pass without Docker, 7 fail with
+`DockerUnavailableException` — `LoginCommandHandlerTests` ×3,
+`RefreshTokenCommandHandlerTests` ×3, `SeedDataServiceTests` ×1). The "14"
+was a stale estimate in that note, not a regression — this step touched none
+of those test files. Correcting the count here since it's the first time
+since Step 10 the suite was actually re-run.
 
 **Step 10 — auth tests, and a migration gap found along the way.** Writing
 DB-backed tests surfaced that **no EF Core migration had ever been created**
@@ -264,8 +355,8 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** без объекта и бригады нечего назначать.
 
 - [ ] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
-- [ ] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
-- [ ] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
+- [x] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
+- [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [ ] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [ ] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
