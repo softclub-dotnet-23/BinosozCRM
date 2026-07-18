@@ -17,5 +17,16 @@
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
+
+    <!-- Test-only (Api.IntegrationTests, MASTER §11.1/§5.27, Phase 0 Step 10) -->
+    <!-- FluentAssertions pinned to 7.2.2, the last Apache-2.0 release before the
+         v8 Xceed commercial license — avoids taking on a licensing question that
+         isn't a code decision. -->
+    <PackageVersion Include="FluentAssertions" Version="7.2.2" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
   </ItemGroup>
 </Project>

@@ -5,11 +5,87 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 9
-**Next step:** Phase 0, Step 10 (тесты логина/refresh/seed)
+**Last completed:** Phase 0, Step 10
+**Next step:** Phase 0, Step 11 — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** — (Step 10)
+**Tests:** `Tests/Api.IntegrationTests` — 14 tests written (5 pass locally, 9 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 10 — auth tests, and a migration gap found along the way.** Writing
+DB-backed tests surfaced that **no EF Core migration had ever been created**
+in this repo — `backend/Infrastructure/Migrations/` didn't exist, and no
+PROGRESS.md step across 1–9 ever itemized one. `Program.cs`'s
+`Database.MigrateAsync()` at startup was a silent no-op against a real
+Postgres — `users`/`refresh_tokens`/etc. never existed as tables. Fixed as a
+plan-mode prerequisite (CLAUDE.md requires plan mode for anything touching
+`Infrastructure/Migrations/`): added a **local `dotnet-ef` tool manifest**
+(`backend/.config/dotnet-tools.json`, pinned to 10.0.10 — matches the
+project's actual EF Core version; the previously-global 9.0.17 install was
+a version mismatch and the global-update command was declined, so this is
+scoped to the repo instead) and generated `InitialCreate` from the existing
+Domain + `Infrastructure/Persistence/Configurations/*` (complete since
+`c21b842`). Spot-checked: `decimal` columns all render as the `numeric(p,s)`
+MASTER §5 specifies (`numeric(18,2)` money, `numeric(18,3)` quantities,
+`numeric(5,2)` `SharePercent`, no EF-default guesses), `TelegramUpdateLog
+.UpdateId` has its unique index (Rule 4), no `CompanyId`/soft-delete filter
+artifacts leaked into the schema (query-time only, as expected).
+
+**Found and deliberately did not fix in this step:** reviewing the
+generated migration showed **zero `AddForeignKey`/`table.ForeignKey` calls
+across all 26 entities** — none of the `Infrastructure/Persistence/
+Configurations/*.cs` files configure a relationship (`HasOne`/`WithMany`/
+`HasForeignKey`), so every FK-shaped column (`WorkOrder.ObjectId`,
+`Brigade.BrigadirUserId`, etc.) is a bare `Guid`/`Guid?` with indexes but no
+DB-level referential integrity. Predates this session (Domain layer from
+`c21b842`). Flagged to the user rather than silently fixed or silently
+ignored — adding relationships to all 26 entities is a separate, much larger
+task than Step 10's scope, and would mean regenerating `InitialCreate`
+again. **Needs its own step before Phase 1 adds real cross-entity writes.**
+
+**Tests written** (`backend/Tests/Api.IntegrationTests`), covering exactly
+Step 10's checklist:
+- `ForcePasswordChangeMiddlewareTests` — pure unit test (`DefaultHttpContext`
+  + a stubbed `next`), no DB. Confirms 403 `PASSWORD_CHANGE_REQUIRED` on any
+  path except `/auth/change-password`/`/auth/logout` when the claim is set,
+  pass-through otherwise. Runs and passes locally without Docker.
+- `LoginCommandHandlerTests` — success (persists a *hashed*, not plaintext,
+  refresh token), wrong password, deactivated account — same
+  `AUTH_INVALID_CREDENTIALS` for wrong-password and unknown-phone, confirming
+  the handler's no-enumeration comment is actually true.
+- `RefreshTokenCommandHandlerTests` — rotation (old token revoked +
+  `ReplacedByTokenId` set), reuse-of-a-revoked-token (revokes the *whole*
+  active chain, not just the reused token), unknown token.
+- `SeedDataServiceTests` — one test, deliberately: `SeedDataService` gates
+  owner-creation on "does *any* Owner exist in the DB?" (not per-company), so
+  two separate `[Fact]`s calling `SeedAsync` with different options would
+  race on that global gate depending on xUnit's run order. First-run-creates
+  and second-run-is-a-no-op are asserted together against the same options
+  in one test to avoid that.
+- Login/Refresh handler tests deliberately use `Role.Prorab` for their test
+  users, not `Owner` — they share one Postgres container/database (via
+  `ICollectionFixture`) with `SeedDataServiceTests`, and an `Owner` created
+  there would trip that same global gate and break the seed test's
+  assumptions.
+
+**This machine has no Docker** (`docker` not found) — the 9
+Testcontainers-backed tests (Login/Refresh/Seed) could not actually be
+executed here, only compiled. Verified real execution isn't silently
+skipped: running them locally fails loudly with a Docker-daemon-unreachable
+stack trace, not a false pass. `ForcePasswordChangeMiddlewareTests` (no
+Docker needed) was run locally and passes — 5/5. The `.github/workflows/
+backend-ci.yml` `ubuntu-latest` runner has Docker preinstalled, so the
+Testcontainers tests will get their first real execution there, once pushed
+(push stays human-only per AGENTS.md).
+
+Package notes: `FluentAssertions` pinned to **7.2.2**, not the latest
+(8.10.0) — v8 introduced a commercial Xceed license above a revenue/team-size
+threshold; 7.x is the last Apache-2.0 release. Decided with the user rather
+than picked silently, since licensing cost isn't a code decision.
+`Microsoft.AspNetCore.Mvc.Testing` was added then removed — started toward a
+`WebApplicationFactory`-based approach, switched to direct handler +
+real-`ApplicationDbContext` tests instead (Step 10's five scenarios are
+Application-layer behavior, not HTTP-pipeline behavior — no JWT-bearer/
+TestServer wiring needed).
 
 **CI (Step 9):** `.github/workflows/backend-ci.yml` — restore → build (Release)
 → test → `dotnet list package --vulnerable`. Zero-warnings не проверяется
@@ -180,7 +256,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
 - [x] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
 - [x] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
-- [ ] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
+- [x] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
 - [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV → MASTER §10.0
 
 ## Phase 1 — Объекты и бригады
@@ -259,7 +335,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 ## Открытые вопросы (MASTER §17) — НЕ решать самому
 
-Если шаг упирается в один из них — реализуй дефолт, оставь настраиваемым, отметь здесь:
+Если шаг упирается в один из них  — реализуй дефолт, оставь настраиваемым, отметь здесь:
 
 - [ ] №6 Переработка — вне MVP (нет `ShiftEndTime` и нормы часов). Решить после Phase 3.
 - [ ] №8 SMS-провайдер для сброса пароля — пока Telegram + ручной сброс через Owner (по API, панели нет).
