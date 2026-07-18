@@ -20,6 +20,13 @@ namespace Api.Common;
 // as a clean 409, same family as CONCURRENCY_CONFLICT (an existing-state
 // conflict, not a validation failure or a missing row).
 //
+// WORK_ORDER_NOT_IN_PROGRESS / PHOTO_TOO_LARGE / PHOTO_INVALID_TYPE (Phase 2
+// Step 4): not in §9.2's table either. The first is §7.1's "ReportedQty
+// принимается только при InProgress" guard — not a status transition itself
+// (progress reports don't change WorkOrder.Status), so it doesn't reuse
+// WORK_ORDER_INVALID_TRANSITION. The other two enforce §11.9's photo rules
+// (size limit, allow-list MIME) at the Application boundary.
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -47,6 +54,9 @@ public static class ErrorCodeCatalog
         ["WORK_ORDER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_SHARES_INVALID"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NO_PROGRESS"] = StatusCodes.Status400BadRequest,
+        ["WORK_ORDER_NOT_IN_PROGRESS"] = StatusCodes.Status400BadRequest,
+        ["PHOTO_TOO_LARGE"] = StatusCodes.Status400BadRequest,
+        ["PHOTO_INVALID_TYPE"] = StatusCodes.Status400BadRequest,
         ["INDIVIDUAL_TASK_WRONG_BRIGADE"] = StatusCodes.Status400BadRequest,
         ["INDIVIDUAL_TASK_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["INDIVIDUAL_TASK_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,

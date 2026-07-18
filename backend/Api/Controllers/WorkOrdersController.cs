@@ -116,4 +116,19 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetWorkOrderLogQuery(workOrderId, clampedPage, clampedPageSize), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpPost("{workOrderId:guid}/progress")]
+    [Authorize(Roles = "Brigadir")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SubmitProgress(
+        Guid workOrderId, [FromForm] SubmitWorkOrderProgressRequest request, CancellationToken cancellationToken)
+    {
+        var photos = (request.Photos ?? [])
+            .Select(file => new PhotoUpload(file.OpenReadStream(), file.ContentType, file.Length))
+            .ToList();
+
+        var command = new SubmitWorkOrderProgressCommand(workOrderId, request.ReportedQty, request.Comment, photos);
+        var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

@@ -5,16 +5,52 @@
 
 ## Current Status
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 3 (Zone A) — `TaskLog` в той же
-транзакции, что переход
-**Next step:** Phase 2, Step 4 [BE] Zone A — `WorkOrderProgress`, upload
-фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
+**Last completed:** Phase 2, Step 4 (Zone A) — `WorkOrderProgress`, upload фото
+**Next step:** Phase 2, Step 5 [BE] Zone A — SignalR-хаб, группы из claims
+(не из клиента), события **после** `SaveChanges` → MASTER §9.4
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 4 (Zone A) — `WorkOrderProgress`, upload фото.**
+No storage backend is named anywhere in MASTER (§11.9 only specifies
+properties: signed URL, expiring, size-limited, allow-list MIME, outside
+the web root) — resolved by explicit user decision: **local filesystem +
+self-issued HMAC-signed URLs**, no cloud dependency added. Key design
+choice: the DB (`WorkOrderProgress.PhotoUrls`, jsonb) stores stable storage
+*keys*, not literal signed URLs — a signed URL saved permanently would go
+dead once its expiry passed, so `WorkOrderProgressDto` mints a fresh signed
+URL on every read instead (`Application/Common/Interfaces/
+IPhotoStorageService.cs`, `Infrastructure/Storage/LocalPhotoStorageService.cs`).
+`PhotoStorage:SigningKey` follows the exact `Jwt:SecretKey` pattern —
+validated ≥32 bytes at startup (`ValidateOnStart`), never committed.
+
+`SubmitWorkOrderProgressCommand`: Brigadir, own brigade only, only while
+`WorkOrder.Status == InProgress` (§7.1) — new code `WORK_ORDER_NOT_IN_PROGRESS`,
+distinct from `WORK_ORDER_INVALID_TRANSITION` since reporting progress
+doesn't itself change `WorkOrder.Status`. Every photo's MIME/size validated
+before any of them are saved (no partial-save-then-fail). `PhotosController`
+(`GET /api/v1/photos/{key}?exp&sig`) is `[AllowAnonymous]` — the signature
+itself is the access control (needed for `<img>` tags/bot-embedded links
+that can't carry a JWT); invalid or expired reads as a plain 404.
+
+Verified with a throwaway check against real Postgres + a real temp
+directory (6/6 passed, deleted after): full submit succeeds and `PhotoUrls`
+round-trips correctly through the `jsonb` column (genuinely uncertain
+going in whether `IReadOnlyCollection<string>` needed an explicit
+converter — confirmed it doesn't); disallowed MIME and oversized photo
+both rejected pre-save; submit blocked outside `InProgress`; signature
+validation correctly catches tampering, expiry, and cross-key reuse; saved
+bytes read back exactly. Full suite: 23/23.
+
+**Flagged, not built:** no way to read `WorkOrderProgress` entries back
+(quantities/photos/comments) — §9.4 only lists the `POST`. A Prorab
+reviewing an `OnReview` work order currently has no way to see what was
+actually reported before `Accept`/`Reject`. Needs a decision on whether a
+`GET` belongs in a future step.
 
 **Step 3 (Zone A) — `TaskLog` в той же транзакции, что переход.**
 Write side was already fully done by Steps 1–2 (`TaskLogs.Add` exists in
@@ -686,7 +722,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 - [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 - [x] Step 3 [BE] — `TaskLog` для `IndividualTask` **в той же транзакции**, что переход (`WorkOrder`'s side already done in Step 1 — see its note) → MASTER §5.15, §7.1, §7.2
-- [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
+- [x] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2
 - [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 *(отложено — см. §15)* → MASTER §5.26, §10.3

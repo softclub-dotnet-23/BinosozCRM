@@ -5,6 +5,7 @@ using Application.Seed;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Interceptors;
+using Infrastructure.Storage;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -45,6 +46,15 @@ public static class DependencyInjection
 
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<SeedDataService>();
+
+        services.AddOptions<PhotoStorageOptions>()
+            .Bind(configuration.GetSection(PhotoStorageOptions.SectionName))
+            .Validate(o => !string.IsNullOrEmpty(o.SigningKey) && Encoding.UTF8.GetByteCount(o.SigningKey) >= 32,
+                "PhotoStorage:SigningKey must be set and at least 32 bytes — never in a committed appsettings.json, use ENV/user-secrets.")
+            .Validate(o => !string.IsNullOrEmpty(o.RootPath),
+                "PhotoStorage:RootPath must be set to a directory outside the web root (MASTER §11.9).")
+            .ValidateOnStart();
+        services.AddSingleton<IPhotoStorageService, LocalPhotoStorageService>();
 
         return services;
     }
