@@ -5,11 +5,34 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 8
-**Next step:** Phase 0, Step 9 (CI)
+**Last completed:** Phase 0, Step 9
+**Next step:** Phase 0, Step 10 (тесты логина/refresh/seed)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** — (Step 10)
 **Updated:** 2026-07-18
+
+**CI (Step 9):** `.github/workflows/backend-ci.yml` — restore → build (Release)
+→ test → `dotnet list package --vulnerable`. Zero-warnings не проверяется
+отдельным шагом CI — он уже механически гарантирован
+`TreatWarningsAsErrors=true` в `backend/Directory.Build.props` (Step 1): любое
+предупреждение компилятора и есть провал шага build. `dotnet list package
+--vulnerable` по умолчанию **не роняет** пайплайн даже при находках — это
+просто отчёт, exit code всегда 0 — поэтому gate сделан вручную поверх
+`--format json`: если у любого проекта в выводе появляется ключ `frameworks`,
+значит нашлись уязвимые пакеты, шаг падает явно (`exit 1`). Проверка на
+локали не завязана — раньше пробовал грепать человекочитаемый текст
+(`"has the following vulnerable packages"`), но он выводится на языке
+рантайма (у меня локально — по-русски), а раннер GitHub Actions обычно
+английский; JSON-схема одна и та же независимо от локали. Проверил оба
+случая не только на «сейчас пакетов нет»: синтетический JSON с
+`vulnerabilities` в `frameworks` подтвердил, что проверка действительно
+падает, когда должна, а не просто всегда молчит. `dotnet test` пока не падает
+и не находит ничего — тестовых проектов ещё нет (Step 10) — но команда уже
+на месте и завершается кодом 0, ничего чинить не придётся, когда тесты
+появятся. Миграции по-прежнему ревьюит человек (не CI-шаг, MASTER §11.8) —
+это про PR review, не про автоматизацию. Деплой сознательно не добавлен —
+цель этого шага буквально «build + test + vulnerable-scan + zero-warnings»,
+куда именно деплоить не решено.
 
 **Нет веб-панели — решено окончательно.** Старый Step 9 (React-каркас) был
 основан на MASTER §13.1, но весь §13/§14 (Frontend/Design) удалён из
@@ -156,7 +179,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
 - [x] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
 - [x] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
-- [ ] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
+- [x] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
 - [ ] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
 - [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV → MASTER §10.0
 
