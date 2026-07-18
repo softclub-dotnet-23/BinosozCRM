@@ -7,12 +7,66 @@
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 3
-**Next step:** Phase 2, Step 4 [BE] — `WorkOrderProgress`, upload фото
-(подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
+**Last completed:** Phase 2, Step 4
+**Next step:** Phase 2, Step 5 [BE] — SignalR-хаб, группы из claims (не из
+клиента), события **после** `SaveChanges` → MASTER §9.4
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 22 tests, confirmed via `dotnet test` (5 pass locally, 17 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Phase 2, Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный
+URL, allow-list MIME).** Greenfield — no file/blob storage abstraction
+existed anywhere in the repo before this step (confirmed by search). New
+`IFileStorageService` (Application/Common/Interfaces), implemented by
+`LocalFileStorageService` (Infrastructure/Files): disk storage under a
+configured `RootPath` outside the web root, HMAC-SHA256 signed URLs with
+expiry (`GetSignedUrl`/`TryValidateSignedUrl`), MIME-derived extensions
+from the same allow-list the validator enforces, and path-traversal
+rejection (`Path.GetFileName(key) != key` → reject — every key this
+service ever hands out is a bare `{guid}.{ext}`, so any mismatch means the
+caller supplied something it didn't mint). New `FilesController`
+(`GET /files/{key}?exp&sig`, `[AllowAnonymous]` — the signature+expiry
+pair *is* the authorization here, not a JWT, since a photo URL embedded in
+an already-authenticated response has to be directly fetchable, e.g. by an
+`<img>` tag or the Telegram bot relaying it).
+
+`AddWorkOrderProgressCommand`: `POST /work-orders/{id}/progress`, Brigadir
+own-brigade only (`WorkOrderAccess.GetForBrigadirAsync`, same isolation as
+Step 3's other Brigadir handlers), gated on `WorkOrder.Status ==
+InProgress` per §7.1's "`ReportedQty` принимается только при `InProgress`"
+— returns `WORK_ORDER_INVALID_TRANSITION`, the same code every other
+wrong-status attempt uses. **Not a state transition** (`WorkOrder.Status`
+doesn't change), so no `TaskLogWriter` call here, unlike every Step 3
+handler. FluentValidation enforces §11.9's size limit and MIME allow-list
+per photo, injecting `IOptions<FileStorageOptions>` into the validator
+(config-driven, not hardcoded, same pattern as `JwtOptions`).
+`WorkOrderProgress.PhotoUrls` stores opaque storage **keys**, not literal
+URLs — signed URLs are minted fresh on every read (`WorkOrderProgressDto
+.FromEntity`) since a URL persisted at write time would eventually expire
+while sitting in the database.
+
+New `FileStorage` config section (`RootPath`, `SignedUrlExpiryMinutes`,
+`MaxFileSizeBytes`, `AllowedContentTypes`) in `appsettings.json` — all
+non-secret, safe to commit. `SignedUrlSecret` follows the exact pattern
+`Jwt:SecretKey` already established: absent from every checked-in
+appsettings file, `ValidateOnStart` requires it set and ≥32 bytes via
+ENV/user-secrets (MASTER §11.1's reasoning applied to §11.9).
+
+Verified with 3 throwaway xUnit tests directly against
+`LocalFileStorageService` (written, run — 3/3 passed — then deleted, no
+csproj/trace left): save → signed URL → validate → read round-trips the
+exact bytes with the right content type; an expired or tampered signature
+is rejected; a `../../etc/passwd`-style key throws rather than escaping
+`RootPath`. Made `LocalFileStorageService` `public` rather than `internal`
+— matches every other Infrastructure service (`Argon2PasswordHasher`,
+`JwtTokenService`, `CurrentUserService`), all public, none of them
+`internal`; this also happened to be what the throwaway test needed to
+construct it directly.
+
+Only `POST .../progress` this step — §9.4 lists no separate `GET` for
+listing progress reports, so none was added. Docker still unavailable —
+suite count unchanged (22 total, 5 pass, 17 need Docker); no new permanent
+tests (that's Step 9's job).
 
 **Phase 2, Step 3 [BE] — `TaskLog` в той же транзакции, что переход.** New
 `Application/Common/TaskLogWriter.cs`: `Append` only adds to the tracked
@@ -774,7 +828,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 - [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 - [x] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
-- [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
+- [x] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2
 - [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 *(отложено — см. §15)* → MASTER §5.26, §10.3

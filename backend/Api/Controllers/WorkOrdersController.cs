@@ -98,4 +98,26 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetWorkOrderLogQuery(workOrderId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    // MASTER §5.12/§11.9: multipart form — ReportedQty/Comment as form
+    // fields, photos as files. Not a status transition (WorkOrder.Status
+    // doesn't change), so this isn't in the /assign../reject transition
+    // family above.
+    [HttpPost("{workOrderId:guid}/progress")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> AddProgress(
+        Guid workOrderId,
+        [FromForm] decimal reportedQty,
+        [FromForm] string? comment,
+        [FromForm] List<IFormFile>? photos,
+        CancellationToken cancellationToken)
+    {
+        var photoDtos = (photos ?? [])
+            .Select(f => new WorkOrderProgressPhoto(f.OpenReadStream(), f.ContentType, f.Length))
+            .ToList();
+
+        var command = new AddWorkOrderProgressCommand(workOrderId, reportedQty, comment, photoDtos);
+        var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

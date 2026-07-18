@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Common.Options;
 using Application.Seed;
 using Infrastructure.Auth;
+using Infrastructure.Files;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Interceptors;
 using Microsoft.AspNetCore.Http;
@@ -45,6 +46,15 @@ public static class DependencyInjection
 
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<SeedDataService>();
+
+        services.AddOptions<FileStorageOptions>()
+            .Bind(configuration.GetSection(FileStorageOptions.SectionName))
+            .Validate(o => !string.IsNullOrEmpty(o.RootPath), "FileStorage:RootPath must be set.")
+            .Validate(o => !string.IsNullOrEmpty(o.SignedUrlSecret) && Encoding.UTF8.GetByteCount(o.SignedUrlSecret) >= 32,
+                "FileStorage:SignedUrlSecret must be set and at least 32 bytes (MASTER §11.9) — never in a committed appsettings.json, use ENV/user-secrets.")
+            .ValidateOnStart();
+
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
         return services;
     }
