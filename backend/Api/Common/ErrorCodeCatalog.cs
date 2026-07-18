@@ -7,11 +7,12 @@ namespace Api.Common;
 // §9.2 marks it 200, "not an error, a UI warning", so it never flows through
 // Result.Failure/this catalogue at all.
 //
-// BRIGADE_NOT_FOUND / WORKER_NOT_FOUND / USER_NOT_FOUND (Phase 1 Step 2):
-// same pattern as WORK_ORDER_NOT_FOUND / PRORAB_NOT_ASSIGNED_TO_OBJECT — a
-// route or body reference to another company's row (or no row at all) reads
-// as 404, not 400/403, per MASTER §11.5 rule 2. Not in §9.2's table either,
-// same as PASSWORD_CHANGE_REQUIRED above.
+// BRIGADE_NOT_FOUND / WORKER_NOT_FOUND / USER_NOT_FOUND (Phase 1 Step 2),
+// CUSTOMER_NOT_FOUND / OBJECT_NOT_FOUND (Phase 1 Step 1): same pattern as
+// WORK_ORDER_NOT_FOUND / PRORAB_NOT_ASSIGNED_TO_OBJECT — a route or body
+// reference to another company's row (or no row at all) reads as 404, not
+// 400/403, per MASTER §11.5 rule 2. Not in §9.2's table either, same as
+// PASSWORD_CHANGE_REQUIRED above.
 //
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
@@ -33,6 +34,8 @@ public static class ErrorCodeCatalog
         ["BRIGADE_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORKER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["CUSTOMER_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["OBJECT_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_SHARES_INVALID"] = StatusCodes.Status400BadRequest,

@@ -48,4 +48,23 @@ public sealed class ConstructionObject : AuditableEntity, ICompanyOwned, ISoftDe
         Status = ConstructionObjectStatus.Completed;
         ActualEndDate = actualEndDate;
     }
+
+    // General field update for PUT /objects/{id} (MASTER §9.4) — CustomerId is
+    // deliberately not settable here; reassigning an object's customer isn't a
+    // stated capability anywhere in MASTER, and this step doesn't need it.
+    public void Update(
+        string name,
+        string? address,
+        DateOnly? startDate,
+        DateOnly? plannedEndDate,
+        DateOnly? actualEndDate,
+        decimal? budget)
+    {
+        Name = name;
+        Address = address;
+        StartDate = startDate;
+        PlannedEndDate = plannedEndDate;
+        ActualEndDate = actualEndDate;
+        Budget = budget;
+    }
 }

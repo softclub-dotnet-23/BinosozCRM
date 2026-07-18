@@ -5,14 +5,56 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 3 (Zone B)
+**Last completed:** Phase 1, Step 1 (Zone A)
 **Next step:** Phase 1, Step 4 [BE] Zone A — `ProrabObjectAssignment` + фильтрация
-объектов по прорабу (not a Zone B step — Zone B's own Phase 1 work, Steps 2-3,
-is complete; Steps 1/4/5/6 belong to Zone A or the shared masking pass, Step 7
-is the joint test step)
+объектов по прорабу (Steps 1-3 now done — Zone A's Step 1, Zone B's Steps 2-3;
+Steps 5/6 also Zone A/shared, Step 7 is the joint test step)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 12 tests written (5 pass locally, 7 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 1 (Zone A) — `Customer`, `ConstructionObject`, `EstimateItem`.**
+`Application/Customers/` (`CreateCustomerCommand`, `ListCustomersQuery`),
+`Application/Objects/` (`CreateConstructionObjectCommand`,
+`ListConstructionObjectsQuery`, `GetConstructionObjectQuery`,
+`UpdateConstructionObjectCommand`, `CreateEstimateItemCommand`,
+`ListEstimateItemsQuery`), `Api/Controllers/CustomersController.cs` +
+`ObjectsController.cs`: `GET,POST /customers`, `GET,POST /objects`,
+`GET,PUT /objects/{id}`, `GET,POST /objects/{id}/estimate-items` — all
+Prorab+ per MASTER §9.4. `IApplicationDbContext` gained `Customers`/
+`ConstructionObjects`/`EstimateItems` `DbSet`s (same catch-up `ApplicationDbContext`
+already had them, interface hadn't). New codes `CUSTOMER_NOT_FOUND`/
+`OBJECT_NOT_FOUND` in `ErrorCodeCatalog`, same 404-not-403 pattern as
+`BRIGADE_NOT_FOUND` from Step 2. No `ProrabObjectAssignment` filtering on the
+objects list yet — that's explicitly Step 4's scope, not invented here.
+
+**Added `ConstructionObject.Update()` to Domain** (Ahmad's file, needed for
+this step's own deliverable, not scope creep): MASTER §9.4 lists
+`GET,PUT /objects/{id}` as a general update endpoint and §12's role matrix
+gives Owner/Prorab full `CRU`, but Domain only had `ChangeStatus`/`Complete`
+— no way to update `Name`/`Address`/dates/`Budget` at all. Added `Update()`
+for those plain fields, keeping `Status` transitions on the existing
+aggregate methods (Rule 3) — the handler calls `Update()` for the descriptive
+fields and separately `Complete()` or `ChangeStatus()` depending on the
+requested status, rather than folding status into `Update()`'s own
+parameters.
+
+**Found, not fixed — Domain has `Customer.Update()`/`EstimateItem.Update()`
+already, unused.** Both entities already carry `Update()` methods (predating
+this step) even though MASTER §9.4's endpoint list has no `PUT /customers/{id}`
+or per-item estimate update — only `GET,POST` for both. Implemented exactly
+what §9.4 lists, nothing invented; flagging since §12's role matrix calls
+both "CRU" for Owner/Prorab, so an update endpoint may be a real gap in §9.4
+rather than a deliberate omission — worth squaring away in MASTER.md, same
+class of issue as the Brigade `PUT /brigadir` role contradiction from Step 3.
+
+Verified with a throwaway EF InMemory check (written, run — 1 test, 12
+assertions covering create/list/get/update/complete for objects, both
+not-found paths, estimate item create + list, customer create + list — all
+passed, then deleted, no `Directory.Packages.props`/csproj trace left).
+Docker still unavailable here — Postgres-backed `Api.IntegrationTests` count
+unchanged by this step (15 total, 5 pass, 10 need Docker); xUnit tests for
+this step itself are Step 7's job, not written now.
 
 **Step 3 (Zone B) — `Brigade`, назначение бригадира.**
 `Application/Brigades/` (`CreateBrigadeCommand`, `ListBrigadesQuery`,
@@ -368,7 +410,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 1 — Объекты и бригады
 **Goal:** без объекта и бригады нечего назначать.
 
-- [ ] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
+- [x] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
 - [x] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [ ] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
