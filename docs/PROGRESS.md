@@ -7,12 +7,63 @@
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 1
-**Next step:** Phase 2, Step 2 [BE] — `IndividualTask` + state machine
-(`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
+**Last completed:** Phase 2, Step 2
+**Next step:** Phase 2, Step 3 [BE] — `TaskLog` в той же транзакции, что
+переход → MASTER §5.15, §7.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 22 tests, confirmed via `dotnet test` (5 pass locally, 17 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Phase 2, Step 2 [BE] — `IndividualTask` + state machine.** Same situation
+as Step 1: the entity, its state machine (`Start`/`Complete`/`ProposeBonus`/
+`ApproveBonus`, all `Result`-returning, `CompletedEarly` correctly computed
+**at closing** per §7.2/§8.5), and `xmin` already existed — nothing in
+`Application`/`Api` referenced it. Built `Application/IndividualTasks/`
+(`CreateIndividualTaskCommand`, `StartIndividualTaskCommand`,
+`CompleteIndividualTaskCommand`, `ListIndividualTasksQuery`),
+`Api/Controllers/IndividualTasksController.cs`: `GET,POST
+/individual-tasks`, `POST .../start`, `POST .../complete` — **`Brigadir`
+only**, per §9.4's endpoint table (no Prorab+ split for this one, unlike
+`WorkOrder`).
+
+**Not built: `ProposeBonus`/`ApproveBonus` endpoints.** §8.5 covers the
+premium-proposal flow, but Phase 3's own step list (Step 6, `[BOT]`,
+"«Личные задачи»: ... → предложение премии") explicitly scopes that to a
+later, currently-deferred bot step — not this one. This step is exactly
+what its checklist line says: the `Assigned→InProgress→Done` state machine
+and the same-brigade assignment check, nothing past that.
+
+**New shared `BrigadeAccess` helper** (`Application/IndividualTasks/`,
+mirrors Phase 1 Step 4's `ProrabObjectAccess`): resolves the calling
+Brigadir's own `BrigadeId` via their linked `Worker` row (§4 — a Brigadir
+is simultaneously a `User` and a `Worker`, `Worker.UserId`), used by every
+handler here instead of duplicating the lookup. `Start`/`Complete` on a
+task belonging to another brigade → new `INDIVIDUAL_TASK_NOT_FOUND` (404,
+not 403 — §4's "не видит чужие бригады"); `Create` targeting a worker
+outside the caller's own brigade → the already-existing
+`INDIVIDUAL_TASK_WRONG_BRIGADE` (400, per §9.2's actual table — this is
+the first handler to ever raise it). A caller with no linked `Worker` row
+at all (shouldn't happen for a real Brigadir, but handled) →
+`WORKER_NOT_FOUND`.
+
+`CreateIndividualTaskCommand` reuses `Company.ReserveNextCode()` from Step
+1 — confirmed the shared sequence actually works across both entity types
+in the verification below (a `WorkOrder` and an `IndividualTask` in the
+same company get consecutive codes, not independent per-entity counters).
+Same `DbUpdateConcurrencyException` → `CONCURRENCY_CONFLICT` handling as
+`CreateWorkOrderCommand`.
+
+Verified with a throwaway EF InMemory check (1 test, written, run, deleted
+— no `Directory.Packages.props`/csproj trace left): a Brigadir creates a
+task for a co-worker in their own brigade (`BR-1`, following a WorkOrder
+create that failed validation and correctly did **not** consume a code
+number) and is rejected assigning to a worker in another brigade
+(`INDIVIDUAL_TASK_WRONG_BRIGADE`); `Start` succeeds on their own task and
+returns `INDIVIDUAL_TASK_NOT_FOUND` for a nonexistent one; `Complete` sets
+`Done` and computes `CompletedEarly`; `List` returns only the caller's own
+brigade's tasks; a user with no linked `Worker` row gets `WORKER_NOT_FOUND`.
+Docker still unavailable — suite count unchanged (22 total, 5 pass, 17 need
+Docker); xUnit tests for `IndividualTask` are Step 9's job.
 
 **Phase 2, Step 1 [BE] — `WorkOrder` + state machine + `Code` + `xmin`.**
 The `WorkOrder` entity, its full state machine (`Assign`/`Start`/
@@ -676,7 +727,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
 
 - [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
-- [ ] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
+- [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 - [ ] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
