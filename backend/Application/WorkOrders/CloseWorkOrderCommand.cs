@@ -21,7 +21,7 @@ public sealed class CloseWorkOrderCommandValidator : AbstractValidator<CloseWork
     }
 }
 
-public sealed class CloseWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class CloseWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<CloseWorkOrderCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(CloseWorkOrderCommand request, CancellationToken cancellationToken)
@@ -35,6 +35,6 @@ public sealed class CloseWorkOrderCommandHandler(IApplicationDbContext context, 
             return Result.Failure<WorkOrderDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         return await WorkOrderTransitionHelper.ApplyAsync(
-            context, workOrder, () => workOrder.Close(), currentUser.UserId!.Value, comment: null, cancellationToken);
+            context, notifier, workOrder, () => workOrder.Close(), currentUser.UserId!.Value, comment: null, cancellationToken);
     }
 }

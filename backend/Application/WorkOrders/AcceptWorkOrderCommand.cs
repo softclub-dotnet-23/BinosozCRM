@@ -19,7 +19,7 @@ public sealed class AcceptWorkOrderCommandValidator : AbstractValidator<AcceptWo
     }
 }
 
-public sealed class AcceptWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class AcceptWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<AcceptWorkOrderCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(AcceptWorkOrderCommand request, CancellationToken cancellationToken)
@@ -35,6 +35,6 @@ public sealed class AcceptWorkOrderCommandHandler(IApplicationDbContext context,
         var completedDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
         return await WorkOrderTransitionHelper.ApplyAsync(
-            context, workOrder, () => workOrder.Accept(completedDate), currentUser.UserId!.Value, comment: null, cancellationToken);
+            context, notifier, workOrder, () => workOrder.Accept(completedDate), currentUser.UserId!.Value, comment: null, cancellationToken);
     }
 }

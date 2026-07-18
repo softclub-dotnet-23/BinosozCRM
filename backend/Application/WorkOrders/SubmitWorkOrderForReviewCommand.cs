@@ -21,7 +21,7 @@ public sealed class SubmitWorkOrderForReviewCommandValidator : AbstractValidator
     }
 }
 
-public sealed class SubmitWorkOrderForReviewCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class SubmitWorkOrderForReviewCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<SubmitWorkOrderForReviewCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(SubmitWorkOrderForReviewCommand request, CancellationToken cancellationToken)
@@ -56,7 +56,7 @@ public sealed class SubmitWorkOrderForReviewCommandHandler(IApplicationDbContext
         }
 
         return await WorkOrderTransitionHelper.ApplyAsync(
-            context, workOrder, () => workOrder.SubmitForReview(hasProgress, payoutShareComplete),
+            context, notifier, workOrder, () => workOrder.SubmitForReview(hasProgress, payoutShareComplete),
             currentUser.UserId!.Value, comment: null, cancellationToken);
     }
 }

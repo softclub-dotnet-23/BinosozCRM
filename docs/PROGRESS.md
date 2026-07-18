@@ -5,15 +5,60 @@
 
 ## Current Status
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 4 (Zone A) — `WorkOrderProgress`, upload фото
-**Next step:** Phase 2, Step 5 [BE] Zone A — SignalR-хаб, группы из claims
-(не из клиента), события **после** `SaveChanges` → MASTER §9.4
+**Last completed:** Phase 2, Step 5 (Zone A) — SignalR-хаб
+**Next step:** Phase 2, Steps 6-8 [BOT] отложены (см. §15) — переходим к
+Step 9 [FULL] — тесты: все переходы (разрешённые + запрещённые), изоляция
+бригады (404). **Note:** Step 9's own description also names "идемпотентность
+бота" — that part can't be done while Steps 6-8 stay deferred; likely needs
+splitting the same way Phase 1 Step 7 did (BE half now, BOT half later)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 5 (Zone A) — SignalR hub.**
+`Api/Hubs/WorkOrdersHub.cs` (`/hubs/work-orders`, `[Authorize]`): group
+membership decided entirely server-side at connect time from JWT claims
+(`company:{companyId}` for everyone, `brigade:{brigadeId}` additionally for
+Brigadir via a `Worker.UserId` lookup) — no hub method exists for a client
+to request a group, satisfying "группы из claims, никогда из клиентского
+ввода" by construction, not by convention. `Application/Common/Interfaces/
+IRealtimeNotifier.cs` + `Api/Hubs/SignalRRealtimeNotifier.cs` keep SignalR
+out of Application (same reasoning as `IFormFile` in Step 4). Wired into
+`WorkOrderTransitionHelper` — fires `WorkOrderStatusChanged` strictly after
+`SaveChangesAsync` succeeds, never on a failed transition. All 7 WorkOrder
+transition handlers now take `IRealtimeNotifier` (mechanical constructor
+change only, no command-shape change — nothing for Shahrom's future bot
+code to worry about). `Program.cs` also accepts the JWT via
+`?access_token=` query string, but only for `/hubs` paths — browsers can't
+attach an `Authorization` header to a WebSocket upgrade request.
+
+**Bug caught before it shipped:** the first draft of the Brigadir
+brigade-lookup in `OnConnectedAsync` used the ambient `context.Workers`
+query (global `CompanyId` filter → `ICurrentUserService` →
+`IHttpContextAccessor`). `IHttpContextAccessor` isn't reliably populated
+through a Hub's connection lifecycle the way it is for a normal HTTP
+request — would have silently broken Brigadir's brigade-group join (fails
+closed, not a security hole, but a real functionality bug). Fixed: reads
+`company_id` directly off `Context.User`'s claims, uses
+`.IgnoreQueryFilters()` with an explicit `CompanyId` match instead of
+depending on ambient state.
+
+Only `WorkOrderStatusChanged` fires for real — `AttendanceMarked`/
+`MaterialShortageReported`/`BonusPendingApproval`/`PayrollDraftReady` (also
+named in §9.4) belong to entities with no write path yet (Phase 3-5).
+
+Verified with a throwaway check against real Postgres (2/2, deleted after):
+a successful transition notifies exactly once with the correct
+company/brigade IDs, and the DB change is already committed/visible by the
+time the notifier fires (confirms "after SaveChanges", not before); a
+failed/invalid transition never notifies. Full-stack SignalR wire testing
+(a real WebSocket connection, actual group delivery) wasn't attempted —
+this project has avoided `WebApplicationFactory`/`TestServer` since Step
+10, and that's what real end-to-end hub testing would need. Full suite:
+23/23, no regressions.
 
 **Step 4 (Zone A) — `WorkOrderProgress`, upload фото.**
 No storage backend is named anywhere in MASTER (§11.9 only specifies
@@ -723,7 +768,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 - [x] Step 3 [BE] — `TaskLog` для `IndividualTask` **в той же транзакции**, что переход (`WorkOrder`'s side already done in Step 1 — see its note) → MASTER §5.15, §7.1, §7.2
 - [x] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
-- [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
+- [x] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2
 - [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 *(отложено — см. §15)* → MASTER §5.26, §10.3
 - [ ] Step 8 [BOT] — «Мои наряды»: отметка выполнения (валидация остатка), фото, отправка на проверку *(отложено — см. §15)* → MASTER §10.4

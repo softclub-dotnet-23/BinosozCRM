@@ -20,7 +20,7 @@ public sealed class RejectWorkOrderCommandValidator : AbstractValidator<RejectWo
     }
 }
 
-public sealed class RejectWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class RejectWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<RejectWorkOrderCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(RejectWorkOrderCommand request, CancellationToken cancellationToken)
@@ -34,6 +34,6 @@ public sealed class RejectWorkOrderCommandHandler(IApplicationDbContext context,
             return Result.Failure<WorkOrderDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         return await WorkOrderTransitionHelper.ApplyAsync(
-            context, workOrder, () => workOrder.Reject(), currentUser.UserId!.Value, request.Reason, cancellationToken);
+            context, notifier, workOrder, () => workOrder.Reject(), currentUser.UserId!.Value, request.Reason, cancellationToken);
     }
 }

@@ -21,7 +21,7 @@ public sealed class ReworkWorkOrderCommandValidator : AbstractValidator<ReworkWo
     }
 }
 
-public sealed class ReworkWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class ReworkWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<ReworkWorkOrderCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(ReworkWorkOrderCommand request, CancellationToken cancellationToken)
@@ -35,6 +35,6 @@ public sealed class ReworkWorkOrderCommandHandler(IApplicationDbContext context,
             return Result.Failure<WorkOrderDto>(new Error("WORK_ORDER_NOT_FOUND", "Work order not found."));
 
         return await WorkOrderTransitionHelper.ApplyAsync(
-            context, workOrder, () => workOrder.Rework(), currentUser.UserId!.Value, comment: null, cancellationToken);
+            context, notifier, workOrder, () => workOrder.Rework(), currentUser.UserId!.Value, comment: null, cancellationToken);
     }
 }

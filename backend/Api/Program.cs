@@ -1,8 +1,10 @@
 using System.Text;
 using Api.Common;
+using Api.Hubs;
 using Api.Middleware;
 using Api.RateLimiting;
 using Application;
+using Application.Common.Interfaces;
 using Application.Common.Options;
 using Application.Seed;
 using Infrastructure;
@@ -49,9 +51,33 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
+
+        // SignalR/WebSocket clients can't attach an Authorization header to
+        // the transport upgrade request the way a normal HTTP call can —
+        // the token has to travel as a query string param instead. Scoped
+        // to /hubs paths only so every other endpoint still requires a real
+        // Authorization header.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    context.Token = accessToken;
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
+
+// MASTER §9.4: /hubs/work-orders — WorkOrderStatusChanged today; the other
+// four named events (AttendanceMarked/MaterialShortageReported/
+// BonusPendingApproval/PayrollDraftReady) get wired once their entities
+// have write paths (Phase 3-5).
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -138,6 +164,7 @@ app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 
 app.MapControllers();
+app.MapHub<WorkOrdersHub>("/hubs/work-orders");
 
 // /health = liveness only, no dependency checks (Predicate excludes all
 // registered checks) — orchestrator just wants "is the process alive".

@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Common.Notifications;
 using Domain.Common;
 using Domain.Entities;
 using Domain.Enums;
@@ -11,10 +12,14 @@ namespace Application.WorkOrders;
 // follow-up. Centralized so all seven WorkOrder transition handlers apply
 // it identically instead of six copies risking drift, and so xmin conflicts
 // (MASTER §9.2 CONCURRENCY_CONFLICT) are handled in exactly one place.
+// Also fires WorkOrderStatusChanged (MASTER §9.4) — strictly after
+// SaveChanges succeeds, never before, and only on the success path (a
+// failed/rolled-back transition never got recorded, so nothing to notify).
 internal static class WorkOrderTransitionHelper
 {
     public static async Task<Result<WorkOrderDto>> ApplyAsync(
         IApplicationDbContext context,
+        IRealtimeNotifier notifier,
         WorkOrder workOrder,
         Func<Result> transition,
         Guid changedByUserId,
@@ -28,6 +33,7 @@ internal static class WorkOrderTransitionHelper
             return Result.Failure<WorkOrderDto>(transitionResult.Error);
 
         var toStatus = workOrder.Status.ToString();
+        var changedAt = DateTimeOffset.UtcNow;
         context.TaskLogs.Add(TaskLog.Create(
             workOrder.CompanyId,
             TaskLogEntityType.WorkOrder,
@@ -35,7 +41,7 @@ internal static class WorkOrderTransitionHelper
             fromStatus,
             toStatus,
             changedByUserId,
-            DateTimeOffset.UtcNow,
+            changedAt,
             comment));
 
         try
@@ -47,6 +53,12 @@ internal static class WorkOrderTransitionHelper
             return Result.Failure<WorkOrderDto>(new Error(
                 "CONCURRENCY_CONFLICT", "The work order was modified by someone else. Reload and try again."));
         }
+
+        await notifier.NotifyWorkOrderStatusChangedAsync(
+            workOrder.CompanyId,
+            workOrder.BrigadeId,
+            new WorkOrderStatusChangedNotification(workOrder.Id, workOrder.Code, fromStatus, toStatus, changedAt),
+            cancellationToken);
 
         return Result.Success(WorkOrderDto.FromEntity(workOrder));
     }

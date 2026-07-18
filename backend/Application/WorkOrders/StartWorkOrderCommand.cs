@@ -19,7 +19,7 @@ public sealed class StartWorkOrderCommandValidator : AbstractValidator<StartWork
     }
 }
 
-public sealed class StartWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class StartWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<StartWorkOrderCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(StartWorkOrderCommand request, CancellationToken cancellationToken)
@@ -33,6 +33,6 @@ public sealed class StartWorkOrderCommandHandler(IApplicationDbContext context, 
             return Result.Failure<WorkOrderDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         return await WorkOrderTransitionHelper.ApplyAsync(
-            context, workOrder, () => workOrder.Start(), currentUser.UserId!.Value, comment: null, cancellationToken);
+            context, notifier, workOrder, () => workOrder.Start(), currentUser.UserId!.Value, comment: null, cancellationToken);
     }
 }
