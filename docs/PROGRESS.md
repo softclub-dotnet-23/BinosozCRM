@@ -5,13 +5,37 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 6 (Zone B)
-**Next step:** Phase 1, Step 7 [BE] — joint tests: 18+ (ровно 18 / на день
-меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2.
-Last step in Phase 1.
+**Last completed:** Phase 1, Step 7 — **Zone B half only** (Worker 18+
+tests). Step 7 stays unchecked below — it's a joint step, and Ahmad's half
+(изоляция прораба по объектам, §1.2) isn't done yet.
+**Next step:** Phase 1, Step 7 [BE] Zone A half — тесты изоляции прораба по
+объектам → MASTER §1.2. Once that lands, Step 7 can be checked off and
+Phase 1 marked complete.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 18 tests, confirmed via `dotnet test` (5 pass locally, 13 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 7 (Zone B half) — Worker 18+ boundary tests.**
+`Tests/Api.IntegrationTests/CreateWorkerCommandHandlerTests.cs` (real
+Testcontainers/Postgres, not InMemory — matches project convention): exactly
+18 on `HireDate` allowed; one day short rejected (`WORKER_UNDERAGE`); 19
+today but 17 on a backdated `HireDate` rejected — the last one is the actual
+point of §8.3 ("проверка на дату HireDate, не на сегодня"), not just a
+restatement of the other two. `PostgresFixture` gained a
+`CreateDbContext(ICurrentUserService)` overload — the existing zero-arg one
+hardcodes a `CompanyId`-less current-user, which silently empties out any
+query against `ICompanyOwned` entities (`Brigade`/`Worker`) via the global
+filter, even though `Add`/`SaveChanges` are unaffected (why the earlier FK
+tests didn't need this). Can't execute against real Postgres on this
+machine (same Docker-daemon gap as every DB-backed test here) — confirmed
+the 3 new tests fail with `DockerUnavailableException` specifically, then
+separately verified the date-boundary arithmetic itself via a throwaway
+InMemory run (3/3 assertions passed, deleted after). First real execution
+happens in CI.
+
+**Not done — Zone A's half of this joint step:** Prorab object-isolation
+tests (§1.2, exercises `ProrabObjectAssignment`/`ConstructionObject`
+filtering) are Ahmad's entities/Application code, not written here.
 
 **Step 6 (Zone B) — masking `Document*` by role.**
 Api-layer only (`Api/Contracts/Workers/WorkerResponse.cs`,
