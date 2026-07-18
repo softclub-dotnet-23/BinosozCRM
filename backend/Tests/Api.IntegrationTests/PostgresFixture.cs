@@ -17,6 +17,16 @@ public sealed class NullCurrentUserService : ICurrentUserService
     public Role? Role => null;
 }
 
+// For tests that need a real, authenticated-shaped caller — CompanyId always
+// set (the CompanyId global query filter needs it to see anything), UserId/
+// Role optional depending on what the handler under test actually reads.
+public sealed class FixedCurrentUserService(Guid companyId, Guid? userId = null, Role? role = null) : ICurrentUserService
+{
+    public Guid? UserId => userId;
+    public Guid? CompanyId => companyId;
+    public Role? Role => role;
+}
+
 // One real Postgres container (Testcontainers, MASTER §2/§3 — no InMemory
 // provider) for the whole test assembly. Migrated once via the InitialCreate
 // migration (backend/Infrastructure/Migrations) so tests exercise the actual
@@ -43,13 +53,15 @@ public sealed class PostgresFixture : IAsyncLifetime
         await context.Database.MigrateAsync();
     }
 
-    public ApplicationDbContext CreateDbContext()
+    public ApplicationDbContext CreateDbContext() => CreateDbContext(new NullCurrentUserService());
+
+    public ApplicationDbContext CreateDbContext(ICurrentUserService currentUser)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_container.GetConnectionString())
             .Options;
 
-        return new ApplicationDbContext(options, new NullCurrentUserService());
+        return new ApplicationDbContext(options, currentUser);
     }
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();

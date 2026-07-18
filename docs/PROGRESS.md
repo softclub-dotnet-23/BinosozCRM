@@ -4,13 +4,55 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 6
-**Next step:** Phase 1, Step 7 [FULL] — joint tests: 18+, изоляция прораба по
-объектам (last step of Phase 1, then Phase 2)
+**Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
+`docs/phase-summaries/Phase1-summary.md`.
+**Phase:** 2 — Наряды и задачи (ядро)
+**Last completed:** Phase 1, Step 7 (all 7 steps done)
+**Next step:** Phase 2, Step 1 [BE] — `WorkOrder` + state machine + `Code`
+(`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 22 tests, confirmed via `dotnet test` (5 pass locally, 17 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 7 [BE] — joint tests: 18+, изоляция прораба по объектам.** New,
+permanent (not throwaway) `Tests/Api.IntegrationTests` files, real Postgres
+via the Step 10 `PostgresFixture` — first tests written directly against
+Step 1/4's own Application handlers rather than auth:
+
+- `WorkerAgeGuardTests.cs` (3 tests, MASTER §8.3): exactly 18 on `HireDate`
+  succeeds; one day short fails `WORKER_UNDERAGE`; a backdated `HireDate`
+  (born 2008-07-01, hired on their 16th birthday in 2024 — already 18
+  *today*, whenever "today" runs) still fails — proves the guard checks age
+  **at `HireDate`**, not at call time, per §8.3's explicit "не должно
+  проходить только потому, что человек уже вырос."
+- `ProrabObjectAssignmentIsolationTests.cs` (4 tests, MASTER §1.2/§11.5):
+  zero assignments → Prorab sees every object; one assignment → sees only
+  that one, and `Get` on the other returns `PRORAB_NOT_ASSIGNED_TO_OBJECT`
+  (not `OBJECT_NOT_FOUND` — the object genuinely exists, just isn't
+  theirs); Owner is never restricted regardless of assignments; a duplicate
+  assignment is rejected `PRORAB_ALREADY_ASSIGNED`.
+
+Added a `FixedCurrentUserService` + `PostgresFixture.CreateDbContext(ICurrentUserService)`
+overload (`PostgresFixture.cs`) — every prior Postgres-backed test ran
+unauthenticated (`NullCurrentUserService`, correct for login/refresh/seed);
+this is the first step needing a real `CompanyId`/`Role`/`UserId` context,
+since both the age guard and the isolation check read `ICurrentUserService`
+directly.
+
+**Docker still unavailable on this machine** — these 7 new tests are
+compile-verified only here, same limitation as every Postgres-backed test
+since Step 10. Verified the underlying logic separately with a throwaway EF
+InMemory check running the *exact same* handler calls and assertions
+(written, run — 2/2 passed — then deleted, no `Directory.Packages.props`/
+csproj trace left) before trusting the permanent Postgres versions.
+Suite total: 22 (was 15) — 5 pass locally (Docker-free), 17 need Docker,
+all 17 new+existing failures are the expected `DockerUnavailableException`,
+not real test failures.
+
+**Phase 1 is now complete — all 7 steps done** (Steps 1/4/5/6 Zone A this
+session, Steps 2/3 Zone B). Phase-summary write-up and the ✅ COMPLETE stamp
+are `done`'s job, not `go`'s — not written yet, follows when the user runs
+`done`.
 
 **Step 6 — маскирование `Document*`/`PayRate` по ролям.**
 `WorkerDto.FromEntity` now takes the caller's `Role?` and nulls out
@@ -561,7 +603,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [x] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
-- [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
+- [x] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
 ## Phase 2 — Наряды и задачи (ядро)
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
