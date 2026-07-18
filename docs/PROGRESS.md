@@ -5,12 +5,62 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 5 (Zone A)
-**Next step:** Phase 1, Step 6 [BE] — masking `Document*` по ролям (shared/
-either zone); Step 7 is the joint test step, last in Phase 1
+**Last completed:** Phase 1, Step 6
+**Next step:** Phase 1, Step 7 [FULL] — joint tests: 18+, изоляция прораба по
+объектам (last step of Phase 1, then Phase 2)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 6 — маскирование `Document*`/`PayRate` по ролям.**
+`WorkerDto.FromEntity` now takes the caller's `Role?` and nulls out
+`PayRate`, `DocumentType`, `DocumentExpiryDate` for anyone who isn't
+Owner/Accountant — Prorab (the only other role currently able to reach
+`GET,POST /brigades/{id}/workers`, per §9.4) gets all three back as `null`,
+including on the response to their **own** `POST` (they typed the value in,
+but the response still masks it — one rule, no special-case for "you just
+told me this"). `PayRate` went from `decimal` to `decimal?` on the DTO to
+represent "hidden."
+
+**Scope note — wider than the checklist line's literal wording, on
+purpose.** The PROGRESS.md line for this step only says "Document*", but
+Shahrom's Step 2 writeup already flagged that Step 6 was meant to cover
+*both* "hiding `PayRate` from Prorab" and "masking `Document*`" — matching
+MASTER §12's role matrix row (`Worker | ... | CRU (без PayRate) | ... |
+R (с PayRate)`), not just §11.6. Did both here rather than leaving PayRate
+for a step that was never itemized separately.
+
+**Found — MASTER §11.6 assumes a field that doesn't exist.** §11.6 says
+"полный номер документа виден только Owner/Accountant... Prorab видит
+маскированный (`****4567`)" — i.e. a partial-reveal mask on a document
+*number*. `Worker` (§5.7) only has `DocumentType` (a category string, e.g.
+"Passport") and `DocumentExpiryDate` — there's no document-number field
+anywhere in the Domain model to apply a `****4567`-style mask to. Not
+inventing a new PII field to satisfy this literally (that's a data-model
+decision, not a masking one) — implemented the closest honest reading of
+the intent with what actually exists: Prorab gets `Document*` fields
+**hidden entirely** (`null`), not partially revealed, since there's nothing
+to partially reveal. Worth resolving in MASTER.md itself — either drop the
+`****4567` framing or add the number field it presupposes.
+
+**Closed a gap flagged back in Step 8**, also under §11.6: `Serilog
+.Destructure.ByTransforming` for PII now exists in `Program.cs`, for both
+`Worker` and `WorkerDto` — excludes `Phone`/`BirthDate`/`DocumentType`/
+`DocumentExpiryDate`/`PayRate` from anything logged via `{@Worker}`/
+`{@WorkerDto}` destructuring. Deliberately separate from the DTO-level
+role-masking above: logs are a different exposure surface (retained
+longer, read by ops/devs regardless of the original caller's role), so
+this isn't redundant with it — an Owner's own request could still leak PII
+into a log line without this.
+
+Verified with a throwaway EF InMemory check (written, run, deleted — no
+`Directory.Packages.props`/csproj trace left): Owner's create-response and
+list-response both show full `PayRate`/`DocumentType`/`DocumentExpiryDate`;
+a Prorab's create-response (for a worker *they* just entered) and
+list-response both show `null` for all three; non-PII fields
+(`FullName`/`Phone`) stay visible either way. Docker still unavailable
+here — suite count unchanged (15 total, 5 pass, 10 need Docker); xUnit
+tests for this step are Step 7's job — the very next one.
 
 **Step 5 (Zone A) — `AdminAuditLog` + interceptor.**
 New `Infrastructure/Persistence/Interceptors/AdminAuditSaveChangesInterceptor.cs`,
@@ -510,7 +560,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
-- [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
+- [x] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
 - [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
 ## Phase 2 — Наряды и задачи (ядро)

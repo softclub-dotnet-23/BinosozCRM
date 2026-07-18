@@ -5,6 +5,8 @@ using Api.RateLimiting;
 using Application;
 using Application.Common.Options;
 using Application.Seed;
+using Application.Workers;
+using Domain.Entities;
 using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,13 +20,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 // MASTER §2/§3: Serilog, structured, no PII. Reads the "Serilog" appsettings
 // section (MinimumLevel/WriteTo/Enrich) so log levels are config-driven, not
-// hardcoded. Column/field-level PII exclusion (Serilog.Destructure.ByTransforming,
-// §11.6) applies to DTOs that don't exist yet (Worker PII fields land in
-// Phase 1) — nothing to exclude from logs today, since nothing PII-bearing is
-// logged yet.
+// hardcoded. §11.6's Worker PII (BirthDate, Phone, DocumentType,
+// DocumentExpiryDate) plus PayRate now exist (Phase 1) — explicit
+// Destructure.ByTransforming excludes them from anything logged via `{@Worker}`/
+// `{@WorkerDto}`, independent of the API-response role-masking in WorkerDto
+// itself (logs are a different exposure surface — retained longer, read by
+// ops/devs regardless of the caller's role — so this isn't redundant with it).
 builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
-    .Enrich.FromLogContext());
+    .Enrich.FromLogContext()
+    .Destructure.ByTransforming<Worker>(w => new { w.Id, w.CompanyId, w.BrigadeId, w.UserId, w.FullName, w.IsActive })
+    .Destructure.ByTransforming<WorkerDto>(w => new { w.Id, w.BrigadeId, w.UserId, w.FullName, w.IsActive }));
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

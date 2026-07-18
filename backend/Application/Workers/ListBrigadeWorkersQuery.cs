@@ -8,7 +8,7 @@ namespace Application.Workers;
 
 public sealed record ListBrigadeWorkersQuery(Guid BrigadeId, int Page, int PageSize) : IRequest<Result<PagedResult<WorkerDto>>>;
 
-public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context)
+public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     : IRequestHandler<ListBrigadeWorkersQuery, Result<PagedResult<WorkerDto>>>
 {
     public async Task<Result<PagedResult<WorkerDto>>> Handle(ListBrigadeWorkersQuery request, CancellationToken cancellationToken)
@@ -27,7 +27,7 @@ public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = items.Select(WorkerDto.FromEntity).ToList();
+        var dtos = items.Select(w => WorkerDto.FromEntity(w, currentUser.Role)).ToList();
 
         return Result.Success(new PagedResult<WorkerDto>(dtos, request.Page, request.PageSize, totalCount));
     }
