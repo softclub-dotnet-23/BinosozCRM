@@ -5,14 +5,151 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 3 (Zone B)
-**Next step:** Phase 1, Step 4 [BE] Zone A — `ProrabObjectAssignment` + фильтрация
-объектов по прорабу (not a Zone B step — Zone B's own Phase 1 work, Steps 2-3,
-is complete; Steps 1/4/5/6 belong to Zone A or the shared masking pass, Step 7
-is the joint test step)
+**Last completed:** Phase 1, Step 5 (Zone A)
+**Next step:** Phase 1, Step 6 [BE] — masking `Document*` по ролям (shared/
+either zone); Step 7 is the joint test step, last in Phase 1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 12 tests written (5 pass locally, 7 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 5 (Zone A) — `AdminAuditLog` + interceptor.**
+New `Infrastructure/Persistence/Interceptors/AdminAuditSaveChangesInterceptor.cs`,
+registered `Scoped` (unlike `AuditableEntitySaveChangesInterceptor`, which is
+`Singleton` — this one needs `ICurrentUserService`, itself Scoped, for
+`ActorUserId`/`CompanyId`). Watches `ChangeTracker` on every `SaveChanges`
+for exactly the four things this step's checklist names: `User.Role`
+(→ `RoleChanged`), `User.IsActive` true→false (→ `UserDeactivated`),
+`Worker.PayRate` (→ `PayRateChanged`, unconditional per §11.7 — "изменение
+PayRate пишется всегда", no threshold), `Brigade.BrigadirUserId`
+(→ `BrigadirAssigned`).
+
+**Interceptor, not per-handler calls — deliberately.** MASTER §9.4 has no
+endpoint yet for changing a user's role, deactivating a user, or changing a
+worker's `PayRate` — only `AssignBrigadirCommand` (Step 3) exists among the
+four. An interceptor means this audits that one real call site *today* and
+will audit the other three automatically the moment their endpoints land in
+a later phase, without anyone needing to remember to add an explicit
+`AdminAuditLog` call at each new site — the same class of "missed check is
+🔴, not a suggestion" risk AGENTS.md calls out for brigade/prorab isolation,
+just applied to audit logging instead. This also finally closes the gap
+Step 3 flagged: "No `AdminAuditLog` entry written for the [brigadir]
+assignment yet... flagged so `BrigadirAssigned` isn't forgotten once it
+lands" — it's wired now, verified against the real
+`AssignBrigadirCommandHandler`, not a re-implementation.
+
+No actor (`ICurrentUserService.CompanyId`/`UserId` both null — e.g.
+`SeedDataService` at startup, before any JWT exists) → no audit row,
+silently. Nothing to attribute the change to.
+
+`OldValueJson`/`NewValueJson` serialize as `{"value":"<ToString()>"}` —
+uniform across the enum/bool/decimal/Guid? fields tracked here rather than
+type-specific formatting per field.
+
+Verified with a throwaway EF InMemory check (2 tests, written, run, deleted
+— no `Directory.Packages.props`/csproj trace left): creating a User/Worker/
+Brigade produces zero audit rows (only modifications are audited, not
+creates); changing `Role` + deactivating in one `SaveChanges` produces
+exactly `RoleChanged` + `UserDeactivated`, both correctly attributed
+(`CompanyId`/`ActorUserId`); `ChangePayRate` produces `PayRateChanged`;
+calling the real `AssignBrigadirCommandHandler` produces `BrigadirAssigned`
+with the new user's id in `NewValueJson`; a context with no authenticated
+actor produces zero rows on a `Deactivate()` call. Docker still unavailable
+here — suite count unchanged (15 total, 5 pass, 10 need Docker); xUnit
+tests for this step are Step 7's job.
+
+**Step 4 (Zone A) — `ProrabObjectAssignment` + фильтрация объектов по прорабу.**
+`Application/Objects/AssignProrabCommand.cs` + `ListObjectProrabsQuery.cs`
+(`POST,GET /objects/{id}/prorabs`, Owner only, overriding the controller's
+default `Owner,Prorab` gate) plus a new `ProrabObjectAccess` helper used by
+every object-scoped handler from Step 1: `ListConstructionObjectsQuery`
+(filters), `GetConstructionObjectQuery`, `UpdateConstructionObjectCommand`,
+`CreateEstimateItemCommand`, `ListEstimateItemsQuery` (all reject access to
+an unassigned object). One shared helper instead of duplicating the
+assignment lookup five times — a missed copy would have been exactly the
+"🔴, not a suggestion" isolation gap AGENTS.md warns about.
+
+Implements MASTER §1.2's default literally: `GetAllowedObjectIdsAsync`
+returns `null` (no restriction) for Owner, or for a Prorab with **zero**
+`ProrabObjectAssignment` rows — the "one prorab, no setup needed" case.
+Once a Prorab has even one assignment, it returns the allow-list and
+everything outside it is rejected.
+
+**Corrected my own first draft**: initially returned `OBJECT_NOT_FOUND` for
+the isolation-guard failures, reusing Step 1's genuine-not-found code. MASTER
+§9.2 already defines a dedicated code for exactly this case —
+`PRORAB_NOT_ASSIGNED_TO_OBJECT`, 404 — which existed in `ErrorCodeCatalog`
+since Step 10 but had no caller until now. Fixed before committing: `OBJECT_NOT_FOUND`
+stays for a genuinely missing/wrong-company object, `PRORAB_NOT_ASSIGNED_TO_OBJECT`
+for "exists, but not yours." Both 404 — the closed-model rule (§9's "404, not
+403, don't confirm existence") is about not distinguishing 403 vs. 404, not
+about hiding which 404 sub-reason applies, and MASTER's own dedicated code
+confirms that reading.
+
+New `PRORAB_ALREADY_ASSIGNED` (409) — the unique `(ProrabUserId, ObjectId)`
+constraint on `ProrabObjectAssignment` (§5.8) means a repeat assignment is
+checked explicitly before insert rather than left to bubble up as a raw
+DB unique-violation. No check that the assigned user actually has
+`Role == Prorab` — not a stated MASTER invariant, same call as
+`AssignBrigadirCommand` (Step 3) and `Worker.UserId` (Step 2).
+
+**`CreateConstructionObjectCommand` is deliberately NOT gated by
+assignment** — §1.2's wording is about visibility ("видит"/sees), and
+there's no existing object yet to scope a fresh `Create` against; the role
+matrix's plain "C" (no "назначенные" qualifier, unlike the R) reads the same
+way.
+
+Verified with a throwaway EF InMemory check (written, run, deleted — no
+`Directory.Packages.props`/csproj trace left): a fresh Prorab with zero
+assignments sees both test objects; after the Owner assigns them to one,
+the list narrows to exactly that one; `Get`/`CreateEstimateItem` on the
+unassigned object both return `PRORAB_NOT_ASSIGNED_TO_OBJECT`, on the
+assigned one both succeed; duplicate assignment → `PRORAB_ALREADY_ASSIGNED`;
+assigning a nonexistent user → `USER_NOT_FOUND`. Docker still unavailable
+here — suite count unchanged by this step (15 total, 5 pass, 10 need
+Docker); xUnit tests for this step are Step 7's job.
+
+**Step 1 (Zone A) — `Customer`, `ConstructionObject`, `EstimateItem`.**
+`Application/Customers/` (`CreateCustomerCommand`, `ListCustomersQuery`),
+`Application/Objects/` (`CreateConstructionObjectCommand`,
+`ListConstructionObjectsQuery`, `GetConstructionObjectQuery`,
+`UpdateConstructionObjectCommand`, `CreateEstimateItemCommand`,
+`ListEstimateItemsQuery`), `Api/Controllers/CustomersController.cs` +
+`ObjectsController.cs`: `GET,POST /customers`, `GET,POST /objects`,
+`GET,PUT /objects/{id}`, `GET,POST /objects/{id}/estimate-items` — all
+Prorab+ per MASTER §9.4. `IApplicationDbContext` gained `Customers`/
+`ConstructionObjects`/`EstimateItems` `DbSet`s (same catch-up `ApplicationDbContext`
+already had them, interface hadn't). New codes `CUSTOMER_NOT_FOUND`/
+`OBJECT_NOT_FOUND` in `ErrorCodeCatalog`, same 404-not-403 pattern as
+`BRIGADE_NOT_FOUND` from Step 2. No `ProrabObjectAssignment` filtering on the
+objects list yet — that's explicitly Step 4's scope, not invented here.
+
+**Added `ConstructionObject.Update()` to Domain** (Ahmad's file, needed for
+this step's own deliverable, not scope creep): MASTER §9.4 lists
+`GET,PUT /objects/{id}` as a general update endpoint and §12's role matrix
+gives Owner/Prorab full `CRU`, but Domain only had `ChangeStatus`/`Complete`
+— no way to update `Name`/`Address`/dates/`Budget` at all. Added `Update()`
+for those plain fields, keeping `Status` transitions on the existing
+aggregate methods (Rule 3) — the handler calls `Update()` for the descriptive
+fields and separately `Complete()` or `ChangeStatus()` depending on the
+requested status, rather than folding status into `Update()`'s own
+parameters.
+
+**Found, not fixed — Domain has `Customer.Update()`/`EstimateItem.Update()`
+already, unused.** Both entities already carry `Update()` methods (predating
+this step) even though MASTER §9.4's endpoint list has no `PUT /customers/{id}`
+or per-item estimate update — only `GET,POST` for both. Implemented exactly
+what §9.4 lists, nothing invented; flagging since §12's role matrix calls
+both "CRU" for Owner/Prorab, so an update endpoint may be a real gap in §9.4
+rather than a deliberate omission — worth squaring away in MASTER.md, same
+class of issue as the Brigade `PUT /brigadir` role contradiction from Step 3.
+
+Verified with a throwaway EF InMemory check (written, run — 1 test, 12
+assertions covering create/list/get/update/complete for objects, both
+not-found paths, estimate item create + list, customer create + list — all
+passed, then deleted, no `Directory.Packages.props`/csproj trace left).
+Docker still unavailable here — Postgres-backed `Api.IntegrationTests` count
+unchanged by this step (15 total, 5 pass, 10 need Docker); xUnit tests for
+this step itself are Step 7's job, not written now.
 
 **Step 3 (Zone B) — `Brigade`, назначение бригадира.**
 `Application/Brigades/` (`CreateBrigadeCommand`, `ListBrigadesQuery`,
@@ -368,11 +505,11 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 1 — Объекты и бригады
 **Goal:** без объекта и бригады нечего назначать.
 
-- [ ] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
+- [x] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
 - [x] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
-- [ ] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
-- [ ] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
+- [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
+- [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
 - [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
