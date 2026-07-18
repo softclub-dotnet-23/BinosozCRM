@@ -12,7 +12,11 @@ tests). Step 7 stays unchecked below — it's a joint step, and Ahmad's half
 объектам → MASTER §1.2. Once that lands, Step 7 can be checked off and
 Phase 1 marked complete.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 18 tests, confirmed via `dotnet test` (5 pass locally, 13 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — **18/18 passing**, confirmed for
+real against Testcontainers/Postgres twice (Docker became available on this
+machine after it was previously absent — see below): 17m15s on first run
+(image pull + container startup), 16s on a second, back-to-back run
+(image cached) — same 18/18, confirming it wasn't a fluke
 **Updated:** 2026-07-18
 
 **Step 7 (Zone B half) — Worker 18+ boundary tests.**
@@ -26,12 +30,17 @@ restatement of the other two. `PostgresFixture` gained a
 hardcodes a `CompanyId`-less current-user, which silently empties out any
 query against `ICompanyOwned` entities (`Brigade`/`Worker`) via the global
 filter, even though `Add`/`SaveChanges` are unaffected (why the earlier FK
-tests didn't need this). Can't execute against real Postgres on this
-machine (same Docker-daemon gap as every DB-backed test here) — confirmed
-the 3 new tests fail with `DockerUnavailableException` specifically, then
-separately verified the date-boundary arithmetic itself via a throwaway
-InMemory run (3/3 assertions passed, deleted after). First real execution
-happens in CI.
+tests didn't need this). Originally verified only via a throwaway InMemory
+run for the date arithmetic (3/3 passed, deleted after) plus a confirmed
+`DockerUnavailableException` (not a logic failure) against real Postgres,
+since Docker wasn't running on this machine at the time. **Re-verified for
+real once Docker became available**: full suite (all 18 tests, all 5
+DB-backed classes — Login/Refresh/Seed/ForeignKeyConstraint/
+CreateWorkerCommandHandler) run against real Testcontainers/Postgres,
+18/18 passed, 0 failures. `.github/workflows/backend-ci.yml` already runs
+this same full-suite `dotnet test` on every push/PR to `master`, on
+`ubuntu-latest` (Docker preinstalled) — confirmed real, not just a build
+step; no CI changes were needed.
 
 **Not done — Zone A's half of this joint step:** Prorab object-isolation
 tests (§1.2, exercises `ProrabObjectAssignment`/`ConstructionObject`
