@@ -5,18 +5,29 @@
 
 ## Current Status
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 2 (Zone A) — `IndividualTask` + state machine
-**Next step:** Phase 2, Step 3 [BE] Zone A — `TaskLog` для `IndividualTask`
-в той же транзакции, что переход (`WorkOrder`'s side already done in Step
-1; `IndividualTask`'s side already done in Step 2 too — see their notes.
-This step's remaining scope may be effectively empty; verify before
-starting) → MASTER §5.15, §7.1, §7.2
+**Last completed:** Phase 2, Step 3 (Zone A) — `TaskLog` в той же
+транзакции, что переход
+**Next step:** Phase 2, Step 4 [BE] Zone A — `WorkOrderProgress`, upload
+фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
 real against Testcontainers/Postgres
-**Updated:** 2026-07-18
+**Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 3 (Zone A) — `TaskLog` в той же транзакции, что переход.**
+Write side was already fully done by Steps 1–2 (`TaskLogs.Add` exists in
+exactly `WorkOrderTransitionHelper`/`IndividualTaskTransitionHelper`,
+covering every status transition for both entities) — nothing new needed
+there. What was actually missing: the read side §9.4 explicitly names,
+`GET /work-orders/{id}/log` (`Prorab+, Brigadir(own)`). Built
+`GetWorkOrderLogQuery`/`TaskLogDto`, same isolation as `GetWorkOrderQuery`.
+No `/individual-tasks/{id}/log` exists in §9.4, so none was built.
+Verified with a throwaway check against real Postgres (1/1, deleted after):
+log entries return in chronological order; a Brigadir from a different
+brigade gets `WORK_ORDER_NOT_FOUND` on the log endpoint too, matching the
+work order itself. Full suite: 23/23, no regressions.
 
 **Step 2 (Zone A) — `IndividualTask` + state machine.**
 `Application/IndividualTasks/` (Create/List/Get + Start/Complete),
@@ -674,7 +685,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 - [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
-- [ ] Step 3 [BE] — `TaskLog` для `IndividualTask` **в той же транзакции**, что переход (`WorkOrder`'s side already done in Step 1 — see its note) → MASTER §5.15, §7.1, §7.2
+- [x] Step 3 [BE] — `TaskLog` для `IndividualTask` **в той же транзакции**, что переход (`WorkOrder`'s side already done in Step 1 — see its note) → MASTER §5.15, §7.1, §7.2
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2

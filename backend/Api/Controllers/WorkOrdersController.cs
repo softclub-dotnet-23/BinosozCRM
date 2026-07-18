@@ -105,4 +105,15 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
         var result = await sender.Send(new CloseWorkOrderCommand(workOrderId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpGet("{workOrderId:guid}/log")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    public async Task<IActionResult> Log(Guid workOrderId, [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
+        var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
+
+        var result = await sender.Send(new GetWorkOrderLogQuery(workOrderId, clampedPage, clampedPageSize), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }
