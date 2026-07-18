@@ -21,16 +21,18 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'Default' is not configured.");
 
         services.AddSingleton<AuditableEntitySaveChangesInterceptor>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<AdminAuditSaveChangesInterceptor>();
 
         services.AddDbContext<ApplicationDbContext>((sp, options) =>
             options.UseNpgsql(connectionString, npgsql =>
                     npgsql.MigrationsAssembly(typeof(DependencyInjection).Assembly.FullName))
-                .AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>()));
+                .AddInterceptors(
+                    sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>(),
+                    sp.GetRequiredService<AdminAuditSaveChangesInterceptor>()));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
-
-        services.AddHttpContextAccessor();
-        services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))

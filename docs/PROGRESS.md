@@ -5,13 +5,57 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 4 (Zone A)
-**Next step:** Phase 1, Step 5 [BE] Zone A — `AdminAuditLog` + interceptor
-(Steps 1-4 now done — Zone A's 1 and 4, Zone B's 2-3; Step 6 is the shared
-masking pass, Step 7 is the joint test step)
+**Last completed:** Phase 1, Step 5 (Zone A)
+**Next step:** Phase 1, Step 6 [BE] — masking `Document*` по ролям (shared/
+either zone); Step 7 is the joint test step, last in Phase 1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 5 (Zone A) — `AdminAuditLog` + interceptor.**
+New `Infrastructure/Persistence/Interceptors/AdminAuditSaveChangesInterceptor.cs`,
+registered `Scoped` (unlike `AuditableEntitySaveChangesInterceptor`, which is
+`Singleton` — this one needs `ICurrentUserService`, itself Scoped, for
+`ActorUserId`/`CompanyId`). Watches `ChangeTracker` on every `SaveChanges`
+for exactly the four things this step's checklist names: `User.Role`
+(→ `RoleChanged`), `User.IsActive` true→false (→ `UserDeactivated`),
+`Worker.PayRate` (→ `PayRateChanged`, unconditional per §11.7 — "изменение
+PayRate пишется всегда", no threshold), `Brigade.BrigadirUserId`
+(→ `BrigadirAssigned`).
+
+**Interceptor, not per-handler calls — deliberately.** MASTER §9.4 has no
+endpoint yet for changing a user's role, deactivating a user, or changing a
+worker's `PayRate` — only `AssignBrigadirCommand` (Step 3) exists among the
+four. An interceptor means this audits that one real call site *today* and
+will audit the other three automatically the moment their endpoints land in
+a later phase, without anyone needing to remember to add an explicit
+`AdminAuditLog` call at each new site — the same class of "missed check is
+🔴, not a suggestion" risk AGENTS.md calls out for brigade/prorab isolation,
+just applied to audit logging instead. This also finally closes the gap
+Step 3 flagged: "No `AdminAuditLog` entry written for the [brigadir]
+assignment yet... flagged so `BrigadirAssigned` isn't forgotten once it
+lands" — it's wired now, verified against the real
+`AssignBrigadirCommandHandler`, not a re-implementation.
+
+No actor (`ICurrentUserService.CompanyId`/`UserId` both null — e.g.
+`SeedDataService` at startup, before any JWT exists) → no audit row,
+silently. Nothing to attribute the change to.
+
+`OldValueJson`/`NewValueJson` serialize as `{"value":"<ToString()>"}` —
+uniform across the enum/bool/decimal/Guid? fields tracked here rather than
+type-specific formatting per field.
+
+Verified with a throwaway EF InMemory check (2 tests, written, run, deleted
+— no `Directory.Packages.props`/csproj trace left): creating a User/Worker/
+Brigade produces zero audit rows (only modifications are audited, not
+creates); changing `Role` + deactivating in one `SaveChanges` produces
+exactly `RoleChanged` + `UserDeactivated`, both correctly attributed
+(`CompanyId`/`ActorUserId`); `ChangePayRate` produces `PayRateChanged`;
+calling the real `AssignBrigadirCommandHandler` produces `BrigadirAssigned`
+with the new user's id in `NewValueJson`; a context with no authenticated
+actor produces zero rows on a `Deactivate()` call. Docker still unavailable
+here — suite count unchanged (15 total, 5 pass, 10 need Docker); xUnit
+tests for this step are Step 7's job.
 
 **Step 4 (Zone A) — `ProrabObjectAssignment` + фильтрация объектов по прорабу.**
 `Application/Objects/AssignProrabCommand.cs` + `ListObjectProrabsQuery.cs`
@@ -465,7 +509,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
-- [ ] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
+- [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
 - [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
