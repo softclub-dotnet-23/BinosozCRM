@@ -53,6 +53,6 @@ public sealed class LoginCommandHandler(
         context.RefreshTokens.Add(refreshToken);
         await context.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new AuthTokensDto(accessToken, accessTokenExpiresAt, refreshTokenPlain, user.ForcePasswordChange));
+        return Result.Success(new AuthTokensDto(accessToken, accessTokenExpiresAt, refreshTokenPlain, user.ForcePasswordChange, user.Role.ToString()));
     }
 }

@@ -1,15 +1,31 @@
 # PROGRESS — БригадаCRM
 
 Каждый шаг ссылается на раздел `docs/MASTER.md` — читать нужно **только его**, не весь файл.
-Теги: `[BE]` backend · `[FE]` React · `[BOT]` Telegram · `[FULL]` несколько сразу.
+Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу.
 
 ## Current Status
 **Phase:** 0 — Foundation
 **Last completed:** Phase 0, Step 8
-**Next step:** Phase 0, Step 9 (React scaffold)
+**Next step:** Phase 0, Step 9 (CI)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** — (Step 11)
-**Updated:** 2026-07-17
+**Tests:** — (Step 10)
+**Updated:** 2026-07-18
+
+**Нет веб-панели — решено окончательно.** Старый Step 9 (React-каркас) был
+основан на MASTER §13.1, но весь §13/§14 (Frontend/Design) удалён из
+`docs/MASTER.md` ещё в начале работы над Phase 0 (коммит `7cfa06c`). Я успел
+начать React-каркас по общим канонам (Vite+React18+TS, Zustand, Axios+JWT-
+интерцептор, protected routes) — код собирался и работал, но пользователь
+решил, что панель не нужна вообще: Owner/Prorab/Accountant работают через
+REST API напрямую (Postman/скрипты/внешний клиент), не через встроенную
+веб-панель. Весь код в `frontend/` удалён (каталог вернулся к состоянию
+только с `Api.md`), все `[FE]`-шаги вычеркнуты из плана по всем фазам,
+`docs/MASTER.md` обновлён (§0 — две поверхности вместо трёх, §2 — убрана
+строка Frontend из стека, §15 — убраны упоминания React из описаний фаз).
+Единственное, что осталось от той попытки — `Application/Auth/AuthTokensDto.cs`
+теперь возвращает `Role` в ответе логина/рефреша; это осталось намеренно —
+полезно для любого прямого потребителя API, не только для несостоявшейся
+панели, и никак не мешает REST-only модели.
 
 **Error handling (Step 8):** `ExceptionHandlingMiddleware` is first in the
 pipeline — catches anything unhandled anywhere downstream, logs full details
@@ -61,15 +77,14 @@ Postgres is unreachable. `SecurityHeadersMiddleware` sets
 `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'` on every
 response; `UseHsts()` (non-Development only) + `UseHttpsRedirection()` cover
 the rest of §11.3. CORS is an explicit allow-list from `Cors:AllowedOrigins`
-config (empty by default, not a wildcard) — `appsettings.json` has a
-`CHANGE_ME` placeholder for the real panel origin, `appsettings.Development.json`
-allows `http://localhost:5173` (Vite dev server) so local frontend dev isn't
-blocked. Verified with a throwaway TestServer check standing in a fake failing
-health check for Postgres: `/health` stays 200 while it's failing,
-`/health/ready` correctly returns 503; an allowed `Origin` gets
-`Access-Control-Allow-Origin` echoed back, a disallowed one gets no CORS
-header at all (browser blocks it client-side); all four security headers
-present on a plain response.
+config (empty by default, not a wildcard) — kept as-is even without a web
+panel, since any direct API client (Postman/scripts) served from a browser
+context would still need it; `appsettings.json` has a `CHANGE_ME` placeholder.
+Verified with a throwaway TestServer check standing in a fake failing health
+check for Postgres: `/health` stays 200 while it's failing, `/health/ready`
+correctly returns 503; an allowed `Origin` gets `Access-Control-Allow-Origin`
+echoed back, a disallowed one gets no CORS header at all (browser blocks it
+client-side); all four security headers present on a plain response.
 
 **Rate limiting (Step 6):** `/auth/login` — 5 attempts / 15 minutes, partitioned
 by IP+phone (not IP alone — MASTER §11.4 wants each phone number to have its
@@ -128,11 +143,6 @@ chain, logout is idempotent. Found and fixed a real bug during this: the
 lookups, since there's no authenticated context yet at that point in the flow —
 those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
-Role-based HTTP **authorization** (`[Authorize(Roles=...)]` on non-auth
-endpoints) is still pending — no other endpoints exist yet to authorize.
-`ExceptionHandlingMiddleware`/full §9.2 error catalogue is Step 8; until then
-`Api/Common/ResultExtensions.cs` maps only the auth error codes.
-
 ---
 
 ## Phase 0 — Foundation
@@ -146,10 +156,9 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [x] Step 6 [BE] — rate limiting на `/auth/login` (5/15мин) **сразу**, не потом → MASTER §11.4
 - [x] Step 7 [BE] — `/health`, `/health/ready`, CORS allow-list, security-заголовки (HSTS/CSP/nosniff) → MASTER §11.3, §11.8
 - [x] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
-- [ ] Step 9 [FE] — React каркас (Vite/TS), protected routes по роли, страница логина, экран принудительной смены пароля, Axios + JWT-интерцептор → MASTER §13.1
-- [ ] Step 10 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
-- [ ] Step 11 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
-- [ ] Step 12 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV → MASTER §10.0
+- [ ] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
+- [ ] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
+- [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV → MASTER §10.0
 
 ## Phase 1 — Объекты и бригады
 **Goal:** без объекта и бригады нечего назначать.
@@ -159,10 +168,8 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [ ] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [ ] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [ ] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
-- [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
-- [ ] Step 7 [FE] — CRUD объектов/заказчиков/сметы по `docs/MASTER.md` §14 (не временная вёрстка) → MASTER §13.4, §14
-- [ ] Step 8 [FE] — CRUD бригад, состав, валидация 18+ на клиенте с показом возраста → MASTER §13.4
-- [ ] Step 9 [FULL] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
+- [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO) → MASTER §11.6, §12
+- [ ] Step 7 [FULL] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
 ## Phase 2 — Наряды и задачи (ядро)
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
@@ -175,9 +182,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` → MASTER §5.25, §10.2
 - [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 → MASTER §5.26, §10.3
 - [ ] Step 8 [BOT] — «Мои наряды»: отметка выполнения (валидация остатка), фото, отправка на проверку → MASTER §10.4
-- [ ] Step 9 [FE] — 4 представления (Board/List/Calendar/Table), Kanban drag&drop **с откатом** при отказе backend → MASTER §13.3
-- [ ] Step 10 [FE] — правая панель деталей, Accept/Reject **не в DOM** вне `OnReview`, Reject с обязательной причиной → MASTER §13.4
-- [ ] Step 11 [FULL] — тесты: все переходы (разрешённые + запрещённые), изоляция бригады (404), идемпотентность бота → MASTER §7.1, §7.2, §10.3
+- [ ] Step 9 [FULL] — тесты: все переходы (разрешённые + запрещённые), изоляция бригады (404), идемпотентность бота → MASTER §7.1, §7.2, §10.3
 
 ## Phase 3 — Явка, отсутствия, премии
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
@@ -188,9 +193,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) → MASTER §8.7, §10.4
-- [ ] Step 7 [FE] — экран Явка: `LateMinutes` с тултипом-расшифровкой, `EnteredManually` иконкой, отсутствия своим цветом → MASTER §13.4, §14.3
-- [ ] Step 8 [FE] — блок подтверждения премии в правой панели + предупреждение «не войдёт без подтверждения» → MASTER §13.4, §14.3
-- [ ] Step 9 [FULL] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
+- [ ] Step 7 [FULL] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
 
 ## Phase 4 — Материалы
 **Goal:** независима от Phase 3, идёт после ядра.
@@ -200,8 +203,7 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием → MASTER §10.4
-- [ ] Step 6 [FE] — два потока рядом (отчёты | заявки), бейдж «повторяется», прогресс частичной поставки → MASTER §13.4, §14.3
-- [ ] Step 7 [FULL] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
+- [ ] Step 6 [FULL] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
@@ -215,23 +217,20 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 - [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
-- [ ] Step 10 [FE] — экран Зарплата: чек-расшифровка, табличные цифры, отрицательный итог красным с пояснением → MASTER §13.4, §14.3
-- [ ] Step 11 [FE] — блок распределения сдельщины (сумма % крупно, красная при ≠100) → MASTER §13.4
-- [ ] Step 12 [FULL] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
+- [ ] Step 10 [FULL] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 
 ## Phase 6 — Полировка и запуск
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.
 
 - [ ] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
-- [ ] Step 2 [FE] — Kanban на дашборде, графики (закрытые наряды, топ нехваток) → MASTER §13.4
-- [ ] Step 3 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
-- [ ] Step 4 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) → MASTER §10.3
-- [ ] Step 5 [BOT] — язык `tg` + `/language`, `.resx` ресурсы → MASTER §10.6
-- [ ] Step 6 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
-- [ ] Step 7 [FULL] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
-- [ ] Step 8 [FULL] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
-- [ ] Step 9 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
-- [ ] Step 10 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §18
+- [ ] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
+- [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) → MASTER §10.3
+- [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы → MASTER §10.6
+- [ ] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
+- [ ] Step 6 [FULL] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
+- [ ] Step 7 [FULL] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
+- [ ] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
+- [ ] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §18
 
 ---
 
@@ -240,6 +239,6 @@ endpoints) is still pending — no other endpoints exist yet to authorize.
 Если шаг упирается в один из них — реализуй дефолт, оставь настраиваемым, отметь здесь:
 
 - [ ] №6 Переработка — вне MVP (нет `ShiftEndTime` и нормы часов). Решить после Phase 3.
-- [ ] №8 SMS-провайдер для сброса пароля — пока Telegram + ручной сброс через Owner.
-- [ ] №9 Fallback без Telegram у бригадира — пока прораб отмечает через панель (`EnteredManually`).
+- [ ] №8 SMS-провайдер для сброса пароля — пока Telegram + ручной сброс через Owner (по API, панели нет).
+- [ ] №9 Fallback без Telegram у бригадира — пока прораб отмечает через API напрямую (`EnteredManually`), без встроенной панели.
 - [ ] №7 История ставок (`WorkerPayRateHistory`) — не храним, смена действует с даты изменения.

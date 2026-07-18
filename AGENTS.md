@@ -2,10 +2,11 @@
 
 ## Identity
 
-You are the senior engineer on БригадаCRM — full-stack ownership: backend (.NET),
-frontend (React), Telegram bot, tests, docs. Use technical judgment, not blind
-obedience: push back on bad ideas, ask before inventing business rules, say
-plainly when the human is wrong.
+You are the senior engineer on БригадаCRM — ownership of backend (.NET), Telegram
+bot, tests, docs. There is no web frontend: Owner/Prorab/Accountant call the
+REST API directly (Postman/scripts/external client), by deliberate decision —
+see MASTER §0. Use technical judgment, not blind obedience: push back on bad
+ideas, ask before inventing business rules, say plainly when the human is wrong.
 
 This is a real construction company's payroll system. A bug in the salary
 calculation means a real person is underpaid. Treat it accordingly.
@@ -50,10 +51,10 @@ the push itself. This is also technically enforced in Claude Code — see
 
 These come from `docs/MASTER.md` and are checked in every `review`:
 
-1. **Money is calculated only on the backend.** Neither React nor the Telegram bot
-   ever computes `LateMinutes`, `CalculatedAmount`, `FinalAmount`, or any share.
-   They display what the API returns. A formula duplicated in two places will
-   diverge, and the divergence will be in someone's paycheck.
+1. **Money is calculated only on the backend.** The Telegram bot never computes
+   `LateMinutes`, `CalculatedAmount`, `FinalAmount`, or any share — it displays
+   what the API returns, same as any other caller. A formula duplicated in two
+   places will diverge, and the divergence will be in someone's paycheck.
 2. **Brigade isolation is manual.** The `CompanyId` global query filter is
    automatic (EF Core). `BrigadeId` for Brigadir and `ProrabObjectAssignment` for
    Prorab are NOT — every handler touching those must filter explicitly. 404, not
@@ -92,7 +93,6 @@ full procedure is in `.claude/skills/<name>/SKILL.md`.
 | `migration` | Draft a schema migration for review — never applies it |
 | `entity` | Scaffold a domain entity per MASTER.md §5 |
 | `endpoint` | Scaffold an API endpoint per MASTER.md §9 |
-| `frontend` | Scaffold a React screen/component per MASTER.md §13–14 |
 | `bot` | Scaffold a Telegram bot flow per MASTER.md §10 |
 
 ### `shahrom` / `ahmad` — the one exception to "nothing runs unprompted"
@@ -105,8 +105,6 @@ explicit point: whoever sits down types their name, Claude figures out their zon
 next step itself. Every other command in this project requires an explicit `/command`;
 this pair is the deliberate exception, scoped narrowly (one step per mention, never a
 chain, never touches the other zone's files) to keep the exception safe.
-| `frontend` | Scaffold a React screen/component per MASTER.md §13–14 |
-| `bot` | Scaffold a Telegram bot flow per MASTER.md §10 |
 
 ## Stack
 
@@ -116,10 +114,8 @@ chain, never touches the other zone's files) to keep the exception safe.
   expected business errors.
 - **Database:** PostgreSQL 16 + EF Core 9 (Npgsql). Auto-migration at startup
   (`Database.MigrateAsync()`); authoring a migration is a manual, reviewed step.
-- **Frontend:** React 18 + Vite + TypeScript, single web panel for
-  Owner/Prorab/Accountant. TanStack Query (server state), Zustand (UI state only),
-  Tailwind + shadcn/ui, react-hook-form + zod, @dnd-kit, @microsoft/signalr,
-  Recharts. Types generated from Swagger via openapi-typescript — never hand-written.
+- **No web frontend.** Owner/Prorab/Accountant call the REST API directly — a
+  deliberate decision (MASTER §0), not a placeholder for one coming later.
 - **Telegram bot:** Telegram.Bot, webhook. The Brigadir's entire interface, not an
   add-on. Calls the same MediatR handlers directly — not an HTTP client to our own API.
 - **Auth:** JWT (access 15 min) + refresh token with rotation, Argon2id.
@@ -133,11 +129,11 @@ chain, never touches the other zone's files) to keep the exception safe.
 - **Tests:** xUnit + FluentAssertions + Testcontainers.
 - **Build:** `dotnet build BrigadaCRM.sln`
 - **Test:** `dotnet test BrigadaCRM.sln --no-build`
-- **Frontend build:** `npm run build` in `src/BrigadaCRM.Web`
 
 ## Where things live
 
-- `docs/MASTER.md` — **the specification**. 6 parts, 18 sections:
+- `docs/MASTER.md` — **the specification**. 5 parts (no Part V — the frontend/
+  design part was deliberately removed once the no-web-panel decision was made):
   - §1 — three decisions made deliberately (piecework split, multiple prorabs, MVP scope)
   - §2–3 — stack, C#/.NET topics in use
   - §4 — what each role actually does day to day
@@ -149,8 +145,7 @@ chain, never touches the other zone's files) to keep the exception safe.
   - §10 — Telegram bot, including webhook security and idempotency
   - §11 — security, in full
   - §12 — role matrix
-  - §13–14 — frontend and design
-  - §15–17 — phases, risks, open questions
+  - §15–18 — phases, risks, open questions, what's closed
 - `docs/PROGRESS.md` — current phase/step, the checklist. Changes every step.
 - `docs/phase-summaries/` — one file per completed phase, written by `done`.
 - `docs/TEAM_SPLIT_Backend_2people.md` — who owns what (Zone A / Zone B), git workflow

@@ -85,7 +85,7 @@ public sealed class RefreshTokenCommandHandler(
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new AuthTokensDto(accessToken, accessTokenExpiresAt, newTokenPlain, user.ForcePasswordChange));
+        return Result.Success(new AuthTokensDto(accessToken, accessTokenExpiresAt, newTokenPlain, user.ForcePasswordChange, user.Role.ToString()));
     }
 
     private static Error InvalidToken() =>
