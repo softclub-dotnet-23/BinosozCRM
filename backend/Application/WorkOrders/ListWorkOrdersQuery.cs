@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Objects;
@@ -19,7 +20,7 @@ public sealed class ListWorkOrdersQueryHandler(IApplicationDbContext context, IC
 
         if (currentUser.Role == Role.Brigadir)
         {
-            var ownBrigadeId = await WorkOrderAccess.GetBrigadirOwnBrigadeIdAsync(context, currentUser, cancellationToken);
+            var ownBrigadeId = await BrigadirAccess.GetOwnBrigadeIdAsync(context, currentUser, cancellationToken);
             query = query.Where(w => w.BrigadeId == ownBrigadeId);
         }
         else

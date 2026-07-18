@@ -5,15 +5,57 @@
 
 ## Current Status
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 1 (Zone A) — `WorkOrder` + state machine + `Code` + `xmin`
-**Next step:** Phase 2, Step 2 [BE] Zone A — `IndividualTask` + state machine
-(`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
+**Last completed:** Phase 2, Step 2 (Zone A) — `IndividualTask` + state machine
+**Next step:** Phase 2, Step 3 [BE] Zone A — `TaskLog` для `IndividualTask`
+в той же транзакции, что переход (`WorkOrder`'s side already done in Step
+1; `IndividualTask`'s side already done in Step 2 too — see their notes.
+This step's remaining scope may be effectively empty; verify before
+starting) → MASTER §5.15, §7.1, §7.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-18
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 2 (Zone A) — `IndividualTask` + state machine.**
+`Application/IndividualTasks/` (Create/List/Get + Start/Complete),
+`IndividualTaskTransitionHelper` (same TaskLog+`xmin` pattern as
+`WorkOrder`'s, TaskLog written now, not deferred). `Api/Controllers/
+IndividualTasksController.cs`, all Brigadir-only per §9.4's literal
+listing. Brigade isolation on Create (`AssignedToWorkerId.BrigadeId ==
+creator.BrigadeId`, else `INDIVIDUAL_TASK_WRONG_BRIGADE`) and on every
+read/transition (cross-brigade → `INDIVIDUAL_TASK_NOT_FOUND`, 404 not 403).
+
+**Real bug caught and fixed as a refactor:** §5.14 says `IndividualTask
+.Code` shares WorkOrder's exact per-company sequence — flagged in Step 1's
+generator comment but left unaddressed there (only `WorkOrder` existed
+yet). Left alone, this step would have silently produced duplicate `BR-N`
+codes across the two entity types. Fixed by merging into `Application/
+Common/BusinessCodeGenerator.cs` (queries both tables now), updating
+`CreateWorkOrderCommand` to use it, deleting the old WorkOrder-only
+generator. Verified directly: `WorkOrder` create → `BR-1`, `IndividualTask`
+create right after → `BR-2`, no collision.
+
+Also extracted `WorkOrderAccess`'s Brigadir-own-brigade lookup into shared
+`Application/Common/BrigadirAccess.cs` (both entities needed the identical
+check), updating all 4 existing `WorkOrder` call sites. Reran the full
+prior suite after the refactor — 23/23, no regressions.
+
+**Not this step's scope, flagged for whoever picks these up:**
+`IndividualTask.ApproveBonus` (Domain, already written in Phase 0) doesn't
+actually gate on `CompletedEarly`, even though `BONUS_NOT_ELIGIBLE`'s
+catalog description says it should ("подтверждение премии на задаче без
+CompletedEarly"). Not fixed now — bonus proposal is Phase 3 Step 6 (bot),
+approval is Phase 5 Step 5 (payroll); this step never calls either method.
+
+Verified with a throwaway check against real Postgres (5/5 passed, then
+deleted): create succeeds/rejects correctly on brigade match; `Code`
+sequencing confirmed shared with `WorkOrder` as above; full lifecycle
+(Assigned→InProgress→Done) writes exactly 2 `TaskLog` rows;
+`CompletedEarly` computes correctly (`DueAt` a day out, completed now →
+`true`); cross-brigade access reads as 404. Full suite after cleanup:
+23/23.
 
 **Step 1 (Zone A) — `WorkOrder` + state machine + `Code` (`BR-{N}`) + `xmin`.**
 `Application/WorkOrders/` (Create/List/Get + all 7 transitions: Assign,
@@ -631,7 +673,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
 
 - [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
-- [ ] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
+- [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 - [ ] Step 3 [BE] — `TaskLog` для `IndividualTask` **в той же транзакции**, что переход (`WorkOrder`'s side already done in Step 1 — see its note) → MASTER §5.15, §7.1, §7.2
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4

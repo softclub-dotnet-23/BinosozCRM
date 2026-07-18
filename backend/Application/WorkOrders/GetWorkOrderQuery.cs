@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Application.Objects;
 using Domain.Common;
@@ -20,7 +21,7 @@ public sealed class GetWorkOrderQueryHandler(IApplicationDbContext context, ICur
 
         if (currentUser.Role == Role.Brigadir)
         {
-            var ownBrigadeId = await WorkOrderAccess.GetBrigadirOwnBrigadeIdAsync(context, currentUser, cancellationToken);
+            var ownBrigadeId = await BrigadirAccess.GetOwnBrigadeIdAsync(context, currentUser, cancellationToken);
             if (ownBrigadeId != workOrder.BrigadeId)
                 return Result.Failure<WorkOrderDto>(new Error("WORK_ORDER_NOT_FOUND", "Work order not found."));
         }

@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Domain.Common;
 using Domain.Enums;
@@ -29,7 +30,7 @@ public sealed class SubmitWorkOrderForReviewCommandHandler(IApplicationDbContext
         if (workOrder is null)
             return Result.Failure<WorkOrderDto>(new Error("WORK_ORDER_NOT_FOUND", "Work order not found."));
 
-        var ownBrigadeId = await WorkOrderAccess.GetBrigadirOwnBrigadeIdAsync(context, currentUser, cancellationToken);
+        var ownBrigadeId = await BrigadirAccess.GetOwnBrigadeIdAsync(context, currentUser, cancellationToken);
         if (ownBrigadeId != workOrder.BrigadeId)
             return Result.Failure<WorkOrderDto>(new Error("WORK_ORDER_NOT_FOUND", "Work order not found."));
 

@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Application.Objects;
 using Domain.Common;
@@ -53,8 +54,9 @@ public sealed class CreateWorkOrderCommandHandler(IApplicationDbContext context,
         if (request.EstimateItemId is not null && !await context.EstimateItems.AnyAsync(e => e.Id == request.EstimateItemId, cancellationToken))
             return Result.Failure<WorkOrderDto>(new Error("ESTIMATE_ITEM_NOT_FOUND", "Estimate item not found."));
 
-        // Code generation is best-effort MAX+1 (WorkOrderCodeGenerator), not
-        // a DB sequence, so two concurrent creates in the same company could
+        // Code generation is best-effort MAX+1 (BusinessCodeGenerator, shared
+        // with IndividualTask — §5.14's "та же последовательность"), not a
+        // DB sequence, so two concurrent creates in the same company could
         // race on the same number — the unique (CompanyId, Code) index turns
         // that into a clean DbUpdateException instead of silent corruption.
         // Retry a couple of times with a freshly computed code; a failure on
@@ -62,7 +64,7 @@ public sealed class CreateWorkOrderCommandHandler(IApplicationDbContext context,
         // Result — this deep into a collision is not an "expected" failure.
         for (var attempt = 0; attempt < MaxCodeAttempts; attempt++)
         {
-            var code = await WorkOrderCodeGenerator.NextCodeAsync(context, currentUser.CompanyId!.Value, cancellationToken);
+            var code = await BusinessCodeGenerator.NextCodeAsync(context, currentUser.CompanyId!.Value, cancellationToken);
 
             var workOrder = WorkOrder.Create(
                 currentUser.CompanyId!.Value,

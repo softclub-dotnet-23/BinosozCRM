@@ -48,6 +48,8 @@ public static class ErrorCodeCatalog
         ["WORK_ORDER_SHARES_INVALID"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NO_PROGRESS"] = StatusCodes.Status400BadRequest,
         ["INDIVIDUAL_TASK_WRONG_BRIGADE"] = StatusCodes.Status400BadRequest,
+        ["INDIVIDUAL_TASK_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["INDIVIDUAL_TASK_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["TIMESHEET_ALREADY_CHECKED_IN"] = StatusCodes.Status400BadRequest,
         ["TIMESHEET_ABSENCE_CONFLICT"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,

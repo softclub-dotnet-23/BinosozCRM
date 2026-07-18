@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<WorkOrder> WorkOrders { get; }
     DbSet<WorkOrderProgress> WorkOrderProgresses { get; }
     DbSet<WorkOrderPayoutShare> WorkOrderPayoutShares { get; }
+    DbSet<IndividualTask> IndividualTasks { get; }
     DbSet<TaskLog> TaskLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
