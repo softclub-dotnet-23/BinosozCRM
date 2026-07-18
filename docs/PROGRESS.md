@@ -5,13 +5,44 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 2 (Zone B)
-**Next step:** Phase 1, Step 3 [BE] Zone B — `Brigade`, назначение бригадира
-(Phase 1, Step 1 [BE] Zone A — `Customer`/`ConstructionObject`/`EstimateItem` —
-is still open too, independently; not a Zone B blocker)
+**Last completed:** Phase 1, Step 3 (Zone B)
+**Next step:** Phase 1, Step 4 [BE] Zone A — `ProrabObjectAssignment` + фильтрация
+объектов по прорабу (not a Zone B step — Zone B's own Phase 1 work, Steps 2-3,
+is complete; Steps 1/4/5/6 belong to Zone A or the shared masking pass, Step 7
+is the joint test step)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 12 tests written (5 pass locally, 7 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 3 (Zone B) — `Brigade`, назначение бригадира.**
+`Application/Brigades/` (`CreateBrigadeCommand`, `ListBrigadesQuery`,
+`AssignBrigadirCommand`), `Api/Controllers/BrigadesController.cs`:
+`POST,GET /brigades` (Owner/Prorab), `PUT /brigades/{id}/brigadir` (Owner
+only). `AssignBrigadirCommand` allows `UserId: null` to clear an assignment —
+`Brigade.AssignBrigadir(Guid?)` was already written to support it. No check
+that the target user has `Role == Brigadir` — not a stated MASTER invariant,
+would have been inventing a rule (same call as `Worker.UserId` in Step 2). No
+`AdminAuditLog` entry written for the assignment yet — that's Zone A's Phase
+1 Step 5, not built yet; flagged so `BrigadirAssigned` isn't forgotten once
+it lands.
+
+**Resolved a self-contradiction in MASTER.md, decided by the user, not
+picked silently:** who can call `PUT /brigades/{id}/brigadir`? §9.4's
+endpoint table says **Owner** only; §13's Phase 1 DoD line ("прораб
+создаёт объект, бригаду, **назначает бригадира**...") explicitly describes
+**Prorab** doing it; §12's role matrix gives Prorab general `CRU` on
+`Brigade` with no stated carve-out for `BrigadirUserId` specifically (unlike
+`Worker.PayRate`, which *is* explicitly carved out). **Decided: Owner only**,
+per §9.4 literally — implemented that way. Worth Ahmad/the user squaring away
+in MASTER.md itself at some point so this doesn't need re-deciding.
+
+Verified with a throwaway EF InMemory check (7/7 passed, then deleted, no
+`Directory.Packages.props`/csproj trace left): create succeeds; assign and
+clear-assignment both work; brigade-not-found, user-not-found, and
+cross-company-brigade (global `CompanyId` filter hides it, doesn't leak it)
+all return the expected 404s; pagination works. No new error codes needed —
+`BRIGADE_NOT_FOUND`/`USER_NOT_FOUND` already existed from Step 2. Real xUnit
+tests for this step are Step 7's job, not written now.
 
 **Step 2 (Zone B) — `Worker`: 18+ on `HireDate`, `ShiftStartTime`, PII fields.**
 Application/Api layer only (`backend/Application/Workers/`,
@@ -325,7 +356,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [ ] Step 1 [BE] — `Customer`, `ConstructionObject`, `EstimateItem` → MASTER §5.5, §5.9, §5.10
 - [x] Step 2 [BE] — `Worker`: 18+ **на дату HireDate** (hard 400), `ShiftStartTime`, `UserId` nullable, PII-поля → MASTER §5.7, §8.3
-- [ ] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
+- [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [ ] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [ ] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
