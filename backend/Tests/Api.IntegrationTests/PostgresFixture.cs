@@ -43,13 +43,22 @@ public sealed class PostgresFixture : IAsyncLifetime
         await context.Database.MigrateAsync();
     }
 
-    public ApplicationDbContext CreateDbContext()
+    public ApplicationDbContext CreateDbContext() => CreateDbContext(new NullCurrentUserService());
+
+    // For tests against ICompanyOwned entities (Brigade, Worker, ...): the
+    // CompanyId global query filter (Infrastructure/Persistence/
+    // ApplicationDbContext) reads it from the context's ICurrentUserService,
+    // not from the row itself — a context built with NullCurrentUserService
+    // (CompanyId null → filter falls back to Guid.Empty) would silently see
+    // zero rows for a real seeded company on any query, even though Add/
+    // SaveChanges (unaffected by query filters) would work fine.
+    public ApplicationDbContext CreateDbContext(ICurrentUserService currentUserService)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_container.GetConnectionString())
             .Options;
 
-        return new ApplicationDbContext(options, new NullCurrentUserService());
+        return new ApplicationDbContext(options, currentUserService);
     }
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
