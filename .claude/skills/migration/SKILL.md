@@ -8,7 +8,7 @@ argument-hint: "[description]"
 1. Show the entity/model changes since the last migration.
 2. Propose a name: `YYYYMMDDHHmm_DescriptiveName`.
 3. Print the exact command — don't run it:
-   `dotnet ef migrations add <Name> --project src/BrigadaCRM.Infrastructure --startup-project src/BrigadaCRM.WebApi`
+   `dotnet ef migrations add <Name> --project backend/Infrastructure --startup-project backend/Api`
 4. Predict `Up()`/`Down()`.
 5. Flag anything risky: data loss, a new required column on a table with existing rows
    (`Worker`, `PayrollEntry` especially — real data), a lock that stalls a large table.

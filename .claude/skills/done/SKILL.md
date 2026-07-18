@@ -2,23 +2,23 @@
 name: done
 description: Close out the current PROGRESS.md step — build clean, test, update docs, commit locally, report, and stop.
 disable-model-invocation: true
-allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(dotnet *) Bash(npm *)
+allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *) Bash(git diff *) Bash(dotnet *)
 argument-hint: "[commit message]"
 ---
 
 Stop immediately at any failing step — never commit on a red build.
 
 ## 1. Build — zero warnings
-`dotnet build BrigadaCRM.sln`. If React changed: `npm run build` in `src/BrigadaCRM.Web`.
+`dotnet build backend/backend.slnx`.
 Warnings → fix and rebuild, unless suppressed by `.editorconfig` convention.
 
 ## 2. Migrations
-`dotnet ef migrations list --project src/BrigadaCRM.Infrastructure --startup-project src/BrigadaCRM.WebApi`
+`dotnet ef migrations list --project backend/Infrastructure --startup-project backend/Api`
 Pending → `dotnet ef database update` against the LOCAL dev database only. Never a
 shared or production database from this command.
 
 ## 3. Tests
-`dotnet test BrigadaCRM.sln --no-build`. Any failure → stop and report.
+`dotnet test backend/backend.slnx --no-build`. Any failure → stop and report.
 
 ## 4. Update docs/PROGRESS.md
 - Check off the step.
@@ -33,7 +33,7 @@ shared or production database from this command.
 ## 5. Commit locally
 `git add .`
 `git commit -m "<message>"` — $ARGUMENTS if given, else
-`Phase X Step Y [BE|FE|BOT|FULL]: <description from PROGRESS.md>`.
+`Phase X Step Y [BE|BOT|FULL]: <description from PROGRESS.md>`.
 Never `git push`.
 
 ## 6. Report and stop

@@ -16,7 +16,7 @@
   всю зарплатную математику единолично, не «немного каждый».
 - **Domain-слой теперь тоже один владелец** (обновление после первого запуска на
   практике) — см. §2.0. Раньше сущности были разбиты между зонами так же, как и
-  остальной код; теперь весь `src/BrigadaCRM.Domain/` и EF-конфигурации — у одного
+  остальной код; теперь весь `backend/Domain/` и EF-конфигурации — у одного
   человека, чтобы `ApplicationDbContext`/миграции вообще перестали быть местом
   конфликта, а не просто «редким» местом.
 
@@ -33,9 +33,10 @@
 техническая, не «главный» — оба código-owners в своих зонах.
 
 **Почему не «фронтенд/бэкенд» на двоих.** Проект сейчас без веб-панели (MASTER §0) —
-этот вопрос уже не стоит буквально, но принцип остался: делить по слоям (один
-пишет модели, другой — API) значит оба ждут друг друга на каждом шаге. Оба ведут
-вертикальные срезы — сущность → API → (при необходимости) бот-флоу.
+этот вопрос уже не стоит буквально. **Почему не «по слоям» вообще** (один — Domain/EF,
+другой — всё остальное): тогда один человек 3 месяца работает и не может ничего
+показать, а другой сидит без сущностей — оба ждут друг друга на каждом шаге. Оба
+ведут вертикальные срезы — сущность → API → (при необходимости) бот-флоу.
 
 ---
 
@@ -50,15 +51,15 @@
 опечатка в `decimal(18,2)` — и это баг в чужой зоне, который никто не увидит на
 ревью, потому что "это же файл того, другого").
 
-**Решение: весь `src/BrigadaCRM.Domain/` (все 26 сущностей) и
-`src/BrigadaCRM.Infrastructure/Persistence/` (конфигурации + сам
+**Решение: весь `backend/Domain/` (все 26 сущностей) и
+`backend/Infrastructure/Persistence/` (конфигурации + сам
 `ApplicationDbContext`) — у одного человека. Здесь — Ахмад**, потому что он уже
 тимлид и уже единолично ведёт миграции (§5) — это те же обязанности, просто
 явно названные, а не разделение работы заново.
 
 **Что это меняет для Шахрома:** он **не пишет** `.cs`-файлы сущностей и
 EF-конфигураций вообще. Если для зоны B нужна новая сущность или поле в
-существующей — Шахром **не редактирует** `Domain/Entities/Worker.cs` сам, а или (а)
+существующей — Шахром **не редактирует** `backend/Domain/Entities/Worker.cs` сам, а или (а)
 просит Ахмада добавить, или (б) сам пишет черновик и отдаёт на review-переносе —
 финальную правку в файл делает Ахмад. Это не бюрократия ради бюрократии: одна
 случайная правка чужого `decimal(18,3)` на `decimal(18,2)` в сущности зарплаты — и
@@ -87,16 +88,16 @@ WorkOrder, WorkOrderProgress, IndividualTask, TaskLog, AdminAuditLog
 
 **Папки:**
 ```
-src/BrigadaCRM.Domain/               ← весь каталог, включая Worker/Timesheet/
+backend/Domain/                      ← весь каталог, включая Worker/Timesheet/
                                         Payroll* — см. §2.0, не только "свои" 13
-src/BrigadaCRM.Infrastructure/Persistence/   ← весь каталог: DbContext + все конфигурации
-src/BrigadaCRM.Infrastructure/Auth/
-src/BrigadaCRM.Application/{Auth,Objects,Customers,WorkOrders,IndividualTasks}/
-src/BrigadaCRM.WebApi/Controllers/{Auth,Objects,Customers,WorkOrders,
-                                    IndividualTasks}Controller.cs
+backend/Infrastructure/Persistence/  ← весь каталог: DbContext + все конфигурации
+backend/Infrastructure/Auth/
+backend/Application/{Auth,Objects,Customers,WorkOrders,IndividualTasks}/
+backend/Api/Controllers/{Auth,Objects,Customers,WorkOrders,
+                          IndividualTasks}Controller.cs
 ```
 
-**Фазы (MASTER §15):** 0 (целиком), 1 (объекты, прорабы), 2 (наряды/задачи — ядро,
+**Фазы (MASTER §13):** 0 (целиком), 1 (объекты, прорабы), 2 (наряды/задачи — ядро,
 кроме бот-хендлеров, см. §4 ниже), 6 (дашборд, health, бэкапы).
 
 **Отвечает дополнительно за:** solution/DI/CI-каркас, seed (§5.27 — Company+3 Owner),
@@ -114,16 +115,16 @@ TelegramLink, TelegramLinkCode, TelegramUpdateLog
 
 **Папки:**
 ```
-src/BrigadaCRM.Application/{Brigades,Workers,Timesheets,Absences,Materials,
-                            Payroll,PayoutShares}/
-src/BrigadaCRM.TelegramBot/
-src/BrigadaCRM.WebApi/Controllers/{Brigades,Workers,Timesheets,Absences,
-                                    Materials,Payroll}Controller.cs
+backend/Application/{Brigades,Workers,Timesheets,Absences,Materials,
+                      Payroll,PayoutShares}/
+backend/TelegramBot/
+backend/Api/Controllers/{Brigades,Workers,Timesheets,Absences,
+                          Materials,Payroll}Controller.cs
 ```
 
-**Не трогает** `Domain/Entities/{Brigade,Worker,Timesheet,AbsenceRecord,
+**Не трогает** `backend/Domain/Entities/{Brigade,Worker,Timesheet,AbsenceRecord,
 MaterialRequest,...,PayrollEntry,PayrollAdvance,TelegramLink*}.cs` и
-`Infrastructure/Persistence/Configurations/` — это у Ахмада, §2.0. Нужно поле,
+`backend/Infrastructure/Persistence/Configurations/` — это у Ахмада, §2.0. Нужно поле,
 нужен индекс, нужна связь — просит, не правит сам.
 
 **Фазы:** 1 (бригады, рабочие, 18+), 2 (Telegram-бот v1 — привязка, secret_token,
@@ -251,8 +252,9 @@ git push origin feat/b-attendance                  # → PR, ревьюер — 
                           собственную фичу параллельно
 
 Недели 12-13 [Фаза 4]  B: материалы (не зависит от Фазы 3)
-                       A: ревью PR B, готовит `GET /dashboard/work-status`
-                          (Фаза 6, MASTER §8.6) заранее, если время позволяет
+                       A: ревью PR B (Фаза 4 — целиком зона B), готовит
+                          `GET /dashboard/work-status` (Фаза 6, MASTER §8.6)
+                          заранее, если время позволяет
 
 Недели 14-17 [Фаза 5]  B: PayrollEntry handlers целиком — самая плотная часть
                           в одиночку (сущность и конфигурация уже готовы
@@ -284,7 +286,7 @@ git push origin feat/b-attendance                  # → PR, ревьюер — 
    `CompanyId`-фильтром автоматически. Пропуск — 🔴 на `/review` всегда.
 4. **Контракт команд между зонами (§4) не меняется в одиночку.**
 5. **Миграции — только A.**
-6. **Открытые вопросы (MASTER §17, теперь 13 штук) не решает ни A, ни B сам** —
+6. **Открытые вопросы (MASTER §15, теперь 13 штук) не решает ни A, ни B сам** —
    дефолт в код, решение — к заказчику.
 7. **`pull origin dev` каждое утро. PR ≤400 строк. Красный CI не мержится.**
 

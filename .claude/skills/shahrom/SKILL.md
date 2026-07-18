@@ -9,14 +9,14 @@ why. Same reasoning applies here, mirrored to Zone B.
 1. Read `docs/TEAM_SPLIT_Backend_2people.md` §2.2 "B — Поле и касса" for the current
    feature list (`Brigade`, `Worker`, `Timesheet`, `AbsenceRecord`, `MaterialRequest`,
    `MaterialConsumptionReport`, `MaterialDelivery`, `WorkOrderPayoutShare`,
-   `PayrollEntry`, `PayrollAdvance`, `TelegramLink*`, `src/BrigadaCRM.TelegramBot`).
+   `PayrollEntry`, `PayrollAdvance`, `TelegramLink*`, `backend/TelegramBot`).
 2. Read `docs/PROGRESS.md`. Find the first unchecked step in that list. Phase 0 belongs
    entirely to Ahmad (§2.0/§3 of the team-split doc — he writes ALL 26 entities and
    EF configurations up front, both zones) — if Phase 0 isn't finished, say so and stop.
 3. Report, tersely: "Шахром — Zone B. Следующий шаг: [step], MASTER §[...]".
 4. **Hard boundary (§2.0 and §7 rule 2 of the team-split doc): never create or edit
-   files under `src/BrigadaCRM.Domain/Entities/` or
-   `src/BrigadaCRM.Infrastructure/Persistence/Configurations/`, even for Zone B's own
+   files under `backend/Domain/Entities/` or
+   `backend/Infrastructure/Persistence/Configurations/`, even for Zone B's own
    entities.** Those belong to Ahmad exclusively — a wrong `decimal(18,3)` vs
    `decimal(18,2)` in a payroll entity is exactly the kind of quiet bug this rule exists
    to prevent. If the step needs a new field or a new entity that doesn't exist yet:

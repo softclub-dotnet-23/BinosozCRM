@@ -13,11 +13,10 @@ narrow to compensate — one step, then stop, same as `/go`.
    here, not one:
    - **Zone A features**: identity/auth, `ConstructionObject`, `EstimateItem`,
      `Customer`, `ProrabObjectAssignment`, `WorkOrder`, `WorkOrderProgress`,
-     `IndividualTask`, `TaskLog`, `AdminAuditLog`, plus solution/DI/CI scaffolding and
-     the React shell.
+     `IndividualTask`, `TaskLog`, `AdminAuditLog`, plus solution/DI/CI scaffolding.
    - **All Domain, for both zones** (§2.0): every file under
-     `src/BrigadaCRM.Domain/Entities/` and
-     `src/BrigadaCRM.Infrastructure/Persistence/` (configurations + `ApplicationDbContext`
+     `backend/Domain/Entities/` and
+     `backend/Infrastructure/Persistence/` (configurations + `ApplicationDbContext`
      itself) — all 26 entities from MASTER.md §5, not just Zone A's 13. Shahrom never
      touches these even for his own zone's entities.
 2. Read `docs/PROGRESS.md`. Priority order:

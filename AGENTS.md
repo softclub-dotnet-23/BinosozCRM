@@ -35,7 +35,7 @@ the push itself. This is also technically enforced in Claude Code — see
 
 - **One task at a time.** Take the next unchecked step from `docs/PROGRESS.md`, in
   order. Never skip ahead, never batch multiple steps into one pass.
-- **Never invent business rules.** `docs/MASTER.md` §17 lists 12 open questions
+- **Never invent business rules.** `docs/MASTER.md` §15 lists 12 open questions
   that are explicitly NOT yours to answer — rates, formulas, thresholds. Each has
   a stated default: implement the default, keep it configurable (usually a
   `Company` field), never hardcode. If a rule you need isn't in MASTER.md at all,
@@ -127,13 +127,14 @@ chain, never touches the other zone's files) to keep the exception safe.
 - **Background:** Hangfire or BackgroundService — shift reminders, payroll drafts,
   overdue flags, TelegramUpdateLog cleanup.
 - **Tests:** xUnit + FluentAssertions + Testcontainers.
-- **Build:** `dotnet build BrigadaCRM.sln`
-- **Test:** `dotnet test BrigadaCRM.sln --no-build`
+- **Build:** `dotnet build backend/backend.slnx`
+- **Test:** `dotnet test backend/backend.slnx --no-build`
 
 ## Where things live
 
-- `docs/MASTER.md` — **the specification**. 5 parts (no Part V — the frontend/
-  design part was deliberately removed once the no-web-panel decision was made):
+- `docs/MASTER.md` — **the specification**. 5 parts, 16 sections (Part V used to
+  be Frontend/Design; removed once the no-web-panel decision was made, and the
+  Plan part renumbered down into its slot):
   - §1 — three decisions made deliberately (piecework split, multiple prorabs, MVP scope)
   - §2–3 — stack, C#/.NET topics in use
   - §4 — what each role actually does day to day
@@ -145,7 +146,7 @@ chain, never touches the other zone's files) to keep the exception safe.
   - §10 — Telegram bot, including webhook security and idempotency
   - §11 — security, in full
   - §12 — role matrix
-  - §15–18 — phases, risks, open questions, what's closed
+  - §13–16 — phases, risks, open questions, what's closed
 - `docs/PROGRESS.md` — current phase/step, the checklist. Changes every step.
 - `docs/phase-summaries/` — one file per completed phase, written by `done`.
 - `docs/TEAM_SPLIT_Backend_2people.md` — who owns what (Zone A / Zone B), git workflow
