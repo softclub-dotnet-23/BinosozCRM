@@ -7,12 +7,57 @@
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 2
-**Next step:** Phase 2, Step 3 [BE] — `TaskLog` в той же транзакции, что
-переход → MASTER §5.15, §7.1
+**Last completed:** Phase 2, Step 3
+**Next step:** Phase 2, Step 4 [BE] — `WorkOrderProgress`, upload фото
+(подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 22 tests, confirmed via `dotnet test` (5 pass locally, 17 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Phase 2, Step 3 [BE] — `TaskLog` в той же транзакции, что переход.** New
+`Application/Common/TaskLogWriter.cs`: `Append` only adds to the tracked
+`DbContext` — it never calls `SaveChangesAsync` itself, so the caller's
+existing single `SaveChangesAsync` (already writing the entity's new
+`Status`) is what makes the entity change and the log write atomic (Rule 3).
+Wired into `IndividualTask.Start`/`Complete` (already existed, just needed
+the log call) and every new `WorkOrder` transition handler.
+
+**`WorkOrder`'s remaining §7.1 transitions built out in full**, not just
+the log wiring: `AssignWorkOrderCommand`, `StartWorkOrderCommand`,
+`SubmitWorkOrderForReviewCommand`, `AcceptWorkOrderCommand`,
+`RejectWorkOrderCommand`, `GetWorkOrderLogQuery` — `Api/Controllers/
+WorkOrdersController.cs` now exposes `POST .../assign|start|submit|accept|
+reject` and `GET .../log`. New `WorkOrderAccess` helper (mirrors
+`ProrabObjectAccess`/`BrigadeAccess`): Prorab+ scoped by
+`ProrabObjectAssignment` on the order's `ObjectId`, Brigadir scoped to their
+own `BrigadeId` via their linked `Worker` row — same 404-not-403 pattern as
+every other isolation check in this codebase.
+
+**Found — `/assign` and `/start` aren't in §9.4's literal endpoint table**
+(only `/submit`, `/accept`|`/reject`, `/log` are listed), but without them a
+`WorkOrder` could never leave `New` via the API and `/submit` could never
+succeed — decided with the user to add them anyway, Prorab+ for `/assign`
+(same role as `Create`), Brigadir-own-brigade for `/start` (mirrors
+`IndividualTask`). `/rework` and `/close` are still not exposed — same
+class of gap, out of this step's scope. Worth reconciling MASTER §9.4's
+table itself in a `docs` pass.
+
+**Found — §7.1 says the piecework payout-share gate is keyed "у бригады"
+(on the brigade)**, but `PayRateType` (§5.7) only exists per-`Worker`, not
+on `Brigade` — there's no brigade-level field to read. Judgment call, not
+an invented business rule: `SubmitWorkOrderForReviewCommand` treats a
+brigade as "piecework" for this gate if it has ≥1 worker with
+`PayRateType.Piecework`; if none, the 100%-payout-share requirement is
+trivially satisfied (doesn't apply). `WorkOrderProgress` (gates `≥1`
+report) and `WorkOrderPayoutShare` (gates the 100% sum) are both queried
+for real here even though no handler can create either yet — Step 4 and
+Phase 5 Step 1 will start returning `true`/populated data with no change
+needed in this handler.
+
+Build clean, 0 warnings. Tests unchanged from Step 2's baseline — Docker
+still unavailable on this machine, 5/22 pass locally, the other 17 are all
+`DockerUnavailableException` (Testcontainers), not real failures; no new
+permanent tests this step (that's Step 9's job).
 
 **Phase 2, Step 2 [BE] — `IndividualTask` + state machine.** Same situation
 as Step 1: the entity, its state machine (`Start`/`Complete`/`ProposeBonus`/
@@ -728,7 +773,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 - [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
-- [ ] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
+- [x] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2

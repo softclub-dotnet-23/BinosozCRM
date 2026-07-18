@@ -9,3 +9,9 @@ public sealed record CreateWorkOrderRequest(
     decimal UnitPrice,
     Guid? EstimateItemId,
     DateOnly? DueDate);
+
+public sealed record AssignWorkOrderRequest(DateOnly? AssignedDate);
+
+public sealed record AcceptWorkOrderRequest(DateOnly? CompletedDate);
+
+public sealed record RejectWorkOrderRequest(string Reason);

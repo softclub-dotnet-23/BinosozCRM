@@ -1,5 +1,7 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Domain.Common;
+using Domain.Enums;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -32,9 +34,19 @@ public sealed class StartIndividualTaskCommandHandler(IApplicationDbContext cont
         if (task is null || task.BrigadeId != callerBrigadeId.Value)
             return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
 
+        var fromStatus = task.Status;
         var result = task.Start(DateTimeOffset.UtcNow);
         if (result.IsFailure)
             return Result.Failure<IndividualTaskDto>(result.Error);
+
+        TaskLogWriter.Append(
+            context,
+            task.CompanyId,
+            TaskLogEntityType.IndividualTask,
+            task.Id,
+            fromStatus.ToString(),
+            task.Status.ToString(),
+            currentUser.UserId!.Value);
 
         await context.SaveChangesAsync(cancellationToken);
 
