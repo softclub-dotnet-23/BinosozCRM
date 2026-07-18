@@ -5,12 +5,38 @@
 
 ## Current Status
 **Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 5 (Zone A)
-**Next step:** Phase 1, Step 6 [BE] — masking `Document*` по ролям (shared/
-either zone); Step 7 is the joint test step, last in Phase 1
+**Last completed:** Phase 1, Step 6 (Zone B)
+**Next step:** Phase 1, Step 7 [BE] — joint tests: 18+ (ровно 18 / на день
+меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2.
+Last step in Phase 1.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 6 (Zone B) — masking `Document*` by role.**
+Api-layer only (`Api/Contracts/Workers/WorkerResponse.cs`,
+`Api/Contracts/Workers/WorkerProrabResponse.cs`, `WorkersController.cs`).
+Resolved, by user decision, a mismatch this step surfaced: MASTER §11.6
+describes masking a document *number* ("Prorab видит маскированный
+`****4567`"), but `Worker` (Ahmad's entity) has no document-number field —
+only `DocumentType` (a category string) and `DocumentExpiryDate`. Decided:
+treat §11.6's masking language as written for a field the schema never
+actually got; with nothing left to mask, Prorab sees both `DocumentType` and
+`DocumentExpiryDate` as-is. That leaves `PayRate`/`PayRateType` as the only
+real per-role difference reachable through this controller (Owner sees it,
+Prorab doesn't, per §12) — `WorkersController` now picks `WorkerResponse` vs
+`WorkerProrabResponse` via `User.IsInRole("Prorab")` instead of returning the
+raw `WorkerDto`. Accountant's §12 entitlement ("R (с PayRate)", full
+`Document*`) still has no route in — §9.4 doesn't give Accountant a
+Worker-reading endpoint; presumably arrives via Payroll (Phase 5).
+
+Verified with a throwaway check that ran the *real* MediatR pipeline
+(`services.AddApplication()` + `AddLogging()`, in-memory `ApplicationDbContext`)
+through the actual `WorkersController`, with a fake `ClaimsPrincipal` role
+claim driving `User.IsInRole` — not just a unit test of the mapping function.
+3/3 passed (Owner gets `WorkerResponse` with `PayRate` populated; Prorab gets
+`WorkerProrabResponse`, both for `Create` and paginated `List`), then
+deleted, no `Directory.Packages.props`/csproj trace left.
 
 **Step 5 (Zone A) — `AdminAuditLog` + interceptor.**
 New `Infrastructure/Persistence/Interceptors/AdminAuditSaveChangesInterceptor.cs`,
@@ -510,7 +536,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
-- [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
+- [x] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
 - [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
 ## Phase 2 — Наряды и задачи (ядро)
