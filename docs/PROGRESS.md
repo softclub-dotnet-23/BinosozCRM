@@ -4,17 +4,68 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 1 — Объекты и бригады — ✅ **COMPLETE** (2026-07-18)
-**Last completed:** Phase 1, Step 7 — both halves (Zone B: Worker 18+
-tests; Zone A: Prorab object-isolation tests)
-**Next step:** Phase 2, Step 1 [BE] Zone A — `WorkOrder` + state machine +
-`Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
+**Phase:** 2 — Наряды и задачи (ядро)
+**Last completed:** Phase 2, Step 1 (Zone A) — `WorkOrder` + state machine + `Code` + `xmin`
+**Next step:** Phase 2, Step 2 [BE] Zone A — `IndividualTask` + state machine
+(`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
-real against Testcontainers/Postgres (Docker now available on this machine)
+real against Testcontainers/Postgres
 **Updated:** 2026-07-18
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 1 (Zone A) — `WorkOrder` + state machine + `Code` (`BR-{N}`) + `xmin`.**
+`Application/WorkOrders/` (Create/List/Get + all 7 transitions: Assign,
+Start, SubmitForReview, Accept, Reject, Rework, Close), `WorkOrderCodeGenerator`,
+`WorkOrderAccess` (Brigadir-own-brigade lookup via `Worker.UserId`, reused
+Prorab-object isolation), `WorkOrderTransitionHelper` (one place for both
+`TaskLog` writing and `xmin` concurrency handling across all 7 transitions).
+`Api/Controllers/WorkOrdersController.cs`.
+
+**Rule 3 applied immediately, not deferred to Step 3** (user decision,
+asked because PROGRESS.md's plan otherwise split "state machine" (this
+step) from "TaskLog in the same transaction" (Step 3) — which would have
+meant transitions existing without TaskLog for however long, exactly the
+anti-pattern Rule 3 names). Every transition here writes `TaskLog` in the
+same `SaveChanges` call as the status change. Step 3's remaining scope is
+now really just `IndividualTask`'s side of `TaskLog`, once that entity gets
+an Application layer in Step 2 — its PROGRESS.md description should be
+read narrower than it currently reads.
+
+**Flagged interpretations — not literal §9.4/§7.1 matches, worth a second look:**
+1. `/assign`, `/start`, `/rework`, `/close` have no dedicated endpoint in
+   §9.4's table (only `/submit`, `/accept`, `/reject` are named) — built
+   anyway, since the state machine is unreachable without a way to leave
+   `New`. Role-gated by inference from §12 (Owner/Prorab general CRUA →
+   Assign/Start/Close; Rework → Brigadir, paired with submit as the other
+   half of "redo and resubmit").
+2. §7.1's `SubmitForReview` guard names `PayRateType=Piecework` "у бригады",
+   but `PayRateType` is a `Worker` field (§5.7) — `Brigade` has no such
+   field at all. Interpreted as: the 100%-share requirement applies only if
+   the brigade has ≥1 Piecework worker; a purely-Hourly brigade skips it.
+   Since `WorkOrderPayoutShare` has no write path before Phase 5, this
+   currently means Submit is blocked for any Piecework-containing brigade
+   until then — correct fail-closed behavior, not a workaround.
+3. **Coordination point (team-split §4):** `SubmitWorkOrderForReviewCommand`,
+   `AcceptWorkOrderCommand`, `RejectWorkOrderCommand` are the exact contracts
+   the Telegram bot will call once Shahrom builds that flow. Shapes are
+   fixed now (`WorkOrderId` [+ `Reason` for Reject]) — flag if they need to
+   change once a real caller exists.
+
+Verified with a throwaway check against real Postgres (6/6 passed, then
+deleted): `Code` sequences `BR-1`/`BR-2` correctly per company; the full
+happy path (New→Assigned→InProgress→OnReview→Accepted→Closed) writes
+exactly 5 `TaskLog` rows in the right order; an invalid transition (e.g.
+`Start` on a `New` order) returns `Result.Failure(WORK_ORDER_INVALID_TRANSITION)`,
+confirmed not an unhandled exception; `Reject`'s reason lands in
+`TaskLog.Comment`; a Brigadir from a different brigade attempting `Submit`
+gets `WORK_ORDER_NOT_FOUND` (404, not 403, per §11.5/§4's "не видит чужие
+бригады"); a genuine `xmin` race between two contexts throws
+`DbUpdateConcurrencyException`, caught and mapped to `CONCURRENCY_CONFLICT`.
+Full suite after cleanup: 23/23, no regressions. New error code:
+`ESTIMATE_ITEM_NOT_FOUND` (404, same "referenced row missing" pattern as
+`BRIGADE_NOT_FOUND`/`WORKER_NOT_FOUND`).
 
 **Step 7 (Zone A half) — Prorab object-isolation tests.**
 `Tests/Api.IntegrationTests/ProrabObjectIsolationTests.cs` (real
@@ -579,9 +630,9 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 2 — Наряды и задачи (ядро)
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
 
-- [ ] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
+- [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 - [ ] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
-- [ ] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
+- [ ] Step 3 [BE] — `TaskLog` для `IndividualTask` **в той же транзакции**, что переход (`WorkOrder`'s side already done in Step 1 — see its note) → MASTER §5.15, §7.1, §7.2
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2

@@ -14,6 +14,10 @@ public interface IApplicationDbContext
     DbSet<ConstructionObject> ConstructionObjects { get; }
     DbSet<EstimateItem> EstimateItems { get; }
     DbSet<ProrabObjectAssignment> ProrabObjectAssignments { get; }
+    DbSet<WorkOrder> WorkOrders { get; }
+    DbSet<WorkOrderProgress> WorkOrderProgresses { get; }
+    DbSet<WorkOrderPayoutShare> WorkOrderPayoutShares { get; }
+    DbSet<TaskLog> TaskLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

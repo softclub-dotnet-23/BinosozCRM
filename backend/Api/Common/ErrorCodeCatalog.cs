@@ -42,6 +42,7 @@ public static class ErrorCodeCatalog
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["CUSTOMER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["OBJECT_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["ESTIMATE_ITEM_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_SHARES_INVALID"] = StatusCodes.Status400BadRequest,
