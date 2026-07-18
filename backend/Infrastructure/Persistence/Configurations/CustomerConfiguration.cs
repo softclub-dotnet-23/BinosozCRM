@@ -16,5 +16,7 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(x => x.ContactPhone).HasMaxLength(20);
         builder.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
     }
 }

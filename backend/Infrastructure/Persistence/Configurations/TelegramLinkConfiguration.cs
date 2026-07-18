@@ -17,5 +17,8 @@ public sealed class TelegramLinkConfiguration : IEntityTypeConfiguration<Telegra
 
         builder.HasIndex(x => x.TelegramChatId).IsUnique();
         builder.HasIndex(x => x.UserId).IsUnique();
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

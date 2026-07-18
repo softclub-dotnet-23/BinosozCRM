@@ -27,5 +27,12 @@ public sealed class IndividualTaskConfiguration : IEntityTypeConfiguration<Indiv
         builder.HasIndex(x => new { x.BrigadeId, x.Status });
 
         builder.Property<uint>("xmin").HasColumnName("xmin").HasColumnType("xid").IsRowVersion();
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Brigade>().WithMany().HasForeignKey(x => x.BrigadeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Worker>().WithMany().HasForeignKey(x => x.AssignedToWorkerId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.BonusApprovedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

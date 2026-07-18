@@ -18,5 +18,9 @@ public sealed class WorkOrderProgressConfiguration : IEntityTypeConfiguration<Wo
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => x.WorkOrderId);
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => x.WorkOrderId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ReportedByUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

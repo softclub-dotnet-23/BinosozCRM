@@ -5,13 +5,62 @@
 
 ## Current Status
 **Phase:** 0 — Foundation
-**Last completed:** Phase 0, Step 10
-**Next step:** Phase 0, Step 11 [BOT] отложен (см. §15) — Phase 0, Step 12 [BE]
-FK constraints на все 26 сущностей (найдено при ревью Step 10, отдельный шаг
-до Phase 1)
+**Last completed:** Phase 0, Step 12
+**Next step:** Phase 0, Step 11 [BOT] отложен (см. §15) — переходим к Phase 1,
+Step 1 [BE] `Customer`/`ConstructionObject`/`EstimateItem`
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 14 tests written (5 pass locally, 9 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Step 12 — FK constraints on all 26 entities.** Added `HasOne<TPrincipal>()
+.WithMany().HasForeignKey(x => x.FkProperty).OnDelete(DeleteBehavior.Restrict)`
+to 22 of the 25 non-`User`/`TelegramUpdateLog` configuration files (73
+relationships total) — `Company`/`User`/`TelegramUpdateLog` have no outgoing
+FK columns to add. Domain entities keep their existing no-navigation-property
+style unchanged (zero edits to `Domain/Entities/*.cs`) — EF Core supports
+FK-only relationships via `HasOne<T>().WithMany()` with no argument on either
+side, configured entirely in `Infrastructure`.
+
+**Delete behavior — one uniform decision, not a MASTER §15 open question:**
+every relationship gets explicit `DeleteBehavior.Restrict`. MASTER.md doesn't
+specify ON DELETE semantics anywhere (checked §6, §11 — indexes only). Every
+entity that can be a delete target already implements `ISoftDelete` (rows
+aren't physically deleted in normal operation), so this mostly never
+triggers — but when it would (an operator manually deletes a row), silently
+cascading away a `Worker`'s `PayrollEntry` history is worse than a blocked
+delete that forces a deliberate decision. `Restrict` also sidesteps Postgres's
+"multiple cascade paths" errors entirely, which `Cascade` would have hit on
+several of the ~15 tables that reach `Company`/`User` through more than one
+path. Left unconfigured, EF Core's default for a required relationship is
+`Cascade` — every one of the 73 needed the explicit call, same rigor Step 10
+already applied to `decimal` precision.
+
+**Two columns deliberately excluded — polymorphic, no real FK possible:**
+`TaskLog.EntityId` (discriminated by `EntityType`) and
+`AdminAuditLog.TargetEntityId` (discriminated by `TargetEntityType`) — target
+table varies per row. Already correctly indexed per MASTER §6; a real FK
+would need a different modeling approach (table-per-type or a check
+constraint per discriminator), out of scope here.
+
+New migration `AddForeignKeyConstraints` (73 `AddForeignKey` + 49 new
+supporting `CreateIndex` calls for FK columns that weren't already indexed —
+verified none duplicate an existing index, e.g. `Worker.CompanyId`'s index
+from Step 1 was reused, not recreated). Read in full before treating this as
+done: confirmed every `AddForeignKey` call carries
+`onDelete: ReferentialAction.Restrict` with no stray `Cascade`/`SetNull`, and
+no unrelated `CreateTable`/`AlterColumn`/`DropColumn` calls — this migration
+touches only foreign keys and their supporting indexes.
+
+New `ForeignKeyConstraintTests.cs` (real Postgres via the Step 10
+`PostgresFixture`, not exhaustive over all 73 relationships — that's what the
+migration review above is for): a required FK (`Worker.CompanyId`/
+`BrigadeId`) rejects nonexistent parents, a nullable FK (`Worker.UserId`)
+rejects a nonexistent parent when set, and a fully valid `Worker` insert is
+**not** blocked — a positive control proving the constraints don't
+over-restrict legitimate cross-entity writes, which is exactly what Phase 1
+is about to start doing. Same Docker limitation as Step 10 — this machine
+has none, so these 3 tests are compile-verified only locally; CI will run
+them for real.
 
 **Step 10 — auth tests, and a migration gap found along the way.** Writing
 DB-backed tests surfaced that **no EF Core migration had ever been created**
@@ -42,8 +91,8 @@ DB-level referential integrity. Predates this session (Domain layer from
 `c21b842`). Flagged to the user rather than silently fixed or silently
 ignored — adding relationships to all 26 entities is a separate, much larger
 task than Step 10's scope, and would mean regenerating `InitialCreate`
-again. **Scheduled as Phase 0 Step 12, before Phase 1** (added 2026-07-18,
-per user request).
+again. **Done as Phase 0 Step 12, before Phase 1** (added and completed
+2026-07-18, per user request — see Step 12 writeup below).
 
 **Tests written** (`backend/Tests/Api.IntegrationTests`), covering exactly
 Step 10's checklist:
@@ -261,7 +310,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
 - [x] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
 - [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV *(отложено — см. §15)* — MASTER §10.0
-- [ ] Step 12 [BE] — FK constraints на все 26 сущностей: `HasOne`/`WithMany`/`HasForeignKey`
+- [x] Step 12 [BE] — FK constraints на все 26 сущностей: `HasOne`/`WithMany`/`HasForeignKey`
       в `Infrastructure/Persistence/Configurations/*.cs` для каждого `Guid`/`Guid?`
       столбца, который сейчас ссылается на другую сущность без реального FK
       (`WorkOrder.ObjectId`, `Brigade.BrigadirUserId` и т.д. — по одному на каждую

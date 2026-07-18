@@ -21,5 +21,11 @@ public sealed class TimesheetConfiguration : IEntityTypeConfiguration<Timesheet>
 
         builder.HasIndex(x => new { x.WorkerId, x.Date }).IsUnique();
         builder.HasIndex(x => new { x.ObjectId, x.Date });
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Worker>().WithMany().HasForeignKey(x => x.WorkerId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ConstructionObject>().WithMany().HasForeignKey(x => x.ObjectId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WorkOrderProgress>().WithMany().HasForeignKey(x => x.WorkOrderProgressId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ApprovedByUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

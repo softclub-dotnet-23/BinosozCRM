@@ -26,5 +26,9 @@ public sealed class WorkerConfiguration : IEntityTypeConfiguration<Worker>
         builder.HasIndex(x => x.BrigadeId);
         builder.HasIndex(x => x.CompanyId);
         builder.HasIndex(x => x.DocumentExpiryDate).HasFilter("\"DocumentExpiryDate\" IS NOT NULL");
+
+        builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Brigade>().WithMany().HasForeignKey(x => x.BrigadeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
     }
 }
