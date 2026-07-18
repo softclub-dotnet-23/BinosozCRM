@@ -6,7 +6,8 @@
 ## Current Status
 **Phase:** 0 — Foundation
 **Last completed:** Phase 0, Step 10
-**Next step:** Phase 0, Step 11 — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner)
+**Next step:** Phase 0, Step 11 [BOT] отложен (см. §17) — переходим к Phase 1,
+Step 1 [BE] `Customer`/`ConstructionObject`/`EstimateItem`
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 14 tests written (5 pass locally, 9 need Docker — see below)
 **Updated:** 2026-07-18
@@ -257,7 +258,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 8 [BE] — `ExceptionHandlingMiddleware` + формат ошибки + каталог кодов → MASTER §9.1, §9.2
 - [x] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
 - [x] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
-- [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV → MASTER §10.0
+- [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV *(отложено — см. §17)* — MASTER §10.0
 
 ## Phase 1 — Объекты и бригады
 **Goal:** без объекта и бригады нечего назначать.
@@ -278,9 +279,9 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
 - [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
-- [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` → MASTER §5.25, §10.2
-- [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 → MASTER §5.26, §10.3
-- [ ] Step 8 [BOT] — «Мои наряды»: отметка выполнения (валидация остатка), фото, отправка на проверку → MASTER §10.4
+- [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §17)* → MASTER §5.25, §10.2
+- [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 *(отложено — см. §17)* → MASTER §5.26, §10.3
+- [ ] Step 8 [BOT] — «Мои наряды»: отметка выполнения (валидация остатка), фото, отправка на проверку *(отложено — см. §17)* → MASTER §10.4
 - [ ] Step 9 [FULL] — тесты: все переходы (разрешённые + запрещённые), изоляция бригады (404), идемпотентность бота → MASTER §7.1, §7.2, §10.3
 
 ## Phase 3 — Явка, отсутствия, премии
@@ -289,9 +290,9 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
 - [ ] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
 - [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
-- [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя → MASTER §10.4
-- [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) → MASTER §8.4
-- [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) → MASTER §8.7, §10.4
+- [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §17)* → MASTER §10.4
+- [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §17)* → MASTER §8.4
+- [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §17)* → MASTER §8.7, §10.4
 - [ ] Step 7 [FULL] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
 
 ## Phase 4 — Материалы
@@ -301,14 +302,14 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
-- [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием → MASTER §10.4
+- [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §17)* → MASTER §10.4
 - [ ] Step 6 [FULL] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
 
 - [ ] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
-- [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) → MASTER §10.4
+- [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §17)* → MASTER §10.4
 - [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
@@ -323,8 +324,8 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [ ] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
 - [ ] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
-- [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) → MASTER §10.3
-- [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы → MASTER §10.6
+- [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) *(отложено — см. §17)* → MASTER §10.3
+- [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §17)* → MASTER §10.6
 - [ ] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
 - [ ] Step 6 [FULL] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
 - [ ] Step 7 [FULL] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
@@ -341,3 +342,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] №8 SMS-провайдер для сброса пароля — пока Telegram + ручной сброс через Owner (по API, панели нет).
 - [ ] №9 Fallback без Telegram у бригадира — пока прораб отмечает через API напрямую (`EnteredManually`), без встроенной панели.
 - [ ] №7 История ставок (`WorkerPayRateHistory`) — не храним, смена действует с даты изменения.
+- [ ] Telegram-бот отложен, дата возврата не определена — решение пользователя
+      (2026-07-18). Backend-шаги продолжаются без него; все `[BOT]`-шаги в
+      чеклисте выше помечены `*(отложено — см. §17)*`, но не удалены и не
+      вычеркнуты — вернёмся к ним отдельным решением, не по умолчанию.
