@@ -8,11 +8,12 @@ namespace Api.Common;
 // Result.Failure/this catalogue at all.
 //
 // BRIGADE_NOT_FOUND / WORKER_NOT_FOUND / USER_NOT_FOUND (Phase 1 Step 2),
-// CUSTOMER_NOT_FOUND / OBJECT_NOT_FOUND (Phase 1 Step 1): same pattern as
-// WORK_ORDER_NOT_FOUND / PRORAB_NOT_ASSIGNED_TO_OBJECT — a route or body
-// reference to another company's row (or no row at all) reads as 404, not
-// 400/403, per MASTER §11.5 rule 2. Not in §9.2's table either, same as
-// PASSWORD_CHANGE_REQUIRED above.
+// CUSTOMER_NOT_FOUND / OBJECT_NOT_FOUND (Phase 1 Step 1), ESTIMATE_ITEM_NOT_FOUND
+// (Phase 2 Step 1): same pattern as WORK_ORDER_NOT_FOUND /
+// PRORAB_NOT_ASSIGNED_TO_OBJECT — a route or body reference to another
+// company's row (or no row at all) reads as 404, not 400/403, per MASTER
+// §11.5 rule 2. Not in §9.2's table either, same as PASSWORD_CHANGE_REQUIRED
+// above.
 //
 // PRORAB_ALREADY_ASSIGNED (Phase 1 Step 4): not in §9.2's table — the unique
 // (ProrabUserId, ObjectId) constraint on ProrabObjectAssignment (§5.8) means
@@ -42,6 +43,7 @@ public static class ErrorCodeCatalog
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["CUSTOMER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["OBJECT_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["ESTIMATE_ITEM_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_SHARES_INVALID"] = StatusCodes.Status400BadRequest,

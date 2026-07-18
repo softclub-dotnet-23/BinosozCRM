@@ -7,12 +7,79 @@
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 1, Step 7 (all 7 steps done)
-**Next step:** Phase 2, Step 1 [BE] — `WorkOrder` + state machine + `Code`
-(`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
+**Last completed:** Phase 2, Step 1
+**Next step:** Phase 2, Step 2 [BE] — `IndividualTask` + state machine
+(`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 22 tests, confirmed via `dotnet test` (5 pass locally, 17 need Docker — see below)
 **Updated:** 2026-07-18
+
+**Phase 2, Step 1 [BE] — `WorkOrder` + state machine + `Code` + `xmin`.**
+The `WorkOrder` entity, its full state machine (`Assign`/`Start`/
+`SubmitForReview`/`Accept`/`Reject`/`Rework`/`Close`, all returning
+`Result`), the unique `(CompanyId, Code)` index, and `xmin` **already
+existed** — from the original Domain-layer commit plus Step 12's FK pass.
+Nothing in `Application`/`Api` referenced it. This step's actual work:
+`Application/WorkOrders/` (`CreateWorkOrderCommand`, `ListWorkOrdersQuery`),
+`Api/Controllers/WorkOrdersController.cs`: `GET,POST /work-orders`,
+Prorab+, per MASTER §9.4.
+
+**Only `Create`/`List` this step — no `/submit`, `/accept`, `/reject`,
+etc.** Those are real state *transitions*, and Rule 3 ("every transition
+writes `TaskLog` in the same transaction — not 'logging we'll add later'")
+isn't satisfiable yet: `TaskLog` wiring is explicitly Step 3, not built.
+`Create` isn't a transition (no `FromStatus`), so it's exempt. Exposing the
+transition endpoints now would either violate Rule 3 or need re-touching
+every action handler once Step 3 lands — same reasoning Phase 1 Step 4
+used to defer `AdminAuditLog` wiring to its own step.
+
+**`Code` generation needed a real migration — a per-company counter shared
+with `IndividualTask`.** MASTER §5.14 says `IndividualTask.Code` uses "та
+же последовательность, что WorkOrder" — one shared counter, not
+per-entity. Added `Company.NextCodeNumber` (int) + `Company.ReserveNextCode()`
+(`"BR-{N}"`, increments) — `Company` already holds other per-company
+settings, and is Ahmad-owned Domain. Also added `xmin` to `Company` (same
+pattern as `WorkOrder`/`IndividualTask`/`PayrollEntry`): two concurrent
+requests racing on `NextCodeNumber` would otherwise silently compute the
+same code and hit the `(CompanyId, Code)` unique-index violation as a raw,
+uncaught exception; `xmin` turns that into a catchable
+`DbUpdateConcurrencyException` → the existing `CONCURRENCY_CONFLICT` code,
+reusing established machinery instead of a retry-loop or raw-SQL lock.
+
+**Caught and fixed a bug in my own first migration draft, before
+committing:** `AddColumn<int>` for `NextCodeNumber` defaulted to `0`, not
+`1` — EF Core's migration generator uses `default(int)`, not the CLR
+property initializer, unless `.HasDefaultValue(...)` is set explicitly.
+Without the fix, every already-seeded `Company` would have backfilled to
+`0`, and its first `WorkOrder`/`IndividualTask` would have been "BR-0", not
+"BR-1". Deleted the draft migration, added `.HasDefaultValue(1)` to
+`CompanyConfiguration`, regenerated.
+
+New `ESTIMATE_ITEM_NOT_FOUND` (404) for the optional `EstimateItemId` —
+same 404-not-403 pattern as `OBJECT_NOT_FOUND`/`BRIGADE_NOT_FOUND`.
+`CreateWorkOrderCommand` applies the same `ProrabObjectAccess` isolation
+guard as `CreateEstimateItemCommand` (Phase 1 Step 4) — a `WorkOrder`
+always references an *existing* object, unlike creating a brand-new
+`ConstructionObject`. `ListWorkOrdersQuery` only builds the Prorab+ half of
+`GET,POST /work-orders` — Brigadir's "own, read" half isn't built; Brigadir
+has no authenticated path anywhere in this codebase yet (their interface
+is the Telegram bot, deferred).
+
+Verified with a throwaway EF InMemory check (2 tests, written, run,
+deleted — no `Directory.Packages.props`/csproj trace left): `Code` is
+`BR-1` then `BR-2` on successive creates for the same company (proves the
+counter persists across separate `SaveChanges` calls); object/brigade/
+estimate-item not-found each rejected with the right code; a Prorab with
+one assignment can create on that object but is blocked
+(`PRORAB_NOT_ASSIGNED_TO_OBJECT`) on another; list totals match. Did **not**
+attempt to simulate the `xmin`/`CONCURRENCY_CONFLICT` race with
+InMemory — that's genuinely Postgres-specific behavior (real row-version
+semantics), not something the InMemory provider reproduces meaningfully;
+noting this as an inference-verified, not execution-verified, part of the
+design, same caveat class as every other Docker-gated limitation this
+session. Docker still unavailable — suite count unchanged (22 total, 5
+pass, 17 need Docker); xUnit tests for `WorkOrder` are Step 9's job (Phase
+2's test step).
 
 **Step 7 [BE] — joint tests: 18+, изоляция прораба по объектам.** New,
 permanent (not throwaway) `Tests/Api.IntegrationTests` files, real Postgres
@@ -608,7 +675,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 2 — Наряды и задачи (ядро)
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
 
-- [ ] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
+- [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 - [ ] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
 - [ ] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
 - [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9

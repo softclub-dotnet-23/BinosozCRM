@@ -14,6 +14,7 @@ public interface IApplicationDbContext
     DbSet<ConstructionObject> ConstructionObjects { get; }
     DbSet<EstimateItem> EstimateItems { get; }
     DbSet<ProrabObjectAssignment> ProrabObjectAssignments { get; }
+    DbSet<WorkOrder> WorkOrders { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
