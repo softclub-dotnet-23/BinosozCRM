@@ -4,20 +4,28 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 7 — **Zone B half only** (Worker 18+
-tests). Step 7 stays unchecked below — it's a joint step, and Ahmad's half
-(изоляция прораба по объектам, §1.2) isn't done yet.
-**Next step:** Phase 1, Step 7 [BE] Zone A half — тесты изоляции прораба по
-объектам → MASTER §1.2. Once that lands, Step 7 can be checked off and
-Phase 1 marked complete.
+**Phase:** 1 — Объекты и бригады — ✅ **COMPLETE** (2026-07-18)
+**Last completed:** Phase 1, Step 7 — both halves (Zone B: Worker 18+
+tests; Zone A: Prorab object-isolation tests)
+**Next step:** Phase 2, Step 1 [BE] Zone A — `WorkOrder` + state machine +
+`Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — **18/18 passing**, confirmed for
-real against Testcontainers/Postgres twice (Docker became available on this
-machine after it was previously absent — see below): 17m15s on first run
-(image pull + container startup), 16s on a second, back-to-back run
-(image cached) — same 18/18, confirming it wasn't a fluke
+**Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
+real against Testcontainers/Postgres (Docker now available on this machine)
 **Updated:** 2026-07-18
+
+See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 7 (Zone A half) — Prorab object-isolation tests.**
+`Tests/Api.IntegrationTests/ProrabObjectIsolationTests.cs` (real
+Testcontainers/Postgres), 5 tests against `ListConstructionObjectsQuery`/
+`GetConstructionObjectQuery`: zero `ProrabObjectAssignment` rows → sees all
+objects (§1.2's stated default); one assignment → strict allow-list, the
+unassigned object is excluded from the list and returns
+`PRORAB_NOT_ASSIGNED_TO_OBJECT` (404, not 403, per §11.5) on direct read;
+Owner bypasses the filter entirely regardless of any Prorab's assignments.
+Ran against real Docker/Postgres on the first try (available on this
+machine by this point) — 5/5 passed, then full suite 23/23, no regressions.
 
 **Step 7 (Zone B half) — Worker 18+ boundary tests.**
 `Tests/Api.IntegrationTests/CreateWorkerCommandHandlerTests.cs` (real
@@ -41,10 +49,6 @@ CreateWorkerCommandHandler) run against real Testcontainers/Postgres,
 this same full-suite `dotnet test` on every push/PR to `master`, on
 `ubuntu-latest` (Docker preinstalled) — confirmed real, not just a build
 step; no CI changes were needed.
-
-**Not done — Zone A's half of this joint step:** Prorab object-isolation
-tests (§1.2, exercises `ProrabObjectAssignment`/`ConstructionObject`
-filtering) are Ahmad's entities/Application code, not written here.
 
 **Step 6 (Zone B) — masking `Document*` by role.**
 Api-layer only (`Api/Contracts/Workers/WorkerResponse.cs`,
@@ -570,7 +574,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
 - [x] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
-- [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
+- [x] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
 ## Phase 2 — Наряды и задачи (ядро)
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
