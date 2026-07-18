@@ -6,8 +6,9 @@
 ## Current Status
 **Phase:** 0 — Foundation
 **Last completed:** Phase 0, Step 10
-**Next step:** Phase 0, Step 11 [BOT] отложен (см. §15) — переходим к Phase 1,
-Step 1 [BE] `Customer`/`ConstructionObject`/`EstimateItem`
+**Next step:** Phase 0, Step 11 [BOT] отложен (см. §15) — Phase 0, Step 12 [BE]
+FK constraints на все 26 сущностей (найдено при ревью Step 10, отдельный шаг
+до Phase 1)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 14 tests written (5 pass locally, 9 need Docker — see below)
 **Updated:** 2026-07-18
@@ -41,7 +42,8 @@ DB-level referential integrity. Predates this session (Domain layer from
 `c21b842`). Flagged to the user rather than silently fixed or silently
 ignored — adding relationships to all 26 entities is a separate, much larger
 task than Step 10's scope, and would mean regenerating `InitialCreate`
-again. **Needs its own step before Phase 1 adds real cross-entity writes.**
+again. **Scheduled as Phase 0 Step 12, before Phase 1** (added 2026-07-18,
+per user request).
 
 **Tests written** (`backend/Tests/Api.IntegrationTests`), covering exactly
 Step 10's checklist:
@@ -259,6 +261,19 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 9 [FULL] — CI: build + test + `dotnet list package --vulnerable`, zero-warnings → MASTER §11.8
 - [x] Step 10 [BE] — тесты: логин (успех/неверный пароль/деактивирован), ротация refresh, повторное использование, seed идемпотентен (второй запуск ничего не создаёт), `ForcePasswordChange` блокирует запросы → MASTER §11.1, §5.27
 - [ ] Step 11 [BOT] — регистрация бота у `@BotFather` (разовый шаг вне кода, делает Owner), токен → ENV *(отложено — см. §15)* — MASTER §10.0
+- [ ] Step 12 [BE] — FK constraints на все 26 сущностей: `HasOne`/`WithMany`/`HasForeignKey`
+      в `Infrastructure/Persistence/Configurations/*.cs` для каждого `Guid`/`Guid?`
+      столбца, который сейчас ссылается на другую сущность без реального FK
+      (`WorkOrder.ObjectId`, `Brigade.BrigadirUserId` и т.д. — по одному на каждую
+      сущность из MASTER §5), затем новая миграция (`dotnet tool run dotnet-ef migrations add
+      AddForeignKeyConstraints`, review перед коммитом, не применять руками). Найдено
+      при ревью `InitialCreate` (Step 10) — ни одна из 26 конфигураций не объявляет
+      связь, в схеме нет ссылочной целостности на уровне БД вообще. Отдельный шаг,
+      **до** Phase 1, потому что Phase 1 начинает писать реальные кросс-сущностные
+      записи (`Worker.UserId`, `Brigade.BrigadirUserId`, `ProrabObjectAssignment`) —
+      проще зафиксировать целостность до того, как появятся данные, которые могут
+      её нарушать. Ahmad-owned (весь Domain/Infrastructure/Persistence, §2.0
+      team-split) → MASTER §5, §6
 
 ## Phase 1 — Объекты и бригады
 **Goal:** без объекта и бригады нечего назначать.
