@@ -6,15 +6,44 @@
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
-**Phases 2 & 3: functionally ✅ COMPLETE for now (backend only).** All
-`[BE]` steps done except: Phase 2 Step 9's bot-idempotency slice, Phase 3
-Step 3's "финальный расчёт" clause (blocked on Phase 5's
-`CalculatedAmount`/`PayrollAdvance`, neither built yet). Every `[BOT]`
-step across both phases (Phase 2: 6–8, Phase 3: 4–6) stays unchecked,
-blocked on the 2026-07-18 bot deferral. No phase-summary files written for
-either — genuinely not finished, just unblocked for further backend work
-per the user's 2026-07-19 decision to keep going rather than wait on the
-bot.
+**Phases 2, 3, 4 & 5: functionally ✅ COMPLETE for now (backend only).**
+All `[BE]` steps done except: Phase 2 Step 9's bot-idempotency slice.
+Every `[BOT]` step across all four phases stays unchecked, blocked on the
+2026-07-18 bot deferral. No phase-summary files written for any of them —
+genuinely not finished, just unblocked for further backend work per the
+user's 2026-07-19 decision to keep going rather than wait on the bot.
+**Phase 3 Step 3's "финальный расчёт" clause is now newly unblocked** —
+it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
+which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
+part of this step; flagged here so it isn't forgotten, worth a dedicated
+pass if the user wants it closed out.
+**Phase 5, Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8.**
+New permanent `PayrollNumericExampleTests.cs` (real Postgres via
+`PostgresFixture`, mirrors the session's established isolation-test
+style, 4 tests): permanentizes the exact worked examples first verified
+with throwaway checks while building Steps 3/4/7 —
+
+- §8.0 Hourly: **7040** сомони (`160×40 + 2×8×40`) via
+  `GeneratePayrollDraftCommandHandler` against real seeded `Timesheet`/
+  `AbsenceRecord` data.
+- §8.1 lateness deduction: **43.33** (grace=0) and **33.33** (grace=5),
+  one `[Theory]` covering both of MASTER's grace configurations against
+  the identical 15/0/40/10/0-minute sequence.
+- §8.8 combined `FinalAmount`: **4196.67** (`7040 − 43.33 + 200 − 3000`)
+  via `ApprovePayrollEntryCommandHandler`.
+
+Docker still unavailable here, so these 4 are compile-verified only on
+this machine, same limitation as every other Postgres-backed test in the
+suite — but the underlying formulas were already execution-verified via
+InMemory throwaway checks during Steps 3/4/7, so this closes the loop
+with permanent coverage rather than re-deriving trust from scratch.
+Suite: 108 total (was 104) — 69 pass locally (unchanged), 39 need Docker
+(35 pre-existing + 4 new); confirmed every failure is the expected
+`DockerUnavailableException` fail-fast, not a real assertion failure.
+
+**This closes out Phase 5 — all 10 steps done except Step 2 `[BOT]`,
+deferred.**
+
 **Phase 5, Step 9 [BE] — `GET /objects/{id}/cost-breakdown`.** Fixes the
 exact bug §8.10 flags — "факт" used to be materials + WorkOrder totals
 **without** payroll, understating true cost by the entire wage bill.
@@ -304,13 +333,13 @@ need Docker); no new permanent tests this step.
 Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
-**Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 9
-**Next step:** Phase 5, Step 10 [BE] — тесты на числовых примерах
-§8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER
-§8.0, §8.8
+**Phase:** 6 — Полировка и запуск
+**Last completed:** Phase 5, Step 10 — **Phase 5 is now functionally
+complete for backend** (all 10 steps done except Step 2 `[BOT]`, deferred).
+**Next step:** Phase 6, Step 1 [BE] — `GET /dashboard/work-status`
+(агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
 **Updated:** 2026-07-19
 
 **Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
@@ -1560,7 +1589,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [x] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
-- [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
+- [x] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 
 ## Phase 6 — Полировка и запуск
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.
