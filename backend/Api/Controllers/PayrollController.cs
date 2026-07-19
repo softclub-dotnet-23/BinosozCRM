@@ -13,7 +13,9 @@ namespace Api.Controllers;
 // decision, since §9.4's endpoint list names Owner for POST too; see
 // PROGRESS.md Phase 5 Step 3. Approve/Pay are Owner+Accountant, per §9.4's
 // literal text and §12's "RA" for Owner (the "A" is exactly this) — no
-// conflict this time, unlike Create.
+// conflict this time, unlike Create. Adjust is Accountant-only too — §12's
+// "U" belongs to Accountant alone (Owner's "RA" has no "U"), and §9.4
+// names no endpoint for it at all (Phase 5 Step 11, PROGRESS.md).
 [ApiController]
 [Route("api/v1/payroll")]
 [Authorize(Roles = "Owner,Accountant,Brigadir")]
@@ -58,6 +60,15 @@ public sealed class PayrollController(ISender sender) : ControllerBase
     public async Task<IActionResult> Pay(Guid payrollEntryId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new PayPayrollEntryCommand(payrollEntryId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{payrollEntryId:guid}/adjust")]
+    [Authorize(Roles = "Accountant")]
+    public async Task<IActionResult> Adjust(Guid payrollEntryId, AdjustPayrollEntryRequest request, CancellationToken cancellationToken)
+    {
+        var command = new AdjustPayrollEntryCommand(payrollEntryId, request.AdjustmentAmount, request.AdjustmentReason);
+        var result = await sender.Send(command, cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }

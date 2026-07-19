@@ -4,11 +4,15 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 10 (Zone B) — тесты на числовых примерах
-§8.0/§8.1/§8.8
-**Next step:** Phase 5, Step 11 [BE] Zone B — `PayrollEntry.Adjust()` →
-MASTER §8.8, §9.2 (последний BE-шаг Phase 5)
+**Phase:** 6 — Полировка и запуск (Phase 5 — все 11 BE-шагов закрыты;
+Step 2 [BOT] отложен, см. §15)
+**Last completed:** Phase 5, Step 11 (Zone B) — `PayrollEntry.Adjust()`
+**Next step:** Phase 6, Step 1 [BE] — `GET /dashboard/work-status` →
+MASTER §8.6. **Не Zone B**: по team-split doc (§6) Phase 6 "не
+разделяется по зонам", но Steps 1/2/5 конкретно — `WorkOrder`/
+`IndividualTask`/`Auth`, то есть Zone A по субъекту. Следующий явно
+Zone-B-специфичный шаг в текущем плане не назван — по вызову "Шахром"
+не пропускать шаги других зон, ждать координации.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **79/79 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1152,6 +1156,36 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 11 (Zone B) — `PayrollEntry.Adjust()`. Closes out Phase 5's entire
+BE scope.** `Application/Payroll/AdjustPayrollEntryCommand.cs`
+(`POST /payroll/{id}/adjust`, Accountant-only per §12's literal "U" — no
+Owner/Accountant conflict this time, "RA" doesn't include "U") wires up
+Domain's `Adjust(decimal, string)` (Phase 0, unreachable until now) and
+finally gives `PAYROLL_ADJUSTMENT_REASON_REQUIRED` a caller — it's sat in
+`ErrorCodeCatalog` since an earlier phase, defined but never triggerable.
+Enforced exactly per §9.2's own wording — required only when
+`AdjustmentAmount ≠ 0`, so a zero adjustment (clearing a previous one)
+needs no reason. §9.4 names no endpoint for this at all; built anyway,
+same "state machine needs it, table doesn't name it" pattern as every
+other flagged-but-built gap this phase (`WorkOrderPayoutShare.Approve`,
+`MaterialRequest`'s `/ordered`).
+
+**This step exists because it was found, not planned** — Phase 5's
+original 10-step breakdown never scheduled `Adjust()` at all; caught on
+review before committing Step 7 and added as Step 11 the same day (see
+that entry in the checklist below), rather than letting Phase 5 close
+silently missing a documented §8.8 requirement.
+
+Verified against real Postgres (5/5, deleted after): a non-zero
+adjustment with a reason succeeds and both fields round-trip; a non-zero
+adjustment without a reason is rejected
+(`PAYROLL_ADJUSTMENT_REASON_REQUIRED`); a zero adjustment needs no reason;
+adjusting a non-`Draft` entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`); and
+§8.8's own worked example extended one step further — the same
+7040/43.33/200/3000 chain plus a −200 adjustment with a reason — produces
+`FinalAmount = 4196.67 − 200 = 3996.67` exactly through `Approve()`. Full
+suite: 79/79, no regressions.
+
 **Step 10 (Zone B) — тесты на числовых примерах §8.0/§8.1/§8.8.**
 `PayrollCalculationTests.cs` — promotes Steps 3/4/6/7's throwaway worked
 examples into permanent coverage, same split convention as Phase 2 Step 9
@@ -1425,7 +1459,7 @@ regressions.
 - [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [x] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) *(query готова, эндпоинт — Zone A, см. write-up)* → MASTER §8.10
 - [x] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
-- [ ] Step 11 [BE] — `PayrollEntry.Adjust()`: `POST /payroll/{id}/adjust`, Accountant-only, `AdjustmentReason` обязателен при `AdjustmentAmount ≠ 0` (`PAYROLL_ADJUSTMENT_REASON_REQUIRED`, уже в каталоге), только пока `Draft` → MASTER §8.8, §9.2 *(добавлено 2026-07-19 — реальный пробел в разбивке шагов: ни один из Steps 1-10 не строит эту сторону формулы, найдено при review перед коммитом Step 7)*
+- [x] Step 11 [BE] — `PayrollEntry.Adjust()`: `POST /payroll/{id}/adjust`, Accountant-only, `AdjustmentReason` обязателен при `AdjustmentAmount ≠ 0` (`PAYROLL_ADJUSTMENT_REASON_REQUIRED`, уже в каталоге), только пока `Draft` → MASTER §8.8, §9.2 *(добавлено 2026-07-19 — реальный пробел в разбивке шагов: ни один из Steps 1-10 не строит эту сторону формулы, найдено при review перед коммитом Step 7)*
 
 ## Phase 6 — Полировка и запуск
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.
