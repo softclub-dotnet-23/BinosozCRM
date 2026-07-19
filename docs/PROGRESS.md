@@ -5,10 +5,10 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 3 (Zone B) — `CalculatedAmount` (Hourly +
-Piecework + оплачиваемые отсутствия)
-**Next step:** Phase 5, Step 4 [BE] Zone B — `LatenessDeductionAmount` за
-период → MASTER §8.1
+**Last completed:** Phase 5, Step 5 (Zone B) — `BonusAmount` в расчёт по
+`CompletedAt` (payroll-side only — approve-эндпоинт нужен от Ахмада, см. ниже)
+**Next step:** Phase 5, Step 6 [BE] Zone B — `PayrollAdvance` +
+`AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1152,11 +1152,61 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 5 (Zone B) — `BonusAmount`.** Retrofitted `CreatePayrollEntryCommand`
+again with `CalculateBonusAmountAsync`: sums `IndividualTask.BonusAmount`
+for tasks assigned to this worker where `BonusApprovedByUserId IS NOT NULL`
+and `CompletedAt` falls in the period (§8.7 point 5) — deliberately
+excludes proposed-but-unconfirmed bonuses (point 3: "в зарплату не
+попадает"). `UpdateDraft()`'s `bonusAmount` argument is no longer hardcoded
+to 0; `advanceDeductedAmount` still is, pending Step 6.
+
+**Asked, then split by zone boundary before writing anything.** §8.7's
+confirm action (`POST /individual-tasks/{id}/bonus/approve`, points 2/4/6 —
+Prorab confirms or changes the Brigadir-proposed amount, never their own
+task) calls `IndividualTask.ApproveBonus()` — already exists in Domain
+(Phase 0), but the endpoint's natural home is `Application/IndividualTasks/`
++ `IndividualTasksController.cs`, explicitly Zone A's folder per the
+team-split doc ("не трогает... даже если удобно"), even though a Phase 2
+Step 2 note had assigned "подтверждение премии" to "Phase 5 Step 5."
+Flagged before touching any file; **decision: build only the PayrollEntry
+retrofit, leave the endpoint itself for Ahmad.** **нужно от Ахмада:**
+`POST /individual-tasks/{id}/bonus/approve` (Prorab+) —
+`Application/IndividualTasks/ApproveBonusCommand.cs` calling the existing
+`ApproveBonus(Guid)`, plus the controller route. Until that exists, no
+bonus can ever reach `BonusApprovedByUserId != null` in practice — this
+step's own logic is correct and tested against directly-constructed Domain
+state, but has no live caller yet.
+
+Verified against real Postgres (4/4, deleted after): a confirmed bonus
+inside the period sums into `BonusAmount`; an unconfirmed one (proposed,
+never approved) contributes 0; a confirmed bonus with `CompletedAt`
+outside the period contributes 0; two confirmed bonuses in the same
+period sum together (60 + 40 = 100). Full suite: 70/70, no regressions.
+
+**Step 4 (Zone B) — `LatenessDeductionAmount`.** Retrofitted
+`CreatePayrollEntryCommand` (Step 3's own documented plan) with
+`CalculateLatenessDeductionAsync`: sums `Timesheet.LateMinutes` over the
+period (rows with `ApprovedAt IS NOT NULL`, same flagged interpretation as
+Step 3's paid-absence lookback) and applies `× (PayRate / 60)`, rounded to
+2dp. No new logic for the grace period itself — `LateMinutes` is already
+grace-adjusted once, at check-in (`Timesheet.CheckIn`, Phase 3 Step 1),
+and never recomputed; this step only sums the already-final per-day
+values. `UpdateDraft()`'s `latenessDeductionAmount` argument is no longer
+hardcoded to 0; `bonusAmount`/`advanceDeductedAmount` still are, pending
+Steps 5/6.
+
+Verified against real Postgres (3/3, deleted after) — MASTER §8.1's own
+two worked examples exactly, same five raw lateness minutes (15, 0, 40,
+10, 0) under two grace settings: grace=0 → Σ=65min → **43.33** exactly;
+grace=5 → Σ=50min (10+0+35+5+0) → **33.33** exactly. Plus: an unapproved
+timesheet's lateness contributes 0 to the deduction. Full suite: 70/70, no
+regressions.
+
 - [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
 - [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
-- [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
-- [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
+- [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
+- [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7 *(только payroll-сторона — см. заметку ниже)*
 - [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8

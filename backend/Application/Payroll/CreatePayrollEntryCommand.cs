@@ -8,17 +8,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Payroll;
 
-// MASTER §8.0 — the base salary figure everything else in Phase 5 adjusts.
+// MASTER §8.0/§8.1/§8.7 — the base salary figure plus its lateness and
+// bonus adjustments; Steps 6-7 finish the rest.
 // §9.4 names only `POST /payroll` (no separate recalculate endpoint), and
 // PayrollEntry(WorkerId, PeriodStart, PeriodEnd) is UNIQUE (§6) — so this is
 // an upsert: first call for a (Worker, Period) creates the Draft, a later
-// call recomputes CalculatedAmount in place (e.g. a Timesheet gets approved
+// call recomputes every amount in place (e.g. a Timesheet gets approved
 // late, after the first draft). Rejected once the entry has moved past
 // Draft — PayrollEntry.UpdateDraft() already enforces that.
-// LatenessDeductionAmount/BonusAmount/AdvanceDeductedAmount are 0 here —
-// Steps 4/5/6 will retrofit this same handler to compute and pass them,
-// same pattern as TerminateWorkerCommand/ListBrigadeWorkersQuery being
-// retrofitted across steps (see PROGRESS.md Phase 3 Step 3).
+// AdvanceDeductedAmount is still 0 — Step 6 will retrofit this same
+// handler to compute and pass it, same pattern as
+// TerminateWorkerCommand/ListBrigadeWorkersQuery being retrofitted across
+// steps (see PROGRESS.md Phase 3 Step 3).
 public sealed record CreatePayrollEntryCommand(Guid WorkerId, DateOnly PeriodStart, DateOnly PeriodEnd)
     : IRequest<Result<PayrollEntryDto>>;
 
@@ -50,6 +51,9 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
 
         calculatedAmount += await CalculatePaidAbsenceAmountAsync(worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
 
+        var latenessDeductionAmount = await CalculateLatenessDeductionAsync(worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
+        var bonusAmount = await CalculateBonusAmountAsync(worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
+
         PayrollEntry entry;
         if (existingEntry is null)
         {
@@ -61,7 +65,7 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
             entry = existingEntry;
         }
 
-        var updateResult = entry.UpdateDraft(calculatedAmount, latenessDeductionAmount: 0, bonusAmount: 0, advanceDeductedAmount: 0);
+        var updateResult = entry.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, advanceDeductedAmount: 0);
         if (updateResult.IsFailure)
             return Result.Failure<PayrollEntryDto>(updateResult.Error);
 
@@ -154,5 +158,51 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
         var averageDailyHours = history.Count < 10 ? 8m : history.Sum() / history.Count;
 
         return paidDays * averageDailyHours * worker.PayRate;
+    }
+
+    // MASTER §8.1: LateMinutes is computed once at check-in (Timesheet.CheckIn,
+    // grace period already applied there — Company.LatenessGraceMinutes at
+    // that moment, a snapshot, same as PlannedStartTime) and never
+    // recalculated; this just sums the already-final per-day values over
+    // the period and applies the per-minute rate. Both worked examples in
+    // §8.1 (65 min -> 43.33, 50 min -> 33.33) are minutes already net of
+    // grace, confirming LateMinutes itself is not re-derived here.
+    // Interpretation, flagged, same reasoning as the paid-absence lookback
+    // above: restricted to ApprovedAt IS NOT NULL, even though §8.1 doesn't
+    // say so as explicitly as §8.0's Hourly formula does — an unapproved
+    // timesheet's lateness hasn't been verified by anyone either.
+    private async Task<decimal> CalculateLatenessDeductionAsync(
+        Worker worker, DateOnly periodStart, DateOnly periodEnd, CancellationToken cancellationToken)
+    {
+        var totalLateMinutes = await context.Timesheets
+            .Where(t => t.WorkerId == worker.Id && t.Date >= periodStart && t.Date <= periodEnd && t.ApprovedAt != null)
+            .SumAsync(t => t.LateMinutes, cancellationToken) ?? 0;
+
+        return Math.Round(totalLateMinutes * worker.PayRate / 60m, 2, MidpointRounding.AwayFromZero);
+    }
+
+    // MASTER §8.7 point 5: "Подтверждённая -> PayrollEntry.BonusAmount
+    // периода по CompletedAt" — only a bonus Prorab has actually confirmed
+    // (BonusApprovedByUserId set) counts; a proposed-but-unconfirmed
+    // BonusAmount "в зарплату не попадает" (point 3), so this deliberately
+    // does NOT sum every IndividualTask.BonusAmount, only approved ones.
+    // The confirm action itself (POST /individual-tasks/{id}/bonus/approve,
+    // point 4/6 — Prorab confirms or changes the amount, never the
+    // Brigadir for their own task) is IndividualTask's own endpoint —
+    // Zone A territory (Application/IndividualTasks/), not built here;
+    // flagged as "нужно от Ахмада" in PROGRESS.md. This only reads
+    // whatever rows already carry a confirmed bonus, same as every other
+    // Zone A table this handler already reads (WorkOrder, WorkOrderProgress,
+    // WorkOrderPayoutShare).
+    private async Task<decimal> CalculateBonusAmountAsync(
+        Worker worker, DateOnly periodStart, DateOnly periodEnd, CancellationToken cancellationToken)
+    {
+        var periodStartUtc = new DateTimeOffset(periodStart, TimeOnly.MinValue, TimeSpan.Zero);
+        var periodEndExclusiveUtc = new DateTimeOffset(periodEnd.AddDays(1), TimeOnly.MinValue, TimeSpan.Zero);
+
+        return await context.IndividualTasks
+            .Where(t => t.AssignedToWorkerId == worker.Id && t.BonusApprovedByUserId != null
+                        && t.CompletedAt != null && t.CompletedAt >= periodStartUtc && t.CompletedAt < periodEndExclusiveUtc)
+            .SumAsync(t => (decimal?)(t.BonusAmount ?? 0), cancellationToken) ?? 0m;
     }
 }
