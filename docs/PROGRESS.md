@@ -15,6 +15,39 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 5 [BE] — подтверждение премии → `BonusAmount` в расчёт по
+`CompletedAt`.** Bonus proposal rides on `/complete` itself — a judgment
+call, documented in code: §9.4 lists no separate "propose bonus" endpoint,
+only `/bonus/approve`, and §8.7 point 2 says the field is offered "сразу"
+at closing. `CompleteIndividualTaskCommand` now takes an optional
+`BonusAmount`, rejected with `BONUS_NOT_ELIGIBLE` if the task didn't
+actually complete early.
+
+New `POST /individual-tasks/{id}/bonus/approve` (Prorab+ only — Brigadir
+can never reach it, satisfying §8.7 point 6's "не подтверждает сам себе
+премию" purely through role authorization, no extra same-person check
+needed). Supports an optional `OverrideAmount` for point 4's "подтверждает
+или меняет сумму" — implemented by re-calling `ProposeBonus` before
+`ApproveBonus` (Domain's `ApproveBonus()` itself takes no amount
+parameter), no Domain change needed.
+
+New `BonusAmountCalculator` (Application/Payroll): Σ confirmed
+(`BonusApprovedByUserId != null`) task bonuses whose `CompletedAt` falls
+inside the period — wired into `GeneratePayrollDraftCommandHandler`
+alongside `CalculatedAmount`/`LatenessDeductionAmount`.
+
+Verified with 5 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 5/5 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session — caught and fixed my own test-setup bug along the
+way, a missing seeded `Company` row needed by `CreateIndividualTaskCommand`'s
+code-sequence lookup): bonus on early completion stays a draft with
+`BonusApprovedByUserId = null`; bonus on a non-early completion is
+rejected; Prorab confirms and can override the amount; a confirmed bonus
+lands correctly in the payroll draft for the period containing
+`CompletedAt`; an unconfirmed bonus contributes nothing. Docker still
+unavailable — suite count unchanged (104 total, 69 pass, 35 need Docker).
+
 **Phase 5, Step 4 [BE] — `LatenessDeductionAmount` за период.** New
 `LatenessDeductionCalculator` (Application/Payroll, internal): Σ
 `LateMinutes` over the period × (`PayRate/60`), implementing §8.1's
@@ -123,10 +156,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 4
-**Next step:** Phase 5, Step 5 [BE] — подтверждение премии
-(`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` →
-MASTER §8.7
+**Last completed:** Phase 5, Step 5
+**Next step:** Phase 5, Step 6 [BE] — `PayrollAdvance` +
+`AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1373,7 +1405,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
 - [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
-- [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
+- [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
