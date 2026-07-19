@@ -81,6 +81,6 @@ public sealed class CreateWorkerCommandHandler(IApplicationDbContext context, IC
         context.Workers.Add(worker);
         await context.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(WorkerDto.FromEntity(worker));
+        return Result.Success(WorkerDto.FromEntity(worker, currentUser.Role));
     }
 }

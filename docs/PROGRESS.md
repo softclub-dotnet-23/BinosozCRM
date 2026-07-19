@@ -4,13 +4,766 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 1 — Объекты и бригады
-**Last completed:** Phase 1, Step 5 (Zone A)
-**Next step:** Phase 1, Step 6 [BE] — masking `Document*` по ролям (shared/
-either zone); Step 7 is the joint test step, last in Phase 1
+**Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
+`docs/phase-summaries/Phase1-summary.md`.
+**Phases 2 & 3: functionally ✅ COMPLETE for now (backend only).** All
+`[BE]` steps done except: Phase 2 Step 9's bot-idempotency slice, Phase 3
+Step 3's "финальный расчёт" clause (blocked on Phase 5's
+`CalculatedAmount`/`PayrollAdvance`, neither built yet). Every `[BOT]`
+step across both phases (Phase 2: 6–8, Phase 3: 4–6) stays unchecked,
+blocked on the 2026-07-18 bot deferral. No phase-summary files written for
+either — genuinely not finished, just unblocked for further backend work
+per the user's 2026-07-19 decision to keep going rather than wait on the
+bot.
+**Phase 5, Step 1 [BE] — `WorkOrderPayoutShare` + Σ`SharePercent = 100`
+invariant.** `PUT /work-orders/{id}/payout-shares` (Brigadir, own brigade,
+gated on `WorkOrder.Status == InProgress`) — replaces the entire share set
+in one `SaveChanges` (delete existing + insert new), never row-by-row,
+matching §5.13's literal "Σ SharePercent = 100.00 ровно... проверяется...
+при сохранении всего набора разом."
+
+**Real bug caught before it shipped.** The sum/duplicate checks were
+originally written as FluentValidation rules with
+`WithErrorCode("WORK_ORDER_SHARES_INVALID")` — but `ValidationBehavior`
+hardcodes every FluentValidation failure to the generic `VALIDATION_FAILED`
+code regardless of `WithErrorCode()` (confirmed by reading the pipeline
+directly). Moved both checks into the handler as explicit
+`Result.Failure(new Error("WORK_ORDER_SHARES_INVALID", ...))` calls so the
+catalog-specified code actually comes back, matching how every other
+domain-specific error code in this codebase is returned.
+
+Each `WorkerId` is validated against the work order's own `BrigadeId`
+(404 `WORKER_NOT_FOUND` for cross-brigade or nonexistent workers) and
+against duplicates within the same set. `ApprovedByUserId`/`Amount` are
+deliberately left untouched — a judgment call: §5.13 ties those to "Prorab
+confirmation" and "snapshot at confirmation," but §9.4 has no separate
+approve-shares endpoint. Read as: `WorkOrder.Accept()` (already built) is
+the Prorab's confirmation, and `Amount` gets populated once §8.0's
+`CalculatedAmount` exists (Step 3) — not invented here.
+
+Verified with 6 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 6/6 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): shares summing to exactly 100 succeed; a sum ≠ 100 is
+rejected; resubmitting replaces rather than appends; a worker outside the
+order's brigade is rejected; a duplicate worker in the same set is
+rejected; setting shares after the order leaves `InProgress` is rejected.
+Docker still unavailable — suite count unchanged (104 total, 69 pass, 35
+need Docker); no new permanent tests this step.
+
+**Phase 4 — Материалы: functionally ✅ COMPLETE for now (backend).**
+Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
+deferral. No `Phase4-summary.md` — same "functionally complete for now"
+status as Phases 2/3.
+**Phase:** 5 — Зарплата
+**Last completed:** Phase 5, Step 1
+**Next step:** Phase 5, Step 2 [BOT] — флоу распределения долей при
+закрытии наряда *(отложено — см. §15)*. Next actionable backend step:
+Phase 5, Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые
+табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 15 tests, confirmed via `dotnet test` (5 pass locally, 10 need Docker — see below)
-**Updated:** 2026-07-18
+**Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
+**Updated:** 2026-07-19
+
+**Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
+пере-поставке.** New permanent `MaterialDeliveryAutoTransitionTests.cs`
+(real Postgres via `PostgresFixture`, mirrors `WorkOrderIsolationTests.cs`'s
+style, 5 tests): permanentizes what Step 3's throwaway check first
+verified — a partial delivery lands the request on `PartiallyDelivered`;
+deliveries summing to the full quantity land it on `Delivered`;
+overdelivery is allowed and still reads as `Delivered` (§8.2: "не ошибка
+... подсвечивается в UI"); a request-less delivery is valid and touches no
+request; delivering against an `Approved`-but-not-`Ordered` request fails
+with `MATERIAL_REQUEST_INVALID_TRANSITION`. Same Docker limitation as
+every Postgres-backed test in this suite — compile-verified only here, not
+execution-verified (the underlying logic was already execution-verified
+via Step 3's throwaway InMemory check).
+
+Suite: 104 total (was 99) — 69 pass locally (unchanged, all 5 new tests
+are Postgres-backed), 35 need Docker (30 pre-existing + 5 new); confirmed
+every failure is the expected `DockerUnavailableException` fail-fast, not
+a real assertion failure. **Phase 4 is now functionally complete for
+backend** — Step 5 `[BOT]` stays deferred, same situation as Phases 2/3.
+
+**Phase 4, Step 4 [BE] — `MaterialShortageReported`.** New
+`IMaterialShortageNotifier` (Application) / `SignalRMaterialShortageNotifier`
+(Api) — reuses the existing `WorkOrdersHub` from Phase 2 Step 5 (same
+company-scoped group) rather than a new hub, since §9.4 lists all five
+events under one `/hubs/work-orders`. Wired into
+`ReportMaterialConsumptionCommandHandler`: fires **after**
+`SaveChangesAsync`, whenever `QtyShortage > 0`, on both a brand-new report
+and an update to an existing one — a shortage found on a recount is just
+as real as one caught the first time. Matches §8.2's "сразу, не
+дожидаясь оформления заявки" and the same post-save ordering rule as
+`IWorkOrderRealtimeNotifier`.
+
+**The one-click `MaterialRequest` proposal from the same MASTER sentence
+is NOT built here** — that's a bot-flow affordance (Step 5, deferred with
+every other `[BOT]` step this session), not a backend endpoint. A Brigadir
+can already file the request themselves via Step 2's
+`CreateMaterialRequestCommand`; the "proposal, one click, fields
+pre-filled" convenience is specifically UI/bot behavior layered on top of
+that existing endpoint, not new backend logic.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context and a spy notifier (written, run — 3/3 passed — then deleted, same
+add-then-revert `Microsoft.EntityFrameworkCore.InMemory` pattern as every
+other throwaway check this session): the notifier fires exactly once with
+the correct object/brigade/material/qty, confirmed to fire only after the
+report row is already committed; zero shortage never calls it; a shortage
+discovered on a same-day update (first report clean, second report finds
+a shortfall) still fires. Docker still unavailable — suite count unchanged
+(99 total, 69 pass, 30 need Docker).
+
+**Phase 4, Step 3 [BE] — `MaterialDelivery` + auto-transition.** Domain
+entity + EF config already existed. `POST,GET /material-deliveries`
+(Prorab+): creating a delivery with a `MaterialRequestId` calls
+`MaterialRequest.RecordDelivery` in the same handler — the entity itself
+does §8.2's Σ-quantity math (`0 < ΣQty < Request.Qty → PartiallyDelivered`,
+`ΣQty ≥ Request.Qty → Delivered`), genuinely automatic per §8.2's
+"переход автоматический, не ручной." A delivery with no
+`MaterialRequestId` is a valid unplanned purchase, recorded with nothing
+else touched, per §8.2's own note.
+
+**Added `POST /material-requests/{id}/mark-ordered` (Prorab+)** — a real
+gap, same class as `WorkOrder`'s `/assign`/`/start` from Phase 2 Step 1:
+not in §9.4's literal table (only `/approve`, `/reject`, `/force-close`
+are listed), but without it `Approved → Ordered` was unreachable via the
+API, and `RecordDelivery` requires exactly that status — no delivery
+could ever be recorded against an approved-but-not-ordered request.
+Verified this directly: a throwaway test confirms delivering against a
+request stuck at `Approved` fails with `MATERIAL_REQUEST_INVALID_TRANSITION`.
+
+**`/force-close` still not exposed — a genuine MASTER/Domain gap, not a
+scope shortcut.** §8.2 requires the force-close comment "пишется в
+`AdminAuditLog`", but `AdminAuditAction`'s enum (§5.16:
+`UserCreated`/`RoleChanged`/`UserDeactivated`/`BrigadirAssigned`/
+`PayRateChanged`/`PayrollPaid`/`AdvanceIssued`) has no matching action,
+and `MaterialRequest` itself has no field to hold the comment at all.
+Adding either would mean changing Domain/enums under this step's time
+budget without being confident it's the right modeling call — flagged for
+a `docs`/architecture pass instead of forced through.
+
+Verified with 5 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 5/5 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): a partial delivery lands on `PartiallyDelivered`;
+two deliveries summing to the full quantity land on `Delivered`;
+overdelivery is allowed and still reads as `Delivered` (§8.2: "не ошибка
+... подсвечивается в UI" — the highlighting itself is a UI concern, no
+backend code needed); a request-less delivery is valid; delivering
+against an `Approved`-but-not-`Ordered` request fails as described above.
+Docker still unavailable — suite count unchanged (99 total, 69 pass, 30
+need Docker); auto-transition tests are Step 6's job (this step's
+throwaway checks covered the same ground for verification, but aren't
+permanent).
+
+**Phase 4, Step 2 [BE] — `MaterialRequest` + `QtyDelivered` +
+`PartiallyDelivered` status.** Domain entity + EF config already existed,
+including the full §7.3 state machine (`Approve`/`Reject`/`MarkOrdered`/
+`RecordDelivery`/`ForceDeliver`). Built the Application/API surface for
+this step's own scope: `POST,GET /material-requests` (Brigadir creates,
+own brigade; Prorab+ reads only — same literal `Brigadir(C) / Prorab+(R)`
+split as Step 1's consumption reports), `POST /{id}/approve|reject`
+(Prorab+, new `MaterialRequestAccess` mirrors `WorkOrderAccess` — scoped by
+`ProrabObjectAssignment` on the request's `ObjectId`).
+
+**`Reject` takes no reason here** — unlike `WorkOrder.Reject`, neither
+§9.4 nor §7.3 require one for `MaterialRequest`, and there's no
+`TaskLog`-equivalent audit trail for this entity to write it into, so
+nothing was invented to match `WorkOrder`'s pattern.
+
+**Deliberately not built — `MarkOrdered`, `/force-close`, anything
+delivery-driven.** `RecordDelivery`'s precondition (`Ordered` or
+`PartiallyDelivered`) can't be reached without `MaterialDelivery`, which
+doesn't have an Application layer yet — that's Step 3's job. Exposing
+`/force-close` now would guard a transition (`PartiallyDelivered →
+Delivered`) nothing can ever trigger yet, same reasoning Phase 2 Step 1
+used to defer `WorkOrder`'s transition endpoints until `TaskLog` existed.
+
+New `MATERIAL_REQUEST_NOT_FOUND` (404) and `MATERIAL_REQUEST_INVALID_TRANSITION`
+(400, matches the existing fallback but listed explicitly for consistency
+with `WORK_ORDER_INVALID_TRANSITION`/`INDIVIDUAL_TASK_INVALID_TRANSITION`)
+added to `ErrorCodeCatalog`.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): create → approve transitions `Requested → Approved`
+correctly; reject then a subsequent approve attempt fails with
+`MATERIAL_REQUEST_INVALID_TRANSITION`; a Prorab with an assignment
+elsewhere (not on this request's object) is blocked with
+`PRORAB_NOT_ASSIGNED_TO_OBJECT`. Docker still unavailable — suite count
+unchanged (99 total, 69 pass, 30 need Docker); auto-transition tests are
+Step 6's job.
+
+**Phase 4, Step 1 [BE] — `MaterialConsumptionReport`.** Domain entity +
+EF config (including the unique `(BrigadeId, ObjectId, MaterialName,
+Date)` index and an `UpdateUsage` method) already existed; built the
+Application/API surface. `POST /material-consumption-reports` (Brigadir,
+own brigade — resolved via the existing `BrigadeAccess` helper): finds the
+existing report for `(BrigadeId, ObjectId, MaterialName, Date)` and calls
+`UpdateUsage` if found, else creates — §8.2's "повторный отчёт за тот же
+материал/день — обновление существующей записи, не дубль" implemented
+literally.
+
+`GET /material-consumption-reports` — Prorab+ only, scoped by
+`ProrabObjectAssignment` (same pattern as `WorkOrder`/`Timesheet`). No
+Brigadir read carve-out here, unlike `WorkOrder`'s "(own, read)" — §9.4
+literally splits this endpoint `Brigadir(C) / Prorab+(R)` with no read
+access for Brigadir at all.
+
+**Deliberately not built this step** — Steps 2/4's job, not this one's:
+the `QtyShortage > 0` → one-click `MaterialRequest` proposal, and the
+`MaterialShortageReported` SignalR event. `MaterialRequest` itself doesn't
+have an Application layer yet.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same
+add-then-revert `Microsoft.EntityFrameworkCore.InMemory` pattern as every
+other throwaway check this session): a second same-day report for the
+same material updates the existing row rather than duplicating it;
+different material or different day both correctly create a new row.
+Docker still unavailable — suite count unchanged (99 total, 69 pass, 30
+need Docker); auto-transition tests are Step 6's job.
+
+**Phase 3, Step 7 [BE] — тесты: `LateMinutes` numeric examples, grace
+period, absence-instead-of-no-show.** Two new permanent test files:
+
+- `TimesheetLateMinutesTests.cs` (pure domain, no DB — 11 tests):
+  `Timesheet.CheckIn` exercised directly with deterministic timestamps
+  against §8.1's exact worked example set (15/0/40/10 minutes late), both
+  grace=0 and grace=5 configurations, plus edge cases the worked examples
+  don't cover: arriving within the grace period clamps to 0 rather than
+  going negative (`max(0, lateMinutes) - grace` needs the *second*
+  `Math.Max(0, ...)` the formula implies), arriving early is 0 not
+  negative, and `LateMinutes` stays `null` (not `0`) when
+  `Worker.ShiftStartTime` isn't configured — same §8.1 rule Step 1's
+  throwaway check first verified, now permanent.
+- `AbsenceTimesheetConflictTests.cs` (real Postgres via `PostgresFixture`
+  — 4 tests): permanentizes the two-way `TIMESHEET_ABSENCE_CONFLICT` guard
+  built in Steps 1/2 — filing an absence over an existing check-in and
+  checking in during a filed absence are both rejected; non-overlapping
+  dates succeed on both sides; `IsPaid=true`/`IsPaid=false` absences are
+  recorded distinctly (§8.9's "`IsPaid=false` → не входит никуда" needs
+  that distinction to survive into Phase 5's payroll consumption).
+
+**Σ`LateMinutes`/`LatenessDeductionAmount` aggregation across a pay
+period is out of scope** — that needs a period-level query that doesn't
+exist yet (Phase 5 Step 4). This step tests the per-check-in computation
+§8.1 actually specifies, not the payroll rollup.
+
+Build clean, 0 warnings. Suite: 99 total (was 84) — 69 pass locally (all
+11 new domain tests included), 30 need Docker (26 pre-existing + 4 new
+Postgres-backed); confirmed every failure is the expected
+`DockerUnavailableException` fail-fast, not a real assertion failure.
+**Phase 3 is now functionally complete for backend** — Steps 4–6 `[BOT]`
+stay deferred, Step 3's "финальный расчёт" clause stays blocked on Phase
+5, same as Phase 2's situation.
+
+**Phase 3, Step 3 [BE] — `Worker.TerminationDate` lifecycle (partial).**
+`TerminateWorkerCommand` already existed (Phase 1 Step 2) but was bare —
+no guards, no lifecycle. §8.9 lists five things that happen on
+termination; this step covers what's actually buildable right now:
+
+1. **Open `IndividualTask` blocks termination** — new
+   `WORKER_HAS_OPEN_TASKS` (400): `TerminateWorkerCommandHandler` now
+   checks for any `IndividualTask` assigned to the worker with `Status !=
+   Done` and refuses outright, per §8.9's "не удалять молча — там может
+   быть незакрытая работа."
+2. **`WorkOrderPayoutShare` rows stay untouched** — no code needed; that
+   entity has no Application layer yet (Phase 5 Step 1), so there was
+   nothing to accidentally touch in the first place.
+5. **`IsActive = false` drops the worker from active lists, not history**
+   — `Worker.Terminate()` already set `IsActive = false` (Phase 1);
+   `ListBrigadeWorkersQuery` now filters to `IsActive = true` by default,
+   with a new `IncludeInactive` opt-in (no separate audit/history endpoint
+   exists to view terminated workers otherwise).
+
+**Explicitly NOT built — items 3 and 4, genuinely blocked, not a scope
+shortcut:** "текущий `PayrollEntry` формируется... досрочно" and
+"непогашенные авансы попадают в этот финальный расчёт" both need §8.0's
+`CalculatedAmount` formula and `PayrollAdvance` settlement — neither
+exists anywhere in Application yet (`WorkOrderPayoutShare`,
+`CalculatedAmount`, `PayrollAdvance`, `PayrollEntry.Approve()` are all
+still-unbuilt Phase 5 Steps 1/3/6/7). Building them now would mean
+implementing payroll calculation as a side effect of a Phase 3 step —
+flagged here so Phase 5's termination tie-in isn't forgotten once
+`CalculatedAmount` lands. **Checklist item stays unchecked** — this is
+part of Step 3, not all of it.
+
+Verified with 2 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 2/2 passed — then deleted, same
+`Microsoft.EntityFrameworkCore.InMemory`-added-then-reverted pattern as
+every other throwaway check this session): an open task blocks
+termination and the worker stays `IsActive`; termination succeeds once the
+task is `Done`, and the worker disappears from the default active-worker
+list while remaining visible via `IncludeInactive`. Docker still
+unavailable — suite count unchanged (84 total, 58 pass, 26 need Docker).
+
+**Phase 3, Step 2 [BE] — `AbsenceRecord`.** Domain entity + EF config
+already existed; built the Application/API surface. New
+`AbsencesController`: `GET,POST /absences` — Prorab+/Accountant only, per
+§8.9's "создаёт прораб или бухгалтер (не бригадир — нужен
+документ/решение)" — the only controller in this codebase with zero
+Brigadir-reachable actions.
+
+**Judgment call, documented in code — no separate `/absences/{id}/approve`
+endpoint exists in §9.4's table**, unlike `WorkOrder`/`Timesheet`. Read
+that as: the creator's decision *is* the approval, since only
+Prorab+/Accountant can create an `AbsenceRecord` at all — `Approve()` is
+called immediately inside `CreateAbsenceRecordCommandHandler` rather than
+leaving `ApprovedByUserId` permanently `null` with no way to ever set it.
+
+**The two-way conflict from §8.9** ("человек отмечен И в отпуске —
+конфликт, 400: либо отметка ошибочна, либо отсутствие. Не угадывать."):
+`TIMESHEET_ABSENCE_CONFLICT` (already in the error catalog from Step 1,
+unused until now) fires from both directions —
+`CreateAbsenceRecordCommandHandler` rejects filing an absence over a date
+range that already has a real check-in, and `CheckInCommandHandler` (plus
+`CreateTimesheetCommand`'s backdated-correction path, when it's actually
+recording a check-in) rejects a check-in landing on a day already covered
+by an `AbsenceRecord`. Neither guesses which side is wrong — both are
+rejected outright, per the literal "не угадывать."
+
+**`ListAbsenceRecordsQuery` is company-wide, not object-scoped** — another
+judgment call: §9.4 lists `GET /absences` without an "(own)"/object
+qualifier (unlike `WorkOrder`'s explicit "(own, read)"), and
+`AbsenceRecord` has no `ObjectId` field to scope by in the first place —
+the automatic `CompanyId` filter is the only isolation axis available.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, including a temporary
+`Microsoft.EntityFrameworkCore.InMemory` reference added and reverted from
+`Directory.Packages.props`/the test csproj, no trace left): filing an
+absence over an existing check-in is rejected; checking in during a filed
+absence is rejected; non-overlapping dates succeed cleanly on both sides.
+Docker still unavailable — suite count unchanged (84 total, 58 pass, 26
+need Docker); numeric-example tests for lateness/absence interaction are
+Step 7's job.
+
+**Phase 3, Step 1 [BE] — `Timesheet` + `LateMinutes` computed at
+check-in.** Domain entity + `TimesheetConfiguration` already existed
+(Ahmad-owned Domain layer per the team split, same pattern as
+`WorkOrder`/`IndividualTask` before Phase 2's Application layers landed) —
+`Timesheet.CheckIn`/`CheckOut`/`Approve` already implemented §8.1's formula
+exactly. This step built the Application/API surface: new
+`TimesheetAccess` (mirrors `WorkOrderAccess`/`BrigadeAccess` — Brigadir
+scoped to own `BrigadeId` via the timesheet's `Worker`, Prorab+ scoped by
+`ProrabObjectAssignment` on `ObjectId`).
+
+`POST /timesheets/check-in` (Brigadir — own brigade or self, §8.4's "за
+всю бригаду и за себя"): finds or creates the `Timesheet` row for
+`(WorkerId, Date)`, rejects a repeat with `TIMESHEET_ALREADY_CHECKED_IN`
+if `CheckInAt` is already set. `POST /timesheets/{id}/check-out` and
+`POST /timesheets/{id}/approve` (Prorab+) follow the same access pattern.
+`GET /timesheets` — Prorab+ object-scoped / Brigadir own-brigade (joins
+through `Worker.BrigadeId` since `Timesheet` has no `BrigadeId` field
+itself).
+
+**Judgment call, documented in code — `POST /timesheets`'s exact scope
+wasn't literally specified.** §9.4 lists `POST /timesheets` without the
+"(own, read)" qualifier used elsewhere, and §8.4 flatly states "только
+бригадир отмечает" (only the Brigadir marks attendance). Read `POST
+/timesheets` as the backdated-correction path — distinct from the live
+`/check-in` flow — always `EnteredManually = true`, Brigadir-only (not
+opened to Prorab+, since §8.4 doesn't carve out an exception for them).
+Worth reconciling in a `docs` pass if this reading turns out wrong.
+
+New `TIMESHEET_NOT_FOUND` (404) in `ErrorCodeCatalog` — same "real code,
+not in §9.2's literal table" pattern as `WORK_ORDER_NOT_FOUND`.
+
+Verified with 7 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 7/7 passed — then deleted, including a temporary
+`Microsoft.EntityFrameworkCore.InMemory` reference added and reverted from
+`Directory.Packages.props`/the test csproj, no trace left): `LateMinutes`
+matches **both** of §8.1's worked numeric examples exactly (grace=0 → 15
+late minutes; grace=5 → 10); `LateMinutes` is `null`, not `0`, when
+`Worker.ShiftStartTime` isn't configured; a second same-day check-in is
+rejected; `CheckOut` computes `HoursWorked`; a Brigadir of a different
+brigade cannot check in someone else's worker (`WORKER_NOT_FOUND`);
+`Approve` sets `ApprovedByUserId`/`ApprovedAt` correctly. Docker still
+unavailable — suite count unchanged (84 total, 58 pass, 26 need Docker);
+no new permanent tests this step (`AbsenceRecord`'s `TIMESHEET_ABSENCE_CONFLICT`
+and numeric-example tests are Step 2's and Step 7's jobs respectively).
+
+**Phase 2, Step 9 [FULL] — тесты (backend half only).** MASTER §7.1/§7.2
+call for "все переходы (разрешённые + запрещённые), изоляция бригады
+(404)"; §10.3's bot-idempotency tests are out of reach until the bot
+deferral is revisited. Built the two halves that are actually testable
+today, 62 new tests total:
+
+- `WorkOrderStateMachineTests.cs` / `IndividualTaskStateMachineTests.cs`
+  (pure domain, no DB — 53 tests): every allowed edge of both state
+  machines plus every disallowed edge from every reachable state via
+  `[Theory]`, including `WorkOrder.Rework`/`Close` and
+  `IndividualTask.ProposeBonus`/`ApproveBonus` — none of which have an API
+  handler yet, but the entity guards exist and needed covering per §7.1/
+  §7.2's literal "все переходы." Caught my own wrong assumption while
+  writing these: `IndividualTask.CompletedEarly` is `DueAt is not null &&
+  completedAt < DueAt.Value` — with no `DueAt` at all that's `false`, not
+  `null` (nullable represents "not yet computed pre-`Done`," not
+  "unknown"). Test was wrong, not the code; fixed the test.
+- `WorkOrderIsolationTests.cs` / `IndividualTaskIsolationTests.cs` (real
+  Postgres via `PostgresFixture`, mirrors Phase 1 Step 7's style — 9 tests):
+  Prorab object-assignment isolation and Brigadir cross-brigade rejection
+  (404, not 403) for the handlers Steps 1–3 actually built, plus `TaskLog`
+  correctness — right `FromStatus`/`ToStatus` pairs, `Reject`'s reason
+  landing in `Comment`, two log rows in the right order across
+  Assign→Start.
+
+Suite total: 84 (was 22) — 58 pass locally (Docker-free), 26 need Docker
+(17 pre-existing + 9 new), confirmed every one of the 26 fails in ~1ms with
+`DockerUnavailableException`, not a real assertion failure. **Checklist
+item left unchecked** — this is half of Step 9, not all of it.
+
+**Phase 2, Step 5 [BE] — SignalR-хаб, группы из claims, события после
+`SaveChanges`.** New `WorkOrdersHub` (`Api/Hubs`) at `/hubs/work-orders`,
+`[Authorize]` — on connect, joins `company:{companyId}` read straight off
+the JWT's own `company_id` claim (`CurrentUserService.CompanyIdClaimType`).
+No hub method ever takes a client-supplied group name — `CompanyId` is the
+only isolation claim actually baked into the token (confirmed against
+`JwtTokenService`: `UserId`/`CompanyId`/`Role`, nothing brigade- or
+object-scoped), so "по компании" is the finest group this step can build
+without inventing a new claim. Finer BrigadeId/ProrabObjectAssignment
+targeting is a real possible refinement, not covered by §9.4's literal
+text — flagged, not built.
+
+New `IWorkOrderRealtimeNotifier` (Application) / `SignalRWorkOrderNotifier`
+(Api, via `IHubContext<WorkOrdersHub>`) sends `WorkOrderStatusChanged` to
+the company group. Wired into all five existing WorkOrder transition
+handlers (`Assign`/`Start`/`Submit`/`Accept`/`Reject`) — each calls the
+notifier **after** its own `SaveChangesAsync`, literally matching §9.4's
+"события после `SaveChanges`, не до." `Program.cs`: `AddSignalR()`,
+`MapHub`, and a JWT-bearer `OnMessageReceived` fallback reading
+`?access_token=` from the query string (browser SignalR clients can't set
+an `Authorization` header on a WebSocket handshake) — scoped to the hub's
+own path only, never applied to REST requests.
+
+**Only `WorkOrderStatusChanged` this step.** §9.4 also lists
+`AttendanceMarked`, `MaterialShortageReported`, `BonusPendingApproval`,
+`PayrollDraftReady` — none of those features exist yet (Phase 3/4/5), so
+there's nothing to fire them from; the hub/notifier pattern is ready for
+each to plug in once its owning step lands.
+
+Verified with 2 throwaway xUnit tests against a temporary EF InMemory
+`IApplicationDbContext` (written, run — 2/2 passed — then deleted,
+including a temporary `Microsoft.EntityFrameworkCore.InMemory` package
+reference added and reverted from `Directory.Packages.props`/the test
+csproj, no trace left): `AssignWorkOrderCommandHandler` calls the notifier
+exactly once with the correct `(companyId, workOrderId, "New",
+"Assigned")` tuple, and — critically — the `TaskLog` row is already
+committed by the time the notifier fires, proving the ordering; a rejected
+transition (already `Assigned`, re-assign attempted) never calls the
+notifier at all. Docker still unavailable — suite count unchanged (22
+total, 5 pass, 17 need Docker); no new permanent tests this step.
+
+**Phase 2, Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный
+URL, allow-list MIME).** Greenfield — no file/blob storage abstraction
+existed anywhere in the repo before this step (confirmed by search). New
+`IFileStorageService` (Application/Common/Interfaces), implemented by
+`LocalFileStorageService` (Infrastructure/Files): disk storage under a
+configured `RootPath` outside the web root, HMAC-SHA256 signed URLs with
+expiry (`GetSignedUrl`/`TryValidateSignedUrl`), MIME-derived extensions
+from the same allow-list the validator enforces, and path-traversal
+rejection (`Path.GetFileName(key) != key` → reject — every key this
+service ever hands out is a bare `{guid}.{ext}`, so any mismatch means the
+caller supplied something it didn't mint). New `FilesController`
+(`GET /files/{key}?exp&sig`, `[AllowAnonymous]` — the signature+expiry
+pair *is* the authorization here, not a JWT, since a photo URL embedded in
+an already-authenticated response has to be directly fetchable, e.g. by an
+`<img>` tag or the Telegram bot relaying it).
+
+`AddWorkOrderProgressCommand`: `POST /work-orders/{id}/progress`, Brigadir
+own-brigade only (`WorkOrderAccess.GetForBrigadirAsync`, same isolation as
+Step 3's other Brigadir handlers), gated on `WorkOrder.Status ==
+InProgress` per §7.1's "`ReportedQty` принимается только при `InProgress`"
+— returns `WORK_ORDER_INVALID_TRANSITION`, the same code every other
+wrong-status attempt uses. **Not a state transition** (`WorkOrder.Status`
+doesn't change), so no `TaskLogWriter` call here, unlike every Step 3
+handler. FluentValidation enforces §11.9's size limit and MIME allow-list
+per photo, injecting `IOptions<FileStorageOptions>` into the validator
+(config-driven, not hardcoded, same pattern as `JwtOptions`).
+`WorkOrderProgress.PhotoUrls` stores opaque storage **keys**, not literal
+URLs — signed URLs are minted fresh on every read (`WorkOrderProgressDto
+.FromEntity`) since a URL persisted at write time would eventually expire
+while sitting in the database.
+
+New `FileStorage` config section (`RootPath`, `SignedUrlExpiryMinutes`,
+`MaxFileSizeBytes`, `AllowedContentTypes`) in `appsettings.json` — all
+non-secret, safe to commit. `SignedUrlSecret` follows the exact pattern
+`Jwt:SecretKey` already established: absent from every checked-in
+appsettings file, `ValidateOnStart` requires it set and ≥32 bytes via
+ENV/user-secrets (MASTER §11.1's reasoning applied to §11.9).
+
+Verified with 3 throwaway xUnit tests directly against
+`LocalFileStorageService` (written, run — 3/3 passed — then deleted, no
+csproj/trace left): save → signed URL → validate → read round-trips the
+exact bytes with the right content type; an expired or tampered signature
+is rejected; a `../../etc/passwd`-style key throws rather than escaping
+`RootPath`. Made `LocalFileStorageService` `public` rather than `internal`
+— matches every other Infrastructure service (`Argon2PasswordHasher`,
+`JwtTokenService`, `CurrentUserService`), all public, none of them
+`internal`; this also happened to be what the throwaway test needed to
+construct it directly.
+
+Only `POST .../progress` this step — §9.4 lists no separate `GET` for
+listing progress reports, so none was added. Docker still unavailable —
+suite count unchanged (22 total, 5 pass, 17 need Docker); no new permanent
+tests (that's Step 9's job).
+
+**Phase 2, Step 3 [BE] — `TaskLog` в той же транзакции, что переход.** New
+`Application/Common/TaskLogWriter.cs`: `Append` only adds to the tracked
+`DbContext` — it never calls `SaveChangesAsync` itself, so the caller's
+existing single `SaveChangesAsync` (already writing the entity's new
+`Status`) is what makes the entity change and the log write atomic (Rule 3).
+Wired into `IndividualTask.Start`/`Complete` (already existed, just needed
+the log call) and every new `WorkOrder` transition handler.
+
+**`WorkOrder`'s remaining §7.1 transitions built out in full**, not just
+the log wiring: `AssignWorkOrderCommand`, `StartWorkOrderCommand`,
+`SubmitWorkOrderForReviewCommand`, `AcceptWorkOrderCommand`,
+`RejectWorkOrderCommand`, `GetWorkOrderLogQuery` — `Api/Controllers/
+WorkOrdersController.cs` now exposes `POST .../assign|start|submit|accept|
+reject` and `GET .../log`. New `WorkOrderAccess` helper (mirrors
+`ProrabObjectAccess`/`BrigadeAccess`): Prorab+ scoped by
+`ProrabObjectAssignment` on the order's `ObjectId`, Brigadir scoped to their
+own `BrigadeId` via their linked `Worker` row — same 404-not-403 pattern as
+every other isolation check in this codebase.
+
+**Found — `/assign` and `/start` aren't in §9.4's literal endpoint table**
+(only `/submit`, `/accept`|`/reject`, `/log` are listed), but without them a
+`WorkOrder` could never leave `New` via the API and `/submit` could never
+succeed — decided with the user to add them anyway, Prorab+ for `/assign`
+(same role as `Create`), Brigadir-own-brigade for `/start` (mirrors
+`IndividualTask`). `/rework` and `/close` are still not exposed — same
+class of gap, out of this step's scope. Worth reconciling MASTER §9.4's
+table itself in a `docs` pass.
+
+**Found — §7.1 says the piecework payout-share gate is keyed "у бригады"
+(on the brigade)**, but `PayRateType` (§5.7) only exists per-`Worker`, not
+on `Brigade` — there's no brigade-level field to read. Judgment call, not
+an invented business rule: `SubmitWorkOrderForReviewCommand` treats a
+brigade as "piecework" for this gate if it has ≥1 worker with
+`PayRateType.Piecework`; if none, the 100%-payout-share requirement is
+trivially satisfied (doesn't apply). `WorkOrderProgress` (gates `≥1`
+report) and `WorkOrderPayoutShare` (gates the 100% sum) are both queried
+for real here even though no handler can create either yet — Step 4 and
+Phase 5 Step 1 will start returning `true`/populated data with no change
+needed in this handler.
+
+Build clean, 0 warnings. Tests unchanged from Step 2's baseline — Docker
+still unavailable on this machine, 5/22 pass locally, the other 17 are all
+`DockerUnavailableException` (Testcontainers), not real failures; no new
+permanent tests this step (that's Step 9's job).
+
+**Phase 2, Step 2 [BE] — `IndividualTask` + state machine.** Same situation
+as Step 1: the entity, its state machine (`Start`/`Complete`/`ProposeBonus`/
+`ApproveBonus`, all `Result`-returning, `CompletedEarly` correctly computed
+**at closing** per §7.2/§8.5), and `xmin` already existed — nothing in
+`Application`/`Api` referenced it. Built `Application/IndividualTasks/`
+(`CreateIndividualTaskCommand`, `StartIndividualTaskCommand`,
+`CompleteIndividualTaskCommand`, `ListIndividualTasksQuery`),
+`Api/Controllers/IndividualTasksController.cs`: `GET,POST
+/individual-tasks`, `POST .../start`, `POST .../complete` — **`Brigadir`
+only**, per §9.4's endpoint table (no Prorab+ split for this one, unlike
+`WorkOrder`).
+
+**Not built: `ProposeBonus`/`ApproveBonus` endpoints.** §8.5 covers the
+premium-proposal flow, but Phase 3's own step list (Step 6, `[BOT]`,
+"«Личные задачи»: ... → предложение премии") explicitly scopes that to a
+later, currently-deferred bot step — not this one. This step is exactly
+what its checklist line says: the `Assigned→InProgress→Done` state machine
+and the same-brigade assignment check, nothing past that.
+
+**New shared `BrigadeAccess` helper** (`Application/IndividualTasks/`,
+mirrors Phase 1 Step 4's `ProrabObjectAccess`): resolves the calling
+Brigadir's own `BrigadeId` via their linked `Worker` row (§4 — a Brigadir
+is simultaneously a `User` and a `Worker`, `Worker.UserId`), used by every
+handler here instead of duplicating the lookup. `Start`/`Complete` on a
+task belonging to another brigade → new `INDIVIDUAL_TASK_NOT_FOUND` (404,
+not 403 — §4's "не видит чужие бригады"); `Create` targeting a worker
+outside the caller's own brigade → the already-existing
+`INDIVIDUAL_TASK_WRONG_BRIGADE` (400, per §9.2's actual table — this is
+the first handler to ever raise it). A caller with no linked `Worker` row
+at all (shouldn't happen for a real Brigadir, but handled) →
+`WORKER_NOT_FOUND`.
+
+`CreateIndividualTaskCommand` reuses `Company.ReserveNextCode()` from Step
+1 — confirmed the shared sequence actually works across both entity types
+in the verification below (a `WorkOrder` and an `IndividualTask` in the
+same company get consecutive codes, not independent per-entity counters).
+Same `DbUpdateConcurrencyException` → `CONCURRENCY_CONFLICT` handling as
+`CreateWorkOrderCommand`.
+
+Verified with a throwaway EF InMemory check (1 test, written, run, deleted
+— no `Directory.Packages.props`/csproj trace left): a Brigadir creates a
+task for a co-worker in their own brigade (`BR-1`, following a WorkOrder
+create that failed validation and correctly did **not** consume a code
+number) and is rejected assigning to a worker in another brigade
+(`INDIVIDUAL_TASK_WRONG_BRIGADE`); `Start` succeeds on their own task and
+returns `INDIVIDUAL_TASK_NOT_FOUND` for a nonexistent one; `Complete` sets
+`Done` and computes `CompletedEarly`; `List` returns only the caller's own
+brigade's tasks; a user with no linked `Worker` row gets `WORKER_NOT_FOUND`.
+Docker still unavailable — suite count unchanged (22 total, 5 pass, 17 need
+Docker); xUnit tests for `IndividualTask` are Step 9's job.
+
+**Phase 2, Step 1 [BE] — `WorkOrder` + state machine + `Code` + `xmin`.**
+The `WorkOrder` entity, its full state machine (`Assign`/`Start`/
+`SubmitForReview`/`Accept`/`Reject`/`Rework`/`Close`, all returning
+`Result`), the unique `(CompanyId, Code)` index, and `xmin` **already
+existed** — from the original Domain-layer commit plus Step 12's FK pass.
+Nothing in `Application`/`Api` referenced it. This step's actual work:
+`Application/WorkOrders/` (`CreateWorkOrderCommand`, `ListWorkOrdersQuery`),
+`Api/Controllers/WorkOrdersController.cs`: `GET,POST /work-orders`,
+Prorab+, per MASTER §9.4.
+
+**Only `Create`/`List` this step — no `/submit`, `/accept`, `/reject`,
+etc.** Those are real state *transitions*, and Rule 3 ("every transition
+writes `TaskLog` in the same transaction — not 'logging we'll add later'")
+isn't satisfiable yet: `TaskLog` wiring is explicitly Step 3, not built.
+`Create` isn't a transition (no `FromStatus`), so it's exempt. Exposing the
+transition endpoints now would either violate Rule 3 or need re-touching
+every action handler once Step 3 lands — same reasoning Phase 1 Step 4
+used to defer `AdminAuditLog` wiring to its own step.
+
+**`Code` generation needed a real migration — a per-company counter shared
+with `IndividualTask`.** MASTER §5.14 says `IndividualTask.Code` uses "та
+же последовательность, что WorkOrder" — one shared counter, not
+per-entity. Added `Company.NextCodeNumber` (int) + `Company.ReserveNextCode()`
+(`"BR-{N}"`, increments) — `Company` already holds other per-company
+settings, and is Ahmad-owned Domain. Also added `xmin` to `Company` (same
+pattern as `WorkOrder`/`IndividualTask`/`PayrollEntry`): two concurrent
+requests racing on `NextCodeNumber` would otherwise silently compute the
+same code and hit the `(CompanyId, Code)` unique-index violation as a raw,
+uncaught exception; `xmin` turns that into a catchable
+`DbUpdateConcurrencyException` → the existing `CONCURRENCY_CONFLICT` code,
+reusing established machinery instead of a retry-loop or raw-SQL lock.
+
+**Caught and fixed a bug in my own first migration draft, before
+committing:** `AddColumn<int>` for `NextCodeNumber` defaulted to `0`, not
+`1` — EF Core's migration generator uses `default(int)`, not the CLR
+property initializer, unless `.HasDefaultValue(...)` is set explicitly.
+Without the fix, every already-seeded `Company` would have backfilled to
+`0`, and its first `WorkOrder`/`IndividualTask` would have been "BR-0", not
+"BR-1". Deleted the draft migration, added `.HasDefaultValue(1)` to
+`CompanyConfiguration`, regenerated.
+
+New `ESTIMATE_ITEM_NOT_FOUND` (404) for the optional `EstimateItemId` —
+same 404-not-403 pattern as `OBJECT_NOT_FOUND`/`BRIGADE_NOT_FOUND`.
+`CreateWorkOrderCommand` applies the same `ProrabObjectAccess` isolation
+guard as `CreateEstimateItemCommand` (Phase 1 Step 4) — a `WorkOrder`
+always references an *existing* object, unlike creating a brand-new
+`ConstructionObject`. `ListWorkOrdersQuery` only builds the Prorab+ half of
+`GET,POST /work-orders` — Brigadir's "own, read" half isn't built; Brigadir
+has no authenticated path anywhere in this codebase yet (their interface
+is the Telegram bot, deferred).
+
+Verified with a throwaway EF InMemory check (2 tests, written, run,
+deleted — no `Directory.Packages.props`/csproj trace left): `Code` is
+`BR-1` then `BR-2` on successive creates for the same company (proves the
+counter persists across separate `SaveChanges` calls); object/brigade/
+estimate-item not-found each rejected with the right code; a Prorab with
+one assignment can create on that object but is blocked
+(`PRORAB_NOT_ASSIGNED_TO_OBJECT`) on another; list totals match. Did **not**
+attempt to simulate the `xmin`/`CONCURRENCY_CONFLICT` race with
+InMemory — that's genuinely Postgres-specific behavior (real row-version
+semantics), not something the InMemory provider reproduces meaningfully;
+noting this as an inference-verified, not execution-verified, part of the
+design, same caveat class as every other Docker-gated limitation this
+session. Docker still unavailable — suite count unchanged (22 total, 5
+pass, 17 need Docker); xUnit tests for `WorkOrder` are Step 9's job (Phase
+2's test step).
+
+**Step 7 [BE] — joint tests: 18+, изоляция прораба по объектам.** New,
+permanent (not throwaway) `Tests/Api.IntegrationTests` files, real Postgres
+via the Step 10 `PostgresFixture` — first tests written directly against
+Step 1/4's own Application handlers rather than auth:
+
+- `WorkerAgeGuardTests.cs` (3 tests, MASTER §8.3): exactly 18 on `HireDate`
+  succeeds; one day short fails `WORKER_UNDERAGE`; a backdated `HireDate`
+  (born 2008-07-01, hired on their 16th birthday in 2024 — already 18
+  *today*, whenever "today" runs) still fails — proves the guard checks age
+  **at `HireDate`**, not at call time, per §8.3's explicit "не должно
+  проходить только потому, что человек уже вырос."
+- `ProrabObjectAssignmentIsolationTests.cs` (4 tests, MASTER §1.2/§11.5):
+  zero assignments → Prorab sees every object; one assignment → sees only
+  that one, and `Get` on the other returns `PRORAB_NOT_ASSIGNED_TO_OBJECT`
+  (not `OBJECT_NOT_FOUND` — the object genuinely exists, just isn't
+  theirs); Owner is never restricted regardless of assignments; a duplicate
+  assignment is rejected `PRORAB_ALREADY_ASSIGNED`.
+
+Added a `FixedCurrentUserService` + `PostgresFixture.CreateDbContext(ICurrentUserService)`
+overload (`PostgresFixture.cs`) — every prior Postgres-backed test ran
+unauthenticated (`NullCurrentUserService`, correct for login/refresh/seed);
+this is the first step needing a real `CompanyId`/`Role`/`UserId` context,
+since both the age guard and the isolation check read `ICurrentUserService`
+directly.
+
+**Docker still unavailable on this machine** — these 7 new tests are
+compile-verified only here, same limitation as every Postgres-backed test
+since Step 10. Verified the underlying logic separately with a throwaway EF
+InMemory check running the *exact same* handler calls and assertions
+(written, run — 2/2 passed — then deleted, no `Directory.Packages.props`/
+csproj trace left) before trusting the permanent Postgres versions.
+Suite total: 22 (was 15) — 5 pass locally (Docker-free), 17 need Docker,
+all 17 new+existing failures are the expected `DockerUnavailableException`,
+not real test failures.
+
+**Phase 1 is now complete — all 7 steps done** (Steps 1/4/5/6 Zone A this
+session, Steps 2/3 Zone B). Phase-summary write-up and the ✅ COMPLETE stamp
+are `done`'s job, not `go`'s — not written yet, follows when the user runs
+`done`.
+
+**Step 6 — маскирование `Document*`/`PayRate` по ролям.**
+`WorkerDto.FromEntity` now takes the caller's `Role?` and nulls out
+`PayRate`, `DocumentType`, `DocumentExpiryDate` for anyone who isn't
+Owner/Accountant — Prorab (the only other role currently able to reach
+`GET,POST /brigades/{id}/workers`, per §9.4) gets all three back as `null`,
+including on the response to their **own** `POST` (they typed the value in,
+but the response still masks it — one rule, no special-case for "you just
+told me this"). `PayRate` went from `decimal` to `decimal?` on the DTO to
+represent "hidden."
+
+**Scope note — wider than the checklist line's literal wording, on
+purpose.** The PROGRESS.md line for this step only says "Document*", but
+Shahrom's Step 2 writeup already flagged that Step 6 was meant to cover
+*both* "hiding `PayRate` from Prorab" and "masking `Document*`" — matching
+MASTER §12's role matrix row (`Worker | ... | CRU (без PayRate) | ... |
+R (с PayRate)`), not just §11.6. Did both here rather than leaving PayRate
+for a step that was never itemized separately.
+
+**Found — MASTER §11.6 assumes a field that doesn't exist.** §11.6 says
+"полный номер документа виден только Owner/Accountant... Prorab видит
+маскированный (`****4567`)" — i.e. a partial-reveal mask on a document
+*number*. `Worker` (§5.7) only has `DocumentType` (a category string, e.g.
+"Passport") and `DocumentExpiryDate` — there's no document-number field
+anywhere in the Domain model to apply a `****4567`-style mask to. Not
+inventing a new PII field to satisfy this literally (that's a data-model
+decision, not a masking one) — implemented the closest honest reading of
+the intent with what actually exists: Prorab gets `Document*` fields
+**hidden entirely** (`null`), not partially revealed, since there's nothing
+to partially reveal. Worth resolving in MASTER.md itself — either drop the
+`****4567` framing or add the number field it presupposes.
+
+**Closed a gap flagged back in Step 8**, also under §11.6: `Serilog
+.Destructure.ByTransforming` for PII now exists in `Program.cs`, for both
+`Worker` and `WorkerDto` — excludes `Phone`/`BirthDate`/`DocumentType`/
+`DocumentExpiryDate`/`PayRate` from anything logged via `{@Worker}`/
+`{@WorkerDto}` destructuring. Deliberately separate from the DTO-level
+role-masking above: logs are a different exposure surface (retained
+longer, read by ops/devs regardless of the original caller's role), so
+this isn't redundant with it — an Owner's own request could still leak PII
+into a log line without this.
+
+Verified with a throwaway EF InMemory check (written, run, deleted — no
+`Directory.Packages.props`/csproj trace left): Owner's create-response and
+list-response both show full `PayRate`/`DocumentType`/`DocumentExpiryDate`;
+a Prorab's create-response (for a worker *they* just entered) and
+list-response both show `null` for all three; non-PII fields
+(`FullName`/`Phone`) stay visible either way. Docker still unavailable
+here — suite count unchanged (15 total, 5 pass, 10 need Docker); xUnit
+tests for this step are Step 7's job — the very next one.
 
 **Step 5 (Zone A) — `AdminAuditLog` + interceptor.**
 New `Infrastructure/Persistence/Interceptors/AdminAuditSaveChangesInterceptor.cs`,
@@ -510,17 +1263,17 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 3 [BE] — `Brigade`, назначение бригадира (`Worker.UserId` ↔ `Brigade.BrigadirUserId`) → MASTER §5.6
 - [x] Step 4 [BE] — `ProrabObjectAssignment` + фильтрация объектов по прорабу (дефолт: нет назначений = видит все) → MASTER §1.2, §11.5
 - [x] Step 5 [BE] — `AdminAuditLog` + interceptor: смена роли, деактивация, `PayRate`, назначение бригадира → MASTER §5.16, §11.7
-- [ ] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
-- [ ] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
+- [x] Step 6 [BE] — маскирование `Document*` по ролям (разные Response DTO, не CSS) → MASTER §11.6, §12
+- [x] Step 7 [BE] — тесты: 18+ (ровно 18 / на день меньше / задним числом), изоляция прораба по объектам → MASTER §8.3, §1.2
 
 ## Phase 2 — Наряды и задачи (ядро)
 **Goal:** ради этого всё остальное. Здесь же входит бот — без него бригадир не может ничего.
 
-- [ ] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
-- [ ] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
-- [ ] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
-- [ ] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
-- [ ] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
+- [x] Step 1 [BE] — `WorkOrder` + state machine + `Code` (`BR-{N}` per company) + `xmin` → MASTER §5.11, §7.1
+- [x] Step 2 [BE] — `IndividualTask` + state machine (`AssignedToWorkerId` в своей бригаде) → MASTER §5.14, §7.2, §8.5
+- [x] Step 3 [BE] — `TaskLog` **в той же транзакции**, что переход → MASTER §5.15, §7.1
+- [x] Step 4 [BE] — `WorkOrderProgress`, upload фото (подписанный URL, allow-list MIME) → MASTER §5.12, §11.9
+- [x] Step 5 [BE] — SignalR-хаб, группы из claims (не из клиента), события **после** `SaveChanges` → MASTER §9.4
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2
 - [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 *(отложено — см. §15)* → MASTER §5.26, §10.3
 - [ ] Step 8 [BOT] — «Мои наряды»: отметка выполнения (валидация остатка), фото, отправка на проверку *(отложено — см. §15)* → MASTER §10.4
@@ -529,28 +1282,28 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 3 — Явка, отсутствия, премии
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
 
-- [ ] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
-- [ ] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
+- [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
+- [x] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
 - [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §15)* → MASTER §8.7, §10.4
-- [ ] Step 7 [BE] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
+- [x] Step 7 [BE] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
 
 ## Phase 4 — Материалы
 **Goal:** независима от Phase 3, идёт после ядра.
 
-- [ ] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
-- [ ] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
-- [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
-- [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
+- [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
+- [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
+- [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
+- [x] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
+- [x] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
 
-- [ ] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
+- [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1

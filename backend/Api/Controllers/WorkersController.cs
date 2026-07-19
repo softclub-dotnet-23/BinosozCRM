@@ -37,12 +37,12 @@ public sealed class WorkersController(ISender sender) : ControllerBase
     }
 
     [HttpGet("brigades/{brigadeId:guid}/workers")]
-    public async Task<IActionResult> List(Guid brigadeId, [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    public async Task<IActionResult> List(Guid brigadeId, [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] bool includeInactive, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
         var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
 
-        var result = await sender.Send(new ListBrigadeWorkersQuery(brigadeId, clampedPage, clampedPageSize), cancellationToken);
+        var result = await sender.Send(new ListBrigadeWorkersQuery(brigadeId, clampedPage, clampedPageSize, includeInactive), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 
