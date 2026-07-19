@@ -67,6 +67,7 @@ public static class ErrorCodeCatalog
         ["MATERIAL_REQUEST_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
+        ["PAYROLL_ENTRY_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
         ["PRORAB_NOT_ASSIGNED_TO_OBJECT"] = StatusCodes.Status404NotFound,
         ["PRORAB_ALREADY_ASSIGNED"] = StatusCodes.Status409Conflict,

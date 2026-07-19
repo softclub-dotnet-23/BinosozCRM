@@ -15,6 +15,181 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 7 [BE] — `PayrollEntry.Approve()`: the `FinalAmount`
+formula.** Where all six preceding Phase 5 steps come together.
+`POST /payroll/{id}/approve` (Accountant/Owner) — Domain's
+`PayrollEntry.Approve()` already computed `FinalAmount = CalculatedAmount
+− LatenessDeductionAmount + BonusAmount − AdvanceDeductedAmount +
+AdjustmentAmount`; this step wires the endpoint. An optional
+`AdjustmentAmount`/`AdjustmentReason` rides on the same call — no separate
+`/adjust` route in §9.4, and `Adjust()` is Draft-only anyway — folded in
+via `Adjust()` immediately before `Approve()`.
+
+**Same `WithErrorCode()` gotcha caught again, same fix as Step 1.**
+Initially wrote the "nonzero adjustment needs a reason" check as a
+FluentValidation rule; caught that `ValidationBehavior` would run it
+*before* the handler and return the generic `VALIDATION_FAILED` instead
+of the catalog-specified `PAYROLL_ADJUSTMENT_REASON_REQUIRED` — removed
+it, checked explicitly in the handler instead.
+
+§8.8's "каждому учтённому авансу проставляется `SettledInPayrollEntryId`"
+— every `PayrollAdvance` matching the exact same criteria
+`AdvanceDeductedAmountCalculator` used at draft time gets stamped with
+the entry's id, in the same transaction as `Approve()`, so it stops
+counting toward any future period's draft.
+
+`POST /payroll/{id}/pay` — writes an explicit `AdminAuditLog`
+(`PayrollPaid`), same reasoning as Step 6's `AdvanceIssued` (the
+interceptor only watches modified rows on other entities, not a
+`PayrollEntry.Status` change). Both endpoints explicitly guard against
+acting on an already-`Paid` entry with `PAYROLL_ALREADY_PAID`, rather
+than falling through to Domain's generic transition-guard code.
+
+Verified with 8 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 8/8 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session — caught and fixed my own test-setup bug along the
+way, an advance dated after the test period that correctly rolled to
+"next period" per the rule instead of settling) — critically, **MASTER's
+own combined worked example checks out exactly**: `7040 − 43.33 + 200 −
+3000 = 4196.67`. Also verified: negative `FinalAmount` is preserved,
+never clamped; advances settle correctly at Approve; a missing
+adjustment reason on a nonzero amount is rejected; Approve/Pay both
+reject an already-paid entry. Docker still unavailable — suite count
+unchanged (104 total, 69 pass, 35 need Docker).
+
+**Phase 5, Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` +
+`SettledInPayrollEntryId`.** `POST /payroll-advances` (Accountant/Owner)
+issues a `PayrollAdvance`, writing an explicit `AdminAuditLog` entry
+(`AdvanceIssued`) — the existing `AdminAuditSaveChangesInterceptor` only
+watches *modified* rows on `User`/`Worker`/`Brigade` for its current
+actions, not newly-created rows of a different entity, so this is logged
+directly in the handler rather than extending the interceptor for one
+more event shape.
+
+New `AdvanceDeductedAmountCalculator`: Σ unsettled
+(`SettledInPayrollEntryId IS NULL`) advances with `IssuedAt ≤ PeriodEnd`,
+implementing §8.8's formula exactly — an advance issued after `PeriodEnd`
+correctly rolls into the next period rather than this one. Wired into
+`GeneratePayrollDraftCommandHandler` alongside the other three
+calculators — draft generation now sets all four of `CalculatedAmount`/
+`LatenessDeductionAmount`/`BonusAmount`/`AdvanceDeductedAmount` together,
+no field left half-computed.
+
+`SettledInPayrollEntryId` itself only gets *set* at `PayrollEntry
+.Approve()` time — that's Step 7's job, not built here; this step only
+reads the field to exclude already-settled advances from a new draft.
+
+Verified with 4 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 4/4 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): issuing an advance writes the audit log entry; an
+unsettled advance within the period reduces the draft; an advance issued
+after `PeriodEnd` doesn't count for that period; a settled advance
+(simulating what Step 7 will do) drops out of future recomputation
+entirely. Docker still unavailable — suite count unchanged (104 total, 69
+pass, 35 need Docker).
+
+**Phase 5, Step 5 [BE] — подтверждение премии → `BonusAmount` в расчёт по
+`CompletedAt`.** Bonus proposal rides on `/complete` itself — a judgment
+call, documented in code: §9.4 lists no separate "propose bonus" endpoint,
+only `/bonus/approve`, and §8.7 point 2 says the field is offered "сразу"
+at closing. `CompleteIndividualTaskCommand` now takes an optional
+`BonusAmount`, rejected with `BONUS_NOT_ELIGIBLE` if the task didn't
+actually complete early.
+
+New `POST /individual-tasks/{id}/bonus/approve` (Prorab+ only — Brigadir
+can never reach it, satisfying §8.7 point 6's "не подтверждает сам себе
+премию" purely through role authorization, no extra same-person check
+needed). Supports an optional `OverrideAmount` for point 4's "подтверждает
+или меняет сумму" — implemented by re-calling `ProposeBonus` before
+`ApproveBonus` (Domain's `ApproveBonus()` itself takes no amount
+parameter), no Domain change needed.
+
+New `BonusAmountCalculator` (Application/Payroll): Σ confirmed
+(`BonusApprovedByUserId != null`) task bonuses whose `CompletedAt` falls
+inside the period — wired into `GeneratePayrollDraftCommandHandler`
+alongside `CalculatedAmount`/`LatenessDeductionAmount`.
+
+Verified with 5 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 5/5 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session — caught and fixed my own test-setup bug along the
+way, a missing seeded `Company` row needed by `CreateIndividualTaskCommand`'s
+code-sequence lookup): bonus on early completion stays a draft with
+`BonusApprovedByUserId = null`; bonus on a non-early completion is
+rejected; Prorab confirms and can override the amount; a confirmed bonus
+lands correctly in the payroll draft for the period containing
+`CompletedAt`; an unconfirmed bonus contributes nothing. Docker still
+unavailable — suite count unchanged (104 total, 69 pass, 35 need Docker).
+
+**Phase 5, Step 4 [BE] — `LatenessDeductionAmount` за период.** New
+`LatenessDeductionCalculator` (Application/Payroll, internal): Σ
+`LateMinutes` over the period × (`PayRate/60`), implementing §8.1's
+period-level formula. `LateMinutes` itself was already computed per
+check-in back in Phase 3 Step 1 — this step only adds the aggregation
+that had nowhere to live until `PayrollEntry.LatenessDeductionAmount`
+existed to hold it.
+
+A `Timesheet` with `LateMinutes == null` (unconfigured `ShiftStartTime`)
+is excluded from the sum rather than treated as `0` — counting it as zero
+would silently hide the missing-configuration case that `null` exists to
+flag in the first place. Not gated on `ApprovedAt` — §8.1 doesn't state
+that gate (unlike §8.0's explicit "только принятые табели" for
+`CalculatedAmount`), so nothing invented here. Wired into
+`GeneratePayrollDraftCommandHandler`: now computes and sets
+`LatenessDeductionAmount` alongside `CalculatedAmount` on every draft
+generate/regenerate, same idempotent behavior as Step 3.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session) — both of §8.1's exact worked examples check out:
+grace=0 → **43.33** сомони (Σ65min × 40/60), grace=5 → **33.33** сомони
+(Σ50min × 40/60); a `null`-`LateMinutes` timesheet correctly contributes
+nothing rather than zero-diluting the sum. Docker still unavailable —
+suite count unchanged (104 total, 69 pass, 35 need Docker); no new
+permanent tests this step (Step 10's job).
+
+**Phase 5, Step 3 [BE] — `CalculatedAmount`, the "критичный" §8.0
+formula.** New `CalculatedAmountCalculator` (Application/Payroll,
+internal) implements both branches exactly:
+
+- **Hourly**: Σ(`Timesheet.HoursWorked × Worker.PayRate`) over the period,
+  counting only `ApprovedAt IS NOT NULL` timesheets.
+- **Piecework**: driven from the worker's own `WorkOrderPayoutShare` rows
+  (Step 1), each order gated on `Status ∈ {Accepted, Closed}` and
+  `CompletedDate` inside the period; `OrderTotal = Σ ReportedQty ×
+  UnitPrice` (fact, never `PlannedQty`), `WorkerAmount = OrderTotal ×
+  SharePercent/100`.
+- **Paid absences** (shared by both): `IsPaid=true` `AbsenceRecord` days
+  overlapping the period × an average daily rate (`Σ HoursWorked over the
+  last 3 months / worked days × PayRate`, falling back to `8h × PayRate`
+  under 10 days of history).
+
+`POST /payroll` (Accountant/Owner) — `GeneratePayrollDraftCommand`
+generates or recomputes a `Draft` `PayrollEntry` per active worker for a
+period, idempotently: re-running preserves `LatenessDeductionAmount`/
+`BonusAmount`/`AdvanceDeductedAmount` on any entry still `Draft` (those
+three are Steps 4/5/6, not built yet), and skips entries already
+`Approved`/`Paid` entirely. Per §8.0's explicit closing rule, a
+zero-activity worker still gets a `Draft` row at `CalculatedAmount = 0`,
+never a silent omission. `GET /payroll` — company-wide list.
+
+Verified with 5 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 5/5 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session) — critically, **both of MASTER's own worked examples
+check out exactly**: Hourly → `160×40 + 2×8×40 = 7040` сомони; Piecework
+split → `5400 × {50%,30%,20%} = 2700/1620/1080` on a plastering order.
+Also verified: zero activity still creates a `Draft` row at 0 rather than
+omitting the worker; an unapproved timesheet contributes nothing;
+regenerating a draft recomputes `CalculatedAmount` without duplicating the
+row or clobbering a `BonusAmount` a later step had already set. Docker
+still unavailable — suite count unchanged (104 total, 69 pass, 35 need
+Docker); no new permanent tests this step (§8.0/§8.1/§8.8 numeric-example
+tests are Step 10's job).
+
 **Phase 5, Step 1 [BE] — `WorkOrderPayoutShare` + Σ`SharePercent = 100`
 invariant.** `PUT /work-orders/{id}/payout-shares` (Brigadir, own brigade,
 gated on `WorkOrder.Status == InProgress`) — replaces the entire share set
@@ -56,11 +231,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 1
-**Next step:** Phase 5, Step 2 [BOT] — флоу распределения долей при
-закрытии наряда *(отложено — см. §15)*. Next actionable backend step:
-Phase 5, Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые
-табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
+**Last completed:** Phase 5, Step 7
+**Next step:** Phase 5, Step 8 [BE] — фоновая задача: черновики за период +
+алерт, если не сформировалась → MASTER §11.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1305,11 +1478,11 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
-- [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
-- [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
-- [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
-- [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
+- [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
+- [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
+- [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
+- [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
+- [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
