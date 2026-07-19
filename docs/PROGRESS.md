@@ -15,6 +15,43 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 8 [BE] — background task: payroll drafts per period +
+alert if generation didn't happen.** Built as a plain `BackgroundService`,
+not Hangfire — a judgment call, documented in code: no job-persistence/
+dashboard package exists anywhere in this codebase, and pulling one in is
+a bigger infrastructure decision than one step; §2's stack table
+explicitly lists `BackgroundService` as the alternative.
+
+New `PayrollPeriodCalculator` (Application/Payroll, pure/static):
+`IsPeriodEnd`/`GetPeriodContaining`, driven by `Company.PayrollPeriodType`
+(Monthly or SemiMonthly). `PayrollDraftBackgroundService` (Api/
+BackgroundServices) checks once every 24h. For every company whose period
+closed **yesterday**: checks whether any `PayrollEntry` exists for that
+period at all — if not, logs at `Error` (the "алерт" — Serilog is the
+alerting surface here; wiring that log to PagerDuty/Slack is ops
+configuration, not backend code) — then generates the draft anyway via
+the existing `GeneratePayrollDraftCommandHandler`, self-healing rather
+than just complaining. A thrown exception is caught and logged
+per-company, never crashing the host or blocking the remaining companies
+in that run.
+
+**Real design snag worked through**: the automatic `CompanyId` global
+query filter falls back to `Guid.Empty` (not "see everything") when
+`ICurrentUserService.CompanyId` is null — which it always is outside an
+HTTP request. Solved with a minimal `SystemCompanyCurrentUserService`, one
+instance constructed per company per run, and a fresh `ApplicationDbContext`
+built directly from `DbContextOptions<ApplicationDbContext>` rather than
+going through the DI-registered `CurrentUserService` (which reads HTTP
+claims that don't exist in a background loop).
+
+Verified with 12 throwaway xUnit tests (no DB needed — the calculator is
+pure, so no InMemory package was even required this time, written, run,
+deleted): monthly period-end detection including leap-year February;
+semi-monthly boundaries at day 15/end-of-month; period-containing
+calculations for both halves of a semi-monthly cycle, including the
+day-15 boundary case itself. Docker still unavailable — suite count
+unchanged (104 total, 69 pass, 35 need Docker).
+
 **Phase 5, Step 7 [BE] — `PayrollEntry.Approve()`: the `FinalAmount`
 formula.** Where all six preceding Phase 5 steps come together.
 `POST /payroll/{id}/approve` (Accountant/Owner) — Domain's
@@ -231,9 +268,10 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 7
-**Next step:** Phase 5, Step 8 [BE] — фоновая задача: черновики за период +
-алерт, если не сформировалась → MASTER §11.8
+**Last completed:** Phase 5, Step 8
+**Next step:** Phase 5, Step 9 [BE] — `GET /objects/{id}/cost-breakdown`:
+материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) →
+MASTER §8.10
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1483,7 +1521,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
-- [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
+- [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 

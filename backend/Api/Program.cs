@@ -1,4 +1,5 @@
 using System.Text;
+using Api.BackgroundServices;
 using Api.Common;
 using Api.Hubs;
 using Api.Middleware;
@@ -84,6 +85,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IWorkOrderRealtimeNotifier, SignalRWorkOrderNotifier>();
 builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNotifier>();
+
+builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 
 builder.Services.AddRateLimiter(options =>
 {
