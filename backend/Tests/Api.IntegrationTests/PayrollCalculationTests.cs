@@ -212,9 +212,10 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
             timesheets.Add(ts);
         }
 
-        var task = IndividualTask.Create(company.Id, "T-BONUS", brigade.Id, worker.Id, "Task", prorabUser.Id);
+        var task = IndividualTask.Create(company.Id, "T-BONUS", brigade.Id, worker.Id, "Task", prorabUser.Id,
+            dueAt: new DateTimeOffset(periodStart.AddDays(20), new TimeOnly(9, 0), TimeSpan.Zero));
         task.Start(new DateTimeOffset(periodStart, new TimeOnly(9, 0), TimeSpan.Zero));
-        task.Complete(new DateTimeOffset(periodStart.AddDays(15), new TimeOnly(9, 0), TimeSpan.Zero));
+        task.Complete(new DateTimeOffset(periodStart.AddDays(15), new TimeOnly(9, 0), TimeSpan.Zero)); // before DueAt -> CompletedEarly
         task.ProposeBonus(200m);
         task.ApproveBonus(prorabUser.Id);
 

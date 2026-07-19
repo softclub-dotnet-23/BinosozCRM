@@ -86,6 +86,9 @@ public sealed class IndividualTask : AuditableEntity, ICompanyOwned, ISoftDelete
         if (Status != IndividualTaskStatus.Done || BonusAmount is null)
             return InvalidTransition();
 
+        if (CompletedEarly != true)
+            return Result.Failure(new Error("BONUS_NOT_ELIGIBLE", "Bonus can only be approved for a task completed before its due date."));
+
         BonusApprovedByUserId = approvedByUserId;
         return Result.Success();
     }

@@ -8,15 +8,15 @@
 Step 2 [BOT] отложен, см. §15)
 **Last completed:** Phase 5, Step 11 (Zone B) — `PayrollEntry.Adjust()`.
 Also, out of sequence (Ahmad, coordination priority over the next step per
-the `ahmad` skill's own rule): `MaterialRequest.Comment` — closes the
-"нужно от Ахмада" gap flagged since Phase 4 Step 2, see that entry below
-for the write-up.
+the `ahmad` skill's own rule), two more "нужно от Ахмада" gaps closed the
+same day: `MaterialRequest.Comment` (Phase 4 Step 2's flag) and
+`POST /individual-tasks/{id}/bonus/approve` (Phase 5 Step 5's flag,
+including a fix to `ApproveBonus()`'s pre-existing `BONUS_NOT_ELIGIBLE`
+gap from Phase 2 Step 2) — see those entries below for the write-ups.
 **Next step:** Phase 6, Step 1 [BE] — `GET /dashboard/work-status` →
 MASTER §8.6. **Не Zone B**: по team-split doc (§6) Phase 6 "не
 разделяется по зонам", но Steps 1/2/5 конкретно — `WorkOrder`/
-`IndividualTask`/`Auth`, то есть Zone A по субъекту. Следующий явно
-Zone-B-специфичный шаг в текущем плане не назван — по вызову "Шахром"
-не пропускать шаги других зон, ждать координации.
+`IndividualTask`/`Auth`, то есть Zone A по субъекту.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **79/79 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1445,6 +1445,32 @@ retrofit, leave the endpoint itself for Ahmad.** **нужно от Ахмада:
 bonus can ever reach `BonusApprovedByUserId != null` in practice — this
 step's own logic is correct and tested against directly-constructed Domain
 state, but has no live caller yet.
+
+**Resolved (Ahmad, 2026-07-19, priority jump over the next sequential
+Phase 6 step — see Current Status):** `Application/IndividualTasks/
+ApproveBonusCommand.cs` + `POST /individual-tasks/{id}/bonus/approve`
+(`Owner,Prorab` — no "own object" isolation, since §12 names none for
+Prorab on this entity and `IndividualTask` has no direct `ObjectId`
+anyway). **Also fixed, by explicit user decision, since this was
+`ApproveBonus()`'s first real caller:** a pre-existing gap flagged back in
+Phase 2 Step 2 — `BONUS_NOT_ELIGIBLE`'s catalog description ("подтверждение
+премии на задаче без `CompletedEarly`") was never actually enforced by
+`IndividualTask.ApproveBonus()`. Added the `CompletedEarly` gate; fixed
+the one line in `PayrollCalculationTests.cs` that would otherwise have
+broken (its bonus scenario created a task with no `DueAt`, so
+`CompletedEarly` evaluated `false` — gave it a real `DueAt` so the
+scenario stays a valid "completed early" case). `IndividualTaskDto` now
+also exposes `BonusAmount`/`BonusApprovedByUserId` — was write-only until
+now, same pattern as `MaterialRequestDto.Comment` earlier the same day.
+**Still no live path to *propose* a bonus** (§8.7 point 2, Brigadir-facing,
+explicitly Phase 3 Step 6's bot-only job, still deferred) — this endpoint
+is correct and tested but has nothing to approve yet outside tests, same
+situation as every other bot-deferred flow.
+
+Verified against real Postgres (2/2, deleted after): approving a bonus on
+a task actually completed early succeeds and the DTO exposes both new
+fields; approving on a task *not* completed early is rejected
+(`BONUS_NOT_ELIGIBLE`). Full suite: 79/79, no regressions.
 
 Verified against real Postgres (4/4, deleted after): a confirmed bonus
 inside the period sums into `BonusAmount`; an unconfirmed one (proposed,

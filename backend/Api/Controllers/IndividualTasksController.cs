@@ -10,9 +10,13 @@ namespace Api.Controllers;
 // MASTER §9.4: GET,POST /individual-tasks, /start, /complete — all Brigadir.
 // §12's role matrix gives Owner/Prorab "R" too, but no endpoint is named for
 // it — same recurring gap as elsewhere, flagged rather than invented.
-// /bonus/approve (Prorab+) isn't built here — bonus proposal/approval is
-// Phase 3 Step 6 (bot) / Phase 5 Step 5 (approval into payroll), not this
-// step's §5.14/§7.2/§8.5 scope.
+// /bonus/approve (Owner,Prorab) landed later — Phase 5 Step 5 flagged it
+// "нужно от Ахмада", built as a priority jump ahead of the next
+// sequential Phase 6 step (see PROGRESS.md). Bonus *proposal*
+// (Brigadir-facing, §8.7 point 2) is still Phase 3 Step 6's job — bot
+// only, deferred — so this endpoint currently has no live path to ever
+// receive a task with BonusAmount set, same situation as every other
+// bot-deferred flow in this project.
 [ApiController]
 [Route("api/v1/individual-tasks")]
 [Authorize(Roles = "Brigadir")]
@@ -60,6 +64,14 @@ public sealed class IndividualTasksController(ISender sender) : ControllerBase
     public async Task<IActionResult> Complete(Guid taskId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CompleteIndividualTaskCommand(taskId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{taskId:guid}/bonus/approve")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> ApproveBonus(Guid taskId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ApproveBonusCommand(taskId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }

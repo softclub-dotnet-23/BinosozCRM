@@ -16,6 +16,8 @@ public sealed record IndividualTaskDto(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     bool? CompletedEarly,
+    decimal? BonusAmount,
+    Guid? BonusApprovedByUserId,
     Guid CreatedByUserId)
 {
     public static IndividualTaskDto FromEntity(IndividualTask task) => new(
@@ -31,5 +33,7 @@ public sealed record IndividualTaskDto(
         task.StartedAt,
         task.CompletedAt,
         task.CompletedEarly,
+        task.BonusAmount,
+        task.BonusApprovedByUserId,
         task.CreatedByUserId);
 }
