@@ -77,7 +77,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Card>
           <PageHeader
             title="Состояние объектов"
@@ -100,7 +100,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Card className="p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[17px] font-bold text-ink">Бюджет и фактические расходы</h2>

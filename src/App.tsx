@@ -6,9 +6,15 @@ import EstimatesPage from "./pages/EstimatesPage";
 import BudgetsPage from "./pages/BudgetsPage";
 import WorksPage from "./pages/WorksPage";
 import BrigadesPage from "./pages/BrigadesPage";
+import BrigadeCompositionPage from "./pages/BrigadeCompositionPage";
+import AssignmentsPage from "./pages/AssignmentsPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import AttendancePage from "./pages/AttendancePage";
-import WarehousePage from "./pages/WarehousePage";
+import MaterialsPage from "./pages/MaterialsPage";
+import ReceiptsPage from "./pages/ReceiptsPage";
+import WriteOffsPage from "./pages/WriteOffsPage";
+import TransfersPage from "./pages/TransfersPage";
+import StockPage from "./pages/StockPage";
 import PayrollPage from "./pages/PayrollPage";
 import ReportsPage from "./pages/ReportsPage";
 import UsersPage from "./pages/UsersPage";
@@ -25,9 +31,16 @@ function App() {
         <Route path="/budgets" element={<BudgetsPage />} />
         <Route path="/works" element={<WorksPage />} />
         <Route path="/brigades" element={<BrigadesPage />} />
+        <Route path="/brigades/composition" element={<BrigadeCompositionPage />} />
+        <Route path="/brigades/assignments" element={<AssignmentsPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
         <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/warehouse" element={<WarehousePage />} />
+        <Route path="/warehouse" element={<Navigate to="/inventory/materials" replace />} />
+        <Route path="/inventory/materials" element={<MaterialsPage />} />
+        <Route path="/inventory/receipts" element={<ReceiptsPage />} />
+        <Route path="/inventory/write-offs" element={<WriteOffsPage />} />
+        <Route path="/inventory/transfers" element={<TransfersPage />} />
+        <Route path="/inventory/stock" element={<StockPage />} />
         <Route path="/payroll" element={<PayrollPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/users" element={<UsersPage />} />

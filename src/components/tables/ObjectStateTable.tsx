@@ -1,6 +1,7 @@
 import type { ObjectSummaryRow } from "../../types";
 import { StatusBadge } from "../ui/StatusBadge";
 import { ProgressBar } from "../ui/ProgressBar";
+import { Avatar } from "../ui/Avatar";
 import { getProgressTone } from "../../utils/progress";
 import { formatCurrency } from "../../utils/format";
 
@@ -21,7 +22,12 @@ export function ObjectStateTable({ rows }: { rows: ObjectSummaryRow[] }) {
           {rows.map((row) => (
             <tr key={row.id} className="border-b border-border last:border-0 hover:bg-[#FAFAF9]">
               <td className="px-5 py-4 font-semibold text-ink sm:px-6">{row.name}</td>
-              <td className="px-3 py-4 text-ink-secondary">{row.foreman}</td>
+              <td className="px-3 py-4 text-ink-secondary">
+                <div className="flex items-center gap-2">
+                  <Avatar name={row.foreman} size="sm" />
+                  <span className="whitespace-nowrap">{row.foreman}</span>
+                </div>
+              </td>
               <td className="px-3 py-4">
                 <div className="flex items-center gap-2.5">
                   <ProgressBar value={row.progress} tone={getProgressTone(row.status, row.progress)} className="w-20" />

@@ -1,6 +1,7 @@
 import { Box, Clock, Users, Zap } from "lucide-react";
 import type { AlertIcon, AttentionItem } from "../../types";
 import { IconContainer } from "../ui/IconContainer";
+import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/StatusBadge";
 import { Button } from "../ui/Button";
 
@@ -34,7 +35,10 @@ export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpe
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
               <p className="truncate text-xs text-ink-secondary">{item.objectName}</p>
-              <p className="truncate text-xs text-ink-muted">{item.responsible}</p>
+              <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-ink-muted">
+                <Avatar name={item.responsible} size="sm" className="h-4 w-4 text-[8px]" />
+                {item.responsible}
+              </div>
             </div>
             <div className="hidden shrink-0 text-right sm:block">
               <Badge tone={SEVERITY_TONE[item.severity]}>{item.alertLabel}</Badge>

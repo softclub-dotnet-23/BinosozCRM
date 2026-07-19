@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
+import { Avatar } from "../ui/Avatar";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Modal } from "../ui/Modal";
 import { formatCurrency, formatNumber } from "../../utils/format";
@@ -47,7 +48,10 @@ export function PayrollCard({ summary }: { summary: PayrollSummary }) {
         <span className="text-lg font-bold text-primary tabular">{formatCurrency(summary.toPay)}</span>
       </div>
 
-      <p className="mt-3 text-xs text-ink-muted">Подготовил: {summary.preparedBy}</p>
+      <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted">
+        <Avatar name={summary.preparedBy.split(" — ").pop() ?? summary.preparedBy} size="sm" className="h-4 w-4 text-[8px]" />
+        Подготовил: {summary.preparedBy}
+      </div>
 
       {status === "returned" && (
         <p className="mt-3 rounded-lg bg-red-soft px-3 py-2 text-xs font-medium text-red">

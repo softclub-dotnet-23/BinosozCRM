@@ -34,8 +34,10 @@ import {
   estimateCategorySpend,
   estimateKpis,
   estimateRiskItems,
-  mockEstimates,
 } from "../data/mockEstimates";
+import { estimatesRepository } from "../data/repositories";
+import { useRepositoryState } from "../hooks/useRepositoryState";
+import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatMillionsCompact, formatNumber } from "../utils/format";
 import { formatDateShort } from "../utils/date";
@@ -63,14 +65,14 @@ const STATUS_OPTIONS: { value: EstimateStatus | "all"; label: string }[] = [
 export default function EstimatesPage() {
   const { showToast } = useToast();
 
-  const [estimates, setEstimates] = useState<Estimate[]>(mockEstimates);
-  const [selectedId, setSelectedId] = useState<string>(mockEstimates[0].id);
-  const [search, setSearch] = useState("");
-  const [objectFilter, setObjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<EstimateStatus | "all">("all");
-  const [responsibleFilter, setResponsibleFilter] = useState("");
-  const [minAmount, setMinAmount] = useState("");
-  const [maxAmount, setMaxAmount] = useState("");
+  const [estimates, setEstimates] = useRepositoryState(estimatesRepository);
+  const [selectedId, setSelectedId] = useState<string>(() => estimatesRepository.getSnapshot()[0]?.id ?? "");
+  const [search, setSearch] = usePersistentState("filters.estimates.search", "");
+  const [objectFilter, setObjectFilter] = usePersistentState("filters.estimates.object", "all");
+  const [statusFilter, setStatusFilter] = usePersistentState<EstimateStatus | "all">("filters.estimates.status", "all");
+  const [responsibleFilter, setResponsibleFilter] = usePersistentState("filters.estimates.responsible", "");
+  const [minAmount, setMinAmount] = usePersistentState("filters.estimates.minAmount", "");
+  const [maxAmount, setMaxAmount] = usePersistentState("filters.estimates.maxAmount", "");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [period, setPeriod] = useState<PeriodKey>("month");
@@ -271,7 +273,7 @@ export default function EstimatesPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.85fr_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.85fr_1fr]">
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <div className="flex flex-wrap items-center gap-2 px-5 pt-5 sm:px-6">

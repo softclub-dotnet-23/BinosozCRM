@@ -1,20 +1,14 @@
 import { mockObjects } from "./mockObjects";
-import type { Assignment, Brigade } from "../types";
+import { mockBrigades } from "./mockBrigades";
+import type { Assignment } from "../types";
+
+export { mockBrigades };
 
 function findObject(id: string) {
   const object = mockObjects.find((o) => o.id === id);
   if (!object) throw new Error(`Unknown mock object id: ${id}`);
   return object;
 }
-
-export const mockBrigades: Brigade[] = [
-  { id: "brigade-1", name: "Бригада «Фундамент»", specialization: "Фундаментные работы", foremanName: "Фируз Рахмонов", membersCount: 8 },
-  { id: "brigade-2", name: "Бригада «Каменщики»", specialization: "Кладочные и монтажные работы", foremanName: "Комрон Саидов", membersCount: 12 },
-  { id: "brigade-3", name: "Бригада «Отделочники»", specialization: "Отделочные работы", foremanName: "Шариф Давлатов", membersCount: 10 },
-  { id: "brigade-4", name: "Бригада «Инженерные сети»", specialization: "Электрика и сантехника", foremanName: "Мухиддин Холов", membersCount: 6 },
-  { id: "brigade-5", name: "Бригада «Кровельщики»", specialization: "Кровельные работы", foremanName: "Азизбек Юсупов", membersCount: 7 },
-  { id: "brigade-6", name: "Бригада «Благоустройство»", specialization: "Благоустройство территории", foremanName: "Бахтиёр Курбонов", membersCount: 9 },
-];
 
 function findBrigade(id: string) {
   const brigade = mockBrigades.find((b) => b.id === id);

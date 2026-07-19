@@ -1,0 +1,10 @@
+import { chromium } from "playwright";
+const outDir = "C:\\Users\\user\\AppData\\Local\\Temp\\claude\\c--Users-user-Desktop-BinosozCRM\\ddba9dc7-b9b8-4a05-b97a-f6f1625364ab\\scratchpad";
+const browser = await chromium.launch({ args: ["--no-sandbox"] });
+const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+await page.goto("http://localhost:5173/inventory/materials", { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+const box = await page.locator("text=Общая стоимость").first().locator("xpath=../../..").boundingBox();
+await page.screenshot({ path: `${outDir}\\kpi5-crop.png`, clip: { x: box.x - 10, y: box.y - 10, width: box.width + 20, height: box.height + 20 } });
+await browser.close();
+console.log("DONE");

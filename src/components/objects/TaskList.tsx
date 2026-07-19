@@ -1,6 +1,7 @@
 import { CircleAlert, CircleCheck, CircleDot } from "lucide-react";
 import type { TaskUrgency, UpcomingTask } from "../../types";
 import { Card } from "../ui/Card";
+import { Avatar } from "../ui/Avatar";
 import { formatDateRu } from "../../utils/date";
 import { cn } from "../../utils/cn";
 
@@ -25,9 +26,10 @@ export function TaskList({ tasks }: { tasks: UpcomingTask[] }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-ink">{task.title}</p>
-                <p className="text-xs text-ink-secondary">
+                <div className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                  <Avatar name={task.responsible} size="sm" className="h-4 w-4 text-[8px]" />
                   {task.responsible} · {formatDateRu(task.date)}
-                </p>
+                </div>
               </div>
               <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", config.className)}>
                 {config.label}

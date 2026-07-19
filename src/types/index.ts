@@ -176,15 +176,355 @@ export interface BudgetOperation {
   responsible: string;
 }
 
+export type BrigadeStatus = "active" | "paused" | "inactive" | "forming" | "overloaded";
+
 export interface Brigade {
   id: string;
+  number: number;
   name: string;
   specialization: string;
   foremanName: string;
   membersCount: number;
+  workersCount: number;
+  helpersCount: number;
+  objectId: string;
+  objectName: string;
+  objectType: ObjectType;
+  imageUrl: string;
+  sectionName: string;
+  currentWork: string;
+  workProgress: number;
+  remainingDays: number;
+  efficiency: number;
+  status: BrigadeStatus;
+  createdDate: string;
+  staffingCapacity: number;
+}
+
+export type EmployeeStatus = "on_shift" | "on_site" | "available" | "on_trip" | "absent" | "on_leave" | "sick_leave";
+
+export type WorkShift = "day" | "evening" | "night" | "day_off";
+
+export type BrigadeMemberRole = "foreman" | "worker" | "helper";
+
+export interface Employee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  phone: string;
+  specialty: string;
+  qualificationGrade: number;
+  brigadeId: string | null;
+  brigadeName: string | null;
+  memberRole: BrigadeMemberRole;
+  objectId: string | null;
+  objectName: string | null;
+  shift: WorkShift;
+  status: EmployeeStatus;
+  assignedDate: string;
+}
+
+export interface CompositionChange {
+  id: string;
+  date: string;
+  employeeId: string;
+  employeeName: string;
+  fromBrigadeName: string;
+  toBrigadeName: string;
+  changeType: "transfer" | "assignment" | "replacement";
 }
 
 export type AssignmentStatus = "active" | "completed" | "cancelled" | "overdue";
+
+export type WorkSectionKey = "prep" | "foundation" | "structure" | "finishing" | "engineering" | "other";
+
+export interface WorkSection {
+  id: WorkSectionKey;
+  name: string;
+}
+
+export type WorkStatus = "completed" | "in_progress" | "overdue" | "planned" | "on_review" | "paused" | "cancelled";
+
+export type WorkPriority = "low" | "medium" | "high" | "critical";
+
+export interface WorkAssignee {
+  name: string;
+  role: string;
+}
+
+export interface WorkComment {
+  id: string;
+  author: string;
+  text: string;
+  date: string;
+}
+
+export interface WorkProgressHistoryEntry {
+  id: string;
+  date: string;
+  progress: number;
+  note: string;
+  author: string;
+}
+
+export interface Work {
+  id: string;
+  code: string;
+  title: string;
+  description: string;
+  objectId: string;
+  objectName: string;
+  objectType: ObjectType;
+  imageUrl: string;
+  sectionId: WorkSectionKey;
+  sectionName: string;
+  responsible: WorkAssignee;
+  brigadeId: string;
+  brigadeName: string;
+  plannedStart: string;
+  plannedEnd: string;
+  actualStart: string | null;
+  actualEnd: string | null;
+  plannedDurationDays: number;
+  progress: number;
+  status: WorkStatus;
+  priority: WorkPriority;
+  budget: number;
+  parentWorkId: string | null;
+  dependencyIds: string[];
+  attachments: string[];
+  comments: WorkComment[];
+  progressHistory: WorkProgressHistoryEntry[];
+}
+
+export interface CriticalWork {
+  work: Work;
+  overdueDays: number;
+}
+
+export interface WorkAnalytics {
+  total: number;
+  completed: number;
+  inProgress: number;
+  overdue: number;
+  planned: number;
+  onReview: number;
+  paused: number;
+  cancelled: number;
+  completedPercent: number;
+  inProgressPercent: number;
+  overduePercent: number;
+  plannedPercent: number;
+  averageProgress: number;
+}
+
+export interface WorkSectionBreakdown {
+  section: WorkSection;
+  workCount: number;
+  averageProgress: number;
+}
+
+export type StaffCategory = "worker" | "engineer" | "admin";
+export type StaffStatus = "active" | "vacation" | "dismissed";
+
+export interface StaffMember {
+  id: string;
+  fullName: string;
+  position: string;
+  category: StaffCategory;
+  brigadeName: string | null;
+  brigadeSpecialization: string | null;
+  department: string | null;
+  phone: string;
+  status: StaffStatus;
+  hireDate: string;
+  email: string;
+  birthDate: string;
+  address: string;
+  employmentType: string;
+  salary: number;
+  passportNumber: string;
+  inn: string;
+  hasContract: boolean;
+}
+
+export interface StaffFilters {
+  categories: StaffCategory[];
+  hireDateFrom: string;
+  hireDateTo: string;
+}
+
+export type AttendanceStatus = "present" | "late" | "absent";
+
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  employeeName: string;
+  position: string;
+  brigadeName: string | null;
+  brigadeSpecialization: string | null;
+  department: string | null;
+  objectName: string;
+  city: string;
+  arrivalTime: string | null;
+  departureTime: string | null;
+  status: AttendanceStatus;
+  note: string;
+}
+
+export interface AttendanceFilters {
+  objectName: string;
+  brigadeName: string;
+  employeeName: string;
+  status: AttendanceStatus | "all";
+  dateFrom: string;
+  dateTo: string;
+}
+
+export type MaterialStatus = "normal" | "low" | "critical";
+
+export interface Material {
+  id: string;
+  number: number;
+  name: string;
+  supplier: string;
+  category: string;
+  unit: string;
+  unitDetail: string | null;
+  imageUrl: string;
+  stock: number;
+  minStock: number;
+  price: number;
+  warehouse: string;
+  note: string;
+}
+
+export interface MaterialFilters {
+  search: string;
+  category: string;
+  status: MaterialStatus | "all";
+  supplier: string;
+}
+
+export type ReceiptStatus = "completed" | "pending" | "cancelled";
+
+export interface MaterialReceiptLine {
+  materialName: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  lineTotal: number;
+}
+
+export interface MaterialReceipt {
+  id: string;
+  number: number;
+  documentNumber: string;
+  date: string;
+  supplier: string;
+  objectName: string;
+  brigadeName: string | null;
+  warehouse: string;
+  responsible: string;
+  invoiceNumber: string;
+  note: string;
+  lines: MaterialReceiptLine[];
+  status: ReceiptStatus;
+  createdDate: string;
+  createdBy: string;
+}
+
+export interface ReceiptFilters {
+  supplier: string;
+  objectName: string;
+  brigadeName: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export type WriteOffReason = "construction_works" | "damage" | "finishing_works" | "defect" | "other_works";
+
+export interface MaterialWriteOffLine {
+  materialName: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  lineTotal: number;
+}
+
+export interface MaterialWriteOff {
+  id: string;
+  number: number;
+  documentNumber: string;
+  date: string;
+  objectName: string;
+  brigadeName: string | null;
+  warehouse: string;
+  responsible: string;
+  reason: WriteOffReason;
+  basis: string;
+  note: string;
+  requiresReview: boolean;
+  lines: MaterialWriteOffLine[];
+  createdDate: string;
+  createdBy: string;
+}
+
+export interface WriteOffFilters {
+  objectName: string;
+  brigadeName: string;
+  reason: WriteOffReason | "all";
+  dateFrom: string;
+  dateTo: string;
+}
+
+export type TransferStatus = "completed" | "in_transit" | "pending" | "cancelled";
+
+export interface MaterialTransferLine {
+  materialName: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  lineTotal: number;
+}
+
+export interface MaterialTransfer {
+  id: string;
+  number: number;
+  documentNumber: string;
+  date: string;
+  fromWarehouse: string;
+  toWarehouse: string;
+  objectName: string | null;
+  responsible: string;
+  basis: string;
+  note: string;
+  status: TransferStatus;
+  lines: MaterialTransferLine[];
+  createdDate: string;
+  createdBy: string;
+}
+
+export interface TransferFilters {
+  fromWarehouse: string;
+  toWarehouse: string;
+  objectName: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface MaterialStockRow {
+  id: string;
+  materialName: string;
+  category: string;
+  warehouse: string;
+  unit: string;
+  quantity: number;
+  reserved: number;
+  available: number;
+  minStock: number;
+}
 
 export interface Assignment {
   id: string;

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { CalendarDays, MapPin, User } from "lucide-react";
+import { CalendarDays, MapPin } from "lucide-react";
 import type { ConstructionObject } from "../../types";
 import { Card } from "../ui/Card";
 import { PageHeader } from "../ui/PageHeader";
@@ -7,6 +7,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { ProgressBar } from "../ui/ProgressBar";
 import { Button } from "../ui/Button";
 import { ObjectImage } from "../ui/ObjectImage";
+import { Avatar } from "../ui/Avatar";
 import { formatCurrency } from "../../utils/format";
 import { formatDateRu } from "../../utils/date";
 import { getProgressTone } from "../../utils/progress";
@@ -26,9 +27,9 @@ export function ObjectSummary({ object }: { object: ConstructionObject }) {
         <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-secondary">
           <MapPin size={13} className="shrink-0" /> {object.address}
         </p>
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-secondary">
-          <User size={13} className="shrink-0" /> {object.foreman}
-        </p>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-secondary">
+          <Avatar name={object.foreman} size="sm" className="h-4 w-4 text-[8px]" /> {object.foreman}
+        </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge status={object.status} />

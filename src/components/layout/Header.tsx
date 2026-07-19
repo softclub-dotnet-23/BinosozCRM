@@ -1,8 +1,12 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from "lucide-react";
 import { SearchInput } from "../ui/SearchInput";
 import { OwnerAvatar } from "../ui/OwnerAvatar";
 import { useOnClickOutside } from "../../hooks/useOnClickOutside";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { materialsRepository } from "../../data/repositories";
+import { getMaterialStatus } from "../../utils/materialAnalytics";
+import { pluralizeRu } from "../../utils/pluralize";
 import { cn } from "../../utils/cn";
 
 interface HeaderProps {
@@ -17,9 +21,8 @@ interface HeaderProps {
   action?: ReactNode;
 }
 
-const NOTIFICATIONS = [
+const STATIC_NOTIFICATIONS = [
   { id: 1, title: "Заливка фундамента просрочена", time: "10 мин назад" },
-  { id: 2, title: "Остаток отделочных материалов ниже минимума", time: "1 ч назад" },
   { id: 3, title: "Зарплата за июль готова к утверждению", time: "3 ч назад" },
 ];
 
@@ -36,12 +39,29 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
   const dateRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  const materials = useRepositorySnapshot(materialsRepository);
+  const criticalCount = useMemo(() => materials.filter((m) => getMaterialStatus(m) === "critical").length, [materials]);
+
+  const notifications = useMemo(() => {
+    const list = [...STATIC_NOTIFICATIONS];
+    if (criticalCount > 0) {
+      const materialWord = pluralizeRu(criticalCount, "материал", "материала", "материалов");
+      const verbWord = criticalCount === 1 ? "имеет" : "имеют";
+      list.splice(1, 0, {
+        id: 2,
+        title: `${criticalCount} ${materialWord} ${verbWord} критический остаток на складе`,
+        time: "Только что",
+      });
+    }
+    return list;
+  }, [criticalCount]);
+
   useOnClickOutside(notifRef, () => setNotifOpen(false));
   useOnClickOutside(dateRef, () => setDateOpen(false));
   useOnClickOutside(profileRef, () => setProfileOpen(false));
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border bg-card/70 px-5 py-4 backdrop-blur sm:px-8">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4 border-b border-border bg-card/70 px-5 py-4 backdrop-blur sm:px-8">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -74,15 +94,17 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
             className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4]"
           >
             <Bell size={18} />
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red text-[10px] font-bold text-white">
-              3
-            </span>
+            {notifications.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red text-[10px] font-bold text-white">
+                {notifications.length}
+              </span>
+            )}
           </button>
           {notifOpen && (
             <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-border bg-card p-2 shadow-[var(--shadow-popover)]">
               <p className="px-3 py-2 text-sm font-bold text-ink">Уведомления</p>
               <div className="space-y-1">
-                {NOTIFICATIONS.map((n) => (
+                {notifications.map((n) => (
                   <div key={n.id} className="rounded-lg px-3 py-2 hover:bg-[#F7F7F6]">
                     <p className="text-sm text-ink">{n.title}</p>
                     <p className="mt-0.5 text-xs text-ink-muted">{n.time}</p>

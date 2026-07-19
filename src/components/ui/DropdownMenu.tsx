@@ -5,7 +5,7 @@ import { cn } from "../../utils/cn";
 interface DropdownMenuProps {
   trigger: ReactNode;
   align?: "left" | "right";
-  items: { label: string; icon?: ReactNode; onClick: () => void; danger?: boolean }[];
+  items: { label: string; icon?: ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }[];
 }
 
 export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuProps) {
@@ -36,6 +36,7 @@ export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuPr
             <button
               key={item.label}
               type="button"
+              disabled={item.disabled}
               onClick={(e) => {
                 e.stopPropagation();
                 item.onClick();
@@ -44,6 +45,7 @@ export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuPr
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#F7F7F6]",
                 item.danger ? "text-red" : "text-ink",
+                item.disabled && "cursor-not-allowed opacity-40 hover:bg-transparent",
               )}
             >
               {item.icon}

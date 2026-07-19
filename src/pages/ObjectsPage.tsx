@@ -7,6 +7,7 @@ import { Button } from "../components/ui/Button";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { ObjectImage } from "../components/ui/ObjectImage";
+import { Avatar } from "../components/ui/Avatar";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
@@ -18,9 +19,11 @@ import { ObjectSummary } from "../components/objects/ObjectSummary";
 import { TaskList } from "../components/objects/TaskList";
 import { ProgressChart } from "../components/charts/ProgressChart";
 import { ObjectBudgetChart } from "../components/charts/ObjectBudgetChart";
-import { mockObjects } from "../data/mockObjects";
 import { mockUpcomingTasks } from "../data/mockTasks";
 import { objectProgressSeries } from "../data/mockDashboard";
+import { objectsRepository } from "../data/repositories";
+import { useRepositoryState } from "../hooks/useRepositoryState";
+import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency } from "../utils/format";
 import { formatDateRu } from "../utils/date";
@@ -58,11 +61,11 @@ function matchesTab(status: ObjectStatus, tab: TabKey): boolean {
 export default function ObjectsPage() {
   const { showToast } = useToast();
 
-  const [objects, setObjects] = useState<ConstructionObject[]>(mockObjects);
-  const [selectedId, setSelectedId] = useState<string>(mockObjects[0].id);
-  const [tab, setTab] = useState<TabKey>("all");
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ObjectFilters>(DEFAULT_FILTERS);
+  const [objects, setObjects] = useRepositoryState(objectsRepository);
+  const [selectedId, setSelectedId] = useState<string>(() => objectsRepository.getSnapshot()[0]?.id ?? "");
+  const [tab, setTab] = usePersistentState<TabKey>("filters.objects.tab", "all");
+  const [search, setSearch] = usePersistentState("filters.objects.search", "");
+  const [filters, setFilters] = usePersistentState<ObjectFilters>("filters.objects.filters", DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [chartMode, setChartMode] = useState<"progress" | "budget">("progress");
@@ -152,7 +155,16 @@ export default function ObjectsPage() {
       ),
     },
     { key: "city", header: "Локация", render: (row) => <span className="text-ink-secondary">{row.city}</span> },
-    { key: "foreman", header: "Прораб", render: (row) => <span className="text-ink-secondary">{row.foreman}</span> },
+    {
+      key: "foreman",
+      header: "Прораб",
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Avatar name={row.foreman} size="sm" />
+          <span className="whitespace-nowrap text-ink-secondary">{row.foreman}</span>
+        </div>
+      ),
+    },
     {
       key: "progress",
       header: "Прогресс",
@@ -229,7 +241,7 @@ export default function ObjectsPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
@@ -300,6 +312,7 @@ export default function ObjectsPage() {
                 setPageSize(size);
                 setPage(1);
               }}
+              pageSizeOptions={[6, 10, 20, 50]}
             />
           </Card>
 

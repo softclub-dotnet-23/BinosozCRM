@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { cn } from "../../utils/cn";
+import { resolvePersonPhoto } from "../../utils/personPhotos";
 
 type AvatarTone = "orange" | "blue" | "green" | "purple" | "red";
 
@@ -32,12 +34,27 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, size = "md", className }: AvatarProps) {
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const sizeClass = size === "md" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs";
+  const photoSrc = resolvePersonPhoto(name);
+
+  if (photoSrc && !photoFailed) {
+    return (
+      <img
+        src={photoSrc}
+        alt={name}
+        onError={() => setPhotoFailed(true)}
+        className={cn("shrink-0 rounded-full object-cover", sizeClass, className)}
+      />
+    );
+  }
+
   const tone = toneForName(name);
   return (
     <div
       className={cn(
         "flex shrink-0 select-none items-center justify-center rounded-full font-bold",
-        size === "md" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs",
+        sizeClass,
         TONE_CLASSNAMES[tone],
         className,
       )}

@@ -20,11 +20,11 @@ export function AppLayout({ title, subtitle, children, search, action }: AppLayo
   const isTablet = useMediaQuery("(max-width: 1180px) and (min-width: 1024px)");
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-app-bg">
+    <div className="flex min-h-screen w-full items-start bg-app-bg">
       <Sidebar collapsed={isTablet} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Header title={title} subtitle={subtitle} onOpenMobileSidebar={() => setMobileOpen(true)} search={search} action={action} />
-        <main className="flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+        <main className="flex-1 px-5 py-6 sm:px-8">
           <div className="mx-auto w-full max-w-[1600px]">{children}</div>
         </main>
       </div>

@@ -50,10 +50,28 @@ const NAV_ITEMS: NavEntry[] = [
     ],
   },
   { to: "/works", label: "Работы", icon: ClipboardCheck },
-  { to: "/brigades", label: "Бригады", icon: HardHat },
+  {
+    label: "Бригады",
+    icon: HardHat,
+    children: [
+      { to: "/brigades", label: "Список бригад" },
+      { to: "/brigades/composition", label: "Состав бригад" },
+      { to: "/brigades/assignments", label: "Назначения" },
+    ],
+  },
   { to: "/employees", label: "Сотрудники", icon: User },
   { to: "/attendance", label: "Посещаемость", icon: Calendar },
-  { to: "/warehouse", label: "Склад и материалы", icon: Package },
+  {
+    label: "Склад и материалы",
+    icon: Package,
+    children: [
+      { to: "/inventory/materials", label: "Материалы" },
+      { to: "/inventory/receipts", label: "Поступления" },
+      { to: "/inventory/write-offs", label: "Списания" },
+      { to: "/inventory/transfers", label: "Перемещения" },
+      { to: "/inventory/stock", label: "Остатки" },
+    ],
+  },
   { to: "/payroll", label: "Зарплаты", icon: Wallet },
   { to: "/reports", label: "Отчёты", icon: BarChart3 },
   { to: "/users", label: "Пользователи", icon: Users },
@@ -98,22 +116,28 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
       )}
       <aside
         className={cn(
-          "flex h-full flex-col border-r border-border bg-card transition-[width,transform] duration-200",
+          "flex h-screen flex-col border-r border-border bg-card transition-[width,transform] duration-200",
           collapsed ? "w-[84px]" : "w-[236px]",
-          "fixed inset-y-0 left-0 z-50 lg:static lg:z-auto",
+          "fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:z-auto",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
         <div className="flex items-center justify-between gap-2 px-5 py-6">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
-              <Building2 size={22} strokeWidth={2.3} />
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 leading-tight">
-                <p className="truncate text-[17px] font-extrabold tracking-tight text-primary">BINOSOZ</p>
-                <p className="text-[10.5px] leading-[1.25] text-ink-muted">Construction Management CRM</p>
+          <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+            {collapsed ? (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft">
+                <img
+                  src="/images/binosoz-mark.svg"
+                  alt="BINOSOZ Construction Management CRM"
+                  className="h-6 w-6 object-contain"
+                />
               </div>
+            ) : (
+              <img
+                src="/images/binosoz-logo.svg"
+                alt="BINOSOZ Construction Management CRM"
+                className="h-11 max-w-full object-contain"
+              />
             )}
           </div>
           <button
@@ -174,6 +198,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                         <NavLink
                           key={child.to}
                           to={child.to}
+                          end
                           onClick={onCloseMobile}
                           className={({ isActive }) =>
                             cn(

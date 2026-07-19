@@ -3,7 +3,7 @@ import { cn } from "../../utils/cn";
 
 export interface DataTableColumn<T> {
   key: string;
-  header: string;
+  header: ReactNode;
   render: (row: T) => ReactNode;
   className?: string;
   headerClassName?: string;
@@ -68,7 +68,7 @@ export function DataTable<T>({ columns, rows, rowKey, selectedRowKey, onRowClick
                   <td
                     key={col.key}
                     className={cn(
-                      "px-2.5 py-3 first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5",
+                      "px-2 py-2.5 first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5",
                       isFixedLayout && "align-middle overflow-hidden",
                       col.className,
                     )}

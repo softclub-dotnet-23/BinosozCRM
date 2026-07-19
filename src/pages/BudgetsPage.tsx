@@ -18,7 +18,10 @@ import { DonutChart } from "../components/charts/DonutChart";
 import { CategoryLegend } from "../components/charts/CategoryLegend";
 import { BudgetSummary } from "../components/budgets/BudgetSummary";
 import { BudgetAddModal } from "../components/budgets/BudgetAddModal";
-import { mockBudgetLines, budgetKpis, budgetCategorySpend, budgetOperations, budgetRiskItems } from "../data/mockBudgets";
+import { budgetKpis, budgetCategorySpend, budgetOperations, budgetRiskItems } from "../data/mockBudgets";
+import { budgetsRepository } from "../data/repositories";
+import { useRepositoryState } from "../hooks/useRepositoryState";
+import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatMillionsCompact } from "../utils/format";
 import { formatDateShort } from "../utils/date";
@@ -67,13 +70,13 @@ function matchesTab(status: BudgetLine["status"], tab: TabKey): boolean {
 export default function BudgetsPage() {
   const { showToast } = useToast();
 
-  const [budgets, setBudgets] = useState<BudgetLine[]>(mockBudgetLines);
-  const [selectedId, setSelectedId] = useState<string>(mockBudgetLines[0].id);
-  const [tab, setTab] = useState<TabKey>("all");
-  const [search, setSearch] = useState("");
+  const [budgets, setBudgets] = useRepositoryState(budgetsRepository);
+  const [selectedId, setSelectedId] = useState<string>(() => budgetsRepository.getSnapshot()[0]?.id ?? "");
+  const [tab, setTab] = usePersistentState<TabKey>("filters.budgets.tab", "all");
+  const [search, setSearch] = usePersistentState("filters.budgets.search", "");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
-  const [period, setPeriod] = useState<"week" | "month" | "quarter" | "year">("month");
+  const [period, setPeriod] = usePersistentState<"week" | "month" | "quarter" | "year">("filters.budgets.period", "month");
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BudgetLine | null>(null);
@@ -284,7 +287,7 @@ export default function BudgetsPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.85fr_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.85fr_1fr]">
         <Card className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
             <h2 className="text-[17px] font-bold text-ink">Бюджеты по объектам</h2>
@@ -416,12 +419,12 @@ export default function BudgetsPage() {
       </div>
 
       {/* Analytics: row 2 — recent operations (~67%) + at-risk budgets (~33%) */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-stretch">
-        <Card className="flex min-w-0 flex-col">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card className="min-w-0">
           <div className="px-5 pt-5 sm:px-6">
             <h2 className="text-[17px] font-bold text-ink">Последние операции по бюджетам</h2>
           </div>
-          <div className="mt-3 flex-1 overflow-x-auto">
+          <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[560px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-ink-secondary">
@@ -454,9 +457,9 @@ export default function BudgetsPage() {
           </div>
         </Card>
 
-        <Card className="flex flex-col p-5 sm:p-6">
+        <Card className="p-5 sm:p-6">
           <h2 className="text-[17px] font-bold text-ink">Бюджеты с превышением</h2>
-          <div className="mt-2 flex-1">
+          <div className="mt-2">
             <RiskList items={budgetRiskItems} onOpen={(item) => showToast(`Открыт бюджет: ${item.title}`, "info")} />
           </div>
           <button

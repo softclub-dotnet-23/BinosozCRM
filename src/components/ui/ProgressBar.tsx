@@ -1,6 +1,6 @@
 import { cn } from "../../utils/cn";
 
-type ProgressTone = "primary" | "green" | "blue" | "red" | "orange";
+type ProgressTone = "primary" | "green" | "blue" | "red" | "orange" | "gray";
 
 const TONE_CLASSNAMES: Record<ProgressTone, string> = {
   primary: "bg-primary",
@@ -8,6 +8,7 @@ const TONE_CLASSNAMES: Record<ProgressTone, string> = {
   blue: "bg-blue",
   red: "bg-red",
   orange: "bg-warning",
+  gray: "bg-[#C4C4C1]",
 };
 
 interface ProgressBarProps {
