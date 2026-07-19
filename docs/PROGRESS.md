@@ -15,14 +15,38 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
-**Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 4
-**Next step:** Phase 4, Step 5 [BOT] — «Материалы» bot flow *(отложено —
-см. §15)*. Next actionable backend step: Phase 4, Step 6 [BE] — тесты:
-авто-переход при частичной/полной/пере-поставке → MASTER §8.2
+**Phase 4 — Материалы: functionally ✅ COMPLETE for now (backend).**
+Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
+deferral. No `Phase4-summary.md` — same "functionally complete for now"
+status as Phases 2/3.
+**Phase:** 5 — Зарплата
+**Last completed:** Phase 4, Step 6
+**Next step:** Phase 5, Step 1 [BE] — `WorkOrderPayoutShare` + инвариант
+`Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER
+§5.13, §1.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 99 tests, confirmed via `dotnet test` (69 pass locally, 30 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
+пере-поставке.** New permanent `MaterialDeliveryAutoTransitionTests.cs`
+(real Postgres via `PostgresFixture`, mirrors `WorkOrderIsolationTests.cs`'s
+style, 5 tests): permanentizes what Step 3's throwaway check first
+verified — a partial delivery lands the request on `PartiallyDelivered`;
+deliveries summing to the full quantity land it on `Delivered`;
+overdelivery is allowed and still reads as `Delivered` (§8.2: "не ошибка
+... подсвечивается в UI"); a request-less delivery is valid and touches no
+request; delivering against an `Approved`-but-not-`Ordered` request fails
+with `MATERIAL_REQUEST_INVALID_TRANSITION`. Same Docker limitation as
+every Postgres-backed test in this suite — compile-verified only here, not
+execution-verified (the underlying logic was already execution-verified
+via Step 3's throwaway InMemory check).
+
+Suite: 104 total (was 99) — 69 pass locally (unchanged, all 5 new tests
+are Postgres-backed), 35 need Docker (30 pre-existing + 5 new); confirmed
+every failure is the expected `DockerUnavailableException` fail-fast, not
+a real assertion failure. **Phase 4 is now functionally complete for
+backend** — Step 5 `[BOT]` stays deferred, same situation as Phases 2/3.
 
 **Phase 4, Step 4 [BE] — `MaterialShortageReported`.** New
 `IMaterialShortageNotifier` (Application) / `SignalRMaterialShortageNotifier`
@@ -1237,7 +1261,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [x] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
+- [x] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
