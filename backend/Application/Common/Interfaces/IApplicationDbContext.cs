@@ -19,6 +19,7 @@ public interface IApplicationDbContext
     DbSet<WorkOrderPayoutShare> WorkOrderPayoutShares { get; }
     DbSet<IndividualTask> IndividualTasks { get; }
     DbSet<TaskLog> TaskLogs { get; }
+    DbSet<Timesheet> Timesheets { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

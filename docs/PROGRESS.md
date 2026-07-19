@@ -6,20 +6,66 @@
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
-**Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 9 — **backend-testable half only**
-(transition + isolation tests). Checklist item stays **unchecked**: §10.3's
-bot-idempotency tests are still blocked on the same 2026-07-18 bot
-deferral as Steps 6–8. Decided with the user: do the backend half now
-rather than block all of Step 9 on the bot's return.
-**Next step:** Phase 2's remaining `[BE]` work is exhausted — everything
-left unchecked (Steps 6–8 `[BOT]`, the bot-idempotency slice of Step 9) is
-blocked on the bot deferral. Needs a decision with the user: revisit the
-bot deferral, or move on to Phase 3 backend-only steps and treat Phase 2 as
-functionally done for now.
+**Phase 2 — Наряды и задачи (ядро): functionally ✅ COMPLETE for now
+(backend).** All `[BE]` steps done (1–5, 9's backend half); Steps 6–8
+`[BOT]` and Step 9's bot-idempotency slice stay unchecked, blocked on the
+2026-07-18 bot deferral — moved on to Phase 3 backend steps per the user's
+2026-07-19 decision, not a phase-summary-worthy completion (no
+`Phase2-summary.md` written; the phase isn't actually finished, just
+unblocked from further backend work until the bot returns).
+**Phase:** 3 — Явка, отсутствия, премии
+**Last completed:** Phase 3, Step 1
+**Next step:** Phase 3, Step 2 [BE] — `AbsenceRecord`: день с отсутствием
+не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER
+§5.21, §8.9
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 84 tests, confirmed via `dotnet test` (58 pass locally, 26 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 3, Step 1 [BE] — `Timesheet` + `LateMinutes` computed at
+check-in.** Domain entity + `TimesheetConfiguration` already existed
+(Ahmad-owned Domain layer per the team split, same pattern as
+`WorkOrder`/`IndividualTask` before Phase 2's Application layers landed) —
+`Timesheet.CheckIn`/`CheckOut`/`Approve` already implemented §8.1's formula
+exactly. This step built the Application/API surface: new
+`TimesheetAccess` (mirrors `WorkOrderAccess`/`BrigadeAccess` — Brigadir
+scoped to own `BrigadeId` via the timesheet's `Worker`, Prorab+ scoped by
+`ProrabObjectAssignment` on `ObjectId`).
+
+`POST /timesheets/check-in` (Brigadir — own brigade or self, §8.4's "за
+всю бригаду и за себя"): finds or creates the `Timesheet` row for
+`(WorkerId, Date)`, rejects a repeat with `TIMESHEET_ALREADY_CHECKED_IN`
+if `CheckInAt` is already set. `POST /timesheets/{id}/check-out` and
+`POST /timesheets/{id}/approve` (Prorab+) follow the same access pattern.
+`GET /timesheets` — Prorab+ object-scoped / Brigadir own-brigade (joins
+through `Worker.BrigadeId` since `Timesheet` has no `BrigadeId` field
+itself).
+
+**Judgment call, documented in code — `POST /timesheets`'s exact scope
+wasn't literally specified.** §9.4 lists `POST /timesheets` without the
+"(own, read)" qualifier used elsewhere, and §8.4 flatly states "только
+бригадир отмечает" (only the Brigadir marks attendance). Read `POST
+/timesheets` as the backdated-correction path — distinct from the live
+`/check-in` flow — always `EnteredManually = true`, Brigadir-only (not
+opened to Prorab+, since §8.4 doesn't carve out an exception for them).
+Worth reconciling in a `docs` pass if this reading turns out wrong.
+
+New `TIMESHEET_NOT_FOUND` (404) in `ErrorCodeCatalog` — same "real code,
+not in §9.2's literal table" pattern as `WORK_ORDER_NOT_FOUND`.
+
+Verified with 7 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 7/7 passed — then deleted, including a temporary
+`Microsoft.EntityFrameworkCore.InMemory` reference added and reverted from
+`Directory.Packages.props`/the test csproj, no trace left): `LateMinutes`
+matches **both** of §8.1's worked numeric examples exactly (grace=0 → 15
+late minutes; grace=5 → 10); `LateMinutes` is `null`, not `0`, when
+`Worker.ShiftStartTime` isn't configured; a second same-day check-in is
+rejected; `CheckOut` computes `HoursWorked`; a Brigadir of a different
+brigade cannot check in someone else's worker (`WORKER_NOT_FOUND`);
+`Approve` sets `ApprovedByUserId`/`ApprovedAt` correctly. Docker still
+unavailable — suite count unchanged (84 total, 58 pass, 26 need Docker);
+no new permanent tests this step (`AbsenceRecord`'s `TIMESHEET_ABSENCE_CONFLICT`
+and numeric-example tests are Step 2's and Step 7's jobs respectively).
 
 **Phase 2, Step 9 [FULL] — тесты (backend half only).** MASTER §7.1/§7.2
 call for "все переходы (разрешённые + запрещённые), изоляция бригады
@@ -916,7 +962,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 3 — Явка, отсутствия, премии
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
 
-- [ ] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
+- [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
 - [ ] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
 - [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
