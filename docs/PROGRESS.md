@@ -5,13 +5,12 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 9 (Zone B) — `GetObjectCostBreakdownQuery`
-(материалы + ФОТ), **не подключён к `/objects/{id}/cost-breakdown` —
-нужен от Ахмада**, см. write-up
-**Next step:** Phase 5, Step 10 [BE] Zone B — тесты на числовых примерах
-§8.0/§8.1/§8.8 → MASTER §8.0, §8.8
+**Last completed:** Phase 5, Step 10 (Zone B) — тесты на числовых примерах
+§8.0/§8.1/§8.8
+**Next step:** Phase 5, Step 11 [BE] Zone B — `PayrollEntry.Adjust()` →
+MASTER §8.8, §9.2 (последний BE-шаг Phase 5)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
+**Tests:** `Tests/Api.IntegrationTests` — **79/79 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
@@ -1153,6 +1152,32 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 10 (Zone B) — тесты на числовых примерах §8.0/§8.1/§8.8.**
+`PayrollCalculationTests.cs` — promotes Steps 3/4/6/7's throwaway worked
+examples into permanent coverage, same split convention as Phase 2 Step 9
+/ Phase 3 Step 7 / Phase 4 Step 6: Hourly `CalculatedAmount` (7040 exactly);
+Piecework `CalculatedAmount` (`Theory` over the 50/30/20 split ->
+2700/1620/1080); `LatenessDeductionAmount` (`Theory` over both §8.1 grace
+settings -> 43.33/33.33); the full §8.8 chain through the real `Approve`
+command — `CalculatedAmount` 7040, lateness 43.33, bonus 200, advance 3000
+-> `FinalAmount` 4196.67 exactly; a negative `FinalAmount` not clamped to
+zero; the §8.0 boundary case (no timesheets, no work orders -> `Draft` at
+`CalculatedAmount = 0`, not a failure).
+
+**Two bugs caught while writing these as PERMANENT tests, not in the
+implementation:** (a) the full-worked-example test initially dropped the
+paid `AbsenceRecord` seed that Step 3's own scenario needs for the 640 of
+the 7040 to be present — caught immediately by the assertion (6400
+instead of 7040), not a silent pass; (b) `A_negative_FinalAmount_is_not_clamped_to_zero`
+used a non-persisted `Guid.NewGuid()` as the Accountant's `UserId`, which
+worked in Step 7's throwaway (no `PayrollAdvance` write there) but failed
+here with a real `AdminAuditLogs.ActorUserId` FK violation once combined
+with `CreatePayrollAdvanceCommand`'s own audit-log write (Step 6) — fixed
+by seeding a real `User` row, same fix pattern as every other
+FK-constrained `UserId` gotcha this project has hit.
+
+Full suite: **79/79** (70 previous + 9 new), no regressions.
+
 **Step 9 (Zone B) — `GetObjectCostBreakdownQuery`.**
 `Application/Payroll/GetObjectCostBreakdownQuery.cs` — `ObjectActualCost =
 Σ MaterialDelivery(UnitCost × Qty) + Σ PayrollAllocation` (§8.10).
@@ -1399,7 +1424,7 @@ regressions.
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять *(Adjust() сам ещё не построен — см. write-up)* → MASTER §8.8
 - [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [x] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) *(query готова, эндпоинт — Zone A, см. write-up)* → MASTER §8.10
-- [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
+- [x] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 - [ ] Step 11 [BE] — `PayrollEntry.Adjust()`: `POST /payroll/{id}/adjust`, Accountant-only, `AdjustmentReason` обязателен при `AdjustmentAmount ≠ 0` (`PAYROLL_ADJUSTMENT_REASON_REQUIRED`, уже в каталоге), только пока `Draft` → MASTER §8.8, §9.2 *(добавлено 2026-07-19 — реальный пробел в разбивке шагов: ни один из Steps 1-10 не строит эту сторону формулы, найдено при review перед коммитом Step 7)*
 
 ## Phase 6 — Полировка и запуск
