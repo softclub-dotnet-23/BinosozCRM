@@ -15,6 +15,34 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 4 [BE] — `LatenessDeductionAmount` за период.** New
+`LatenessDeductionCalculator` (Application/Payroll, internal): Σ
+`LateMinutes` over the period × (`PayRate/60`), implementing §8.1's
+period-level formula. `LateMinutes` itself was already computed per
+check-in back in Phase 3 Step 1 — this step only adds the aggregation
+that had nowhere to live until `PayrollEntry.LatenessDeductionAmount`
+existed to hold it.
+
+A `Timesheet` with `LateMinutes == null` (unconfigured `ShiftStartTime`)
+is excluded from the sum rather than treated as `0` — counting it as zero
+would silently hide the missing-configuration case that `null` exists to
+flag in the first place. Not gated on `ApprovedAt` — §8.1 doesn't state
+that gate (unlike §8.0's explicit "только принятые табели" for
+`CalculatedAmount`), so nothing invented here. Wired into
+`GeneratePayrollDraftCommandHandler`: now computes and sets
+`LatenessDeductionAmount` alongside `CalculatedAmount` on every draft
+generate/regenerate, same idempotent behavior as Step 3.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session) — both of §8.1's exact worked examples check out:
+grace=0 → **43.33** сомони (Σ65min × 40/60), grace=5 → **33.33** сомони
+(Σ50min × 40/60); a `null`-`LateMinutes` timesheet correctly contributes
+nothing rather than zero-diluting the sum. Docker still unavailable —
+suite count unchanged (104 total, 69 pass, 35 need Docker); no new
+permanent tests this step (Step 10's job).
+
 **Phase 5, Step 3 [BE] — `CalculatedAmount`, the "критичный" §8.0
 formula.** New `CalculatedAmountCalculator` (Application/Payroll,
 internal) implements both branches exactly:
@@ -95,9 +123,10 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 3
-**Next step:** Phase 5, Step 4 [BE] — `LatenessDeductionAmount` за период
-→ MASTER §8.1
+**Last completed:** Phase 5, Step 4
+**Next step:** Phase 5, Step 5 [BE] — подтверждение премии
+(`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` →
+MASTER §8.7
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1343,7 +1372,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
 - [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
-- [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
+- [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
