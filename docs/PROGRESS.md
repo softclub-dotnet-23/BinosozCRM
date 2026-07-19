@@ -5,18 +5,44 @@
 
 ## Current Status
 **Phase:** 4 — Материалы
-**Last completed:** Phase 3, Step 7 (Zone B) — тесты: `LateMinutes`
-числовые примеры, grace-период, отсутствие вместо прогула. **Phase 3's
-backend scope is now fully done** — Steps 4-6 [BOT] stay deferred (см.
-§15); next work is Phase 4.
-**Next step:** Phase 4, Step 1 [BE] Zone B — `MaterialConsumptionReport`
-(уникальность на день → update, не дубль) → MASTER §5.18, §8.2
+**Last completed:** Phase 4, Step 1 (Zone B) — `MaterialConsumptionReport`
+**Next step:** Phase 4, Step 2 [BE] Zone B — `MaterialRequest` +
+`QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **60/60 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 1 (Zone B) — `MaterialConsumptionReport`.**
+`Application/MaterialConsumptionReports/` — `UpsertMaterialConsumptionReportCommand`
+(Brigadir, own brigade — derived, not client-supplied, same as
+`IndividualTask`'s precedent), List/Get. Reuses Domain's existing
+`UpdateUsage()` method for the update path — Ahmad had already anticipated
+this upsert shape when writing the entity in Phase 0.
+`Api/Controllers/MaterialConsumptionReportsController.cs` — role split is
+deliberately asymmetric per §9.4's literal `Brigadir(C) / Prorab+(R)`:
+Brigadir only writes today's report, Prorab+ only reads history. No
+overlap, unlike `Timesheet`'s more symmetric split — not inventing a
+Brigadir read-back beyond what's stated.
+
+**Core behavior, matching this step's own title:** the same `(BrigadeId,
+ObjectId, MaterialName, Date)` submitted twice **updates** the existing
+row — never rejects, never duplicates. Different from `Timesheet`'s
+check-in (which rejects a repeat) — correcting the evening's numbers is
+the normal case here, not an error.
+
+**Correctly out of scope, not attempted:** the "one action suggests a
+`MaterialRequest`" bot flow (Step 5, `[BOT]`, deferred) and the
+`MaterialShortageReported` SignalR event (Step 4) both belong to later
+steps in this same phase.
+
+Verified with a throwaway check against real Postgres (3/3, deleted
+after): second same-day submission updates in place (same row ID, new
+values), doesn't duplicate; different materials same day create separate
+rows; two brigades reporting the same material/object/day don't collide.
+Full suite: 60/60, no regressions.
 
 **Step 7 (Zone B) — тесты: `LateMinutes`, grace-период, отсутствие вместо прогула.**
 Promoted Steps 1-2's throwaway verification into permanent, committed
@@ -912,7 +938,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 4 — Материалы
 **Goal:** независима от Phase 3, идёт после ядра.
 
-- [ ] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
+- [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 - [ ] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2

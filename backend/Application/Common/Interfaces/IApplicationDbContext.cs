@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     DbSet<TaskLog> TaskLogs { get; }
     DbSet<Timesheet> Timesheets { get; }
     DbSet<AbsenceRecord> AbsenceRecords { get; }
+    DbSet<MaterialConsumptionReport> MaterialConsumptionReports { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

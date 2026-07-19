@@ -71,6 +71,7 @@ public static class ErrorCodeCatalog
         ["TIMESHEET_ABSENCE_CONFLICT"] = StatusCodes.Status400BadRequest,
         ["TIMESHEET_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["ABSENCE_RECORD_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["MATERIAL_CONSUMPTION_REPORT_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
