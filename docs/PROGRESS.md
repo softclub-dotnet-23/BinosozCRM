@@ -15,6 +15,43 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 9 [BE] — `GET /objects/{id}/cost-breakdown`.** Fixes the
+exact bug §8.10 flags — "факт" used to be materials + WorkOrder totals
+**without** payroll, understating true cost by the entire wage bill.
+
+- `MaterialCost` — Σ `MaterialDelivery.UnitCost × Qty` for the object,
+  always included (materials aren't payroll-period-gated).
+- `PieceworkPayrollCost` — driven from `WorkOrderPayoutShare` on
+  `Accepted`/`Closed` orders with a `CompletedDate`, but recomputed
+  directly as `SharePercent × OrderTotal` rather than trusting
+  `WorkOrderPayoutShare.Amount` — **a real gap flagged, not silently
+  worked around**: no handler anywhere in this codebase ever calls
+  `WorkOrderPayoutShare.Approve()`, so that field is never actually
+  populated.
+- `HourlyPayrollCost` — directly attributed per `Timesheet.ObjectId ×
+  HoursWorked × PayRate` (each timesheet already carries its own object).
+- `PaidAbsencePayrollCost` — genuinely proportional, since `AbsenceRecord`
+  has no `ObjectId` at all: reuses `CalculatedAmountCalculator`'s exact
+  absence-amount formula (bumped from `private` to `internal` so the two
+  can't drift apart), split by this object's share of the worker's total
+  hours that period.
+
+Every payroll component is gated on `PayrollEntry.Status == Paid` — an
+open period contributes nothing, matching §8.10's explicit "не в факте,
+иначе цифра прыгает каждый день" — and the response carries a `Note`
+field saying so explicitly rather than silently showing a number that
+looks final but isn't.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): a full combined scenario (materials + piecework +
+hourly + proportionally-split absence) checks out to the exact expected
+numbers across all four components and the total; a `Draft`-status
+payroll entry contributes nothing; Prorab isolation is enforced. Docker
+still unavailable — suite count unchanged (104 total, 69 pass, 35 need
+Docker).
+
 **Phase 5, Step 8 [BE] — background task: payroll drafts per period +
 alert if generation didn't happen.** Built as a plain `BackgroundService`,
 not Hangfire — a judgment call, documented in code: no job-persistence/
@@ -268,10 +305,10 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 8
-**Next step:** Phase 5, Step 9 [BE] — `GET /objects/{id}/cost-breakdown`:
-материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) →
-MASTER §8.10
+**Last completed:** Phase 5, Step 9
+**Next step:** Phase 5, Step 10 [BE] — тесты на числовых примерах
+§8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER
+§8.0, §8.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1522,7 +1559,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
-- [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
+- [x] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 
 ## Phase 6 — Полировка и запуск

@@ -97,7 +97,11 @@ internal static class CalculatedAmountCalculator
     // истории <10 дней — 8ч × PayRate." Shared by both Hourly and
     // Piecework — the sentence appears identically in both subsections of
     // §8.0, so it isn't special-cased per PayRateType.
-    private static async Task<decimal> ComputePaidAbsenceAmountAsync(
+    // internal, not private: Phase 5 Step 9's cost-breakdown read model
+    // reuses this exact total per (worker, period) before splitting it
+    // across objects by hour-ratio — recomputing the same formula
+    // separately would risk the two drifting apart.
+    internal static async Task<decimal> ComputePaidAbsenceAmountAsync(
         IApplicationDbContext context,
         Worker worker,
         DateOnly periodStart,
