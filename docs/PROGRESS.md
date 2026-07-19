@@ -15,15 +15,52 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 1 [BE] — `WorkOrderPayoutShare` + Σ`SharePercent = 100`
+invariant.** `PUT /work-orders/{id}/payout-shares` (Brigadir, own brigade,
+gated on `WorkOrder.Status == InProgress`) — replaces the entire share set
+in one `SaveChanges` (delete existing + insert new), never row-by-row,
+matching §5.13's literal "Σ SharePercent = 100.00 ровно... проверяется...
+при сохранении всего набора разом."
+
+**Real bug caught before it shipped.** The sum/duplicate checks were
+originally written as FluentValidation rules with
+`WithErrorCode("WORK_ORDER_SHARES_INVALID")` — but `ValidationBehavior`
+hardcodes every FluentValidation failure to the generic `VALIDATION_FAILED`
+code regardless of `WithErrorCode()` (confirmed by reading the pipeline
+directly). Moved both checks into the handler as explicit
+`Result.Failure(new Error("WORK_ORDER_SHARES_INVALID", ...))` calls so the
+catalog-specified code actually comes back, matching how every other
+domain-specific error code in this codebase is returned.
+
+Each `WorkerId` is validated against the work order's own `BrigadeId`
+(404 `WORKER_NOT_FOUND` for cross-brigade or nonexistent workers) and
+against duplicates within the same set. `ApprovedByUserId`/`Amount` are
+deliberately left untouched — a judgment call: §5.13 ties those to "Prorab
+confirmation" and "snapshot at confirmation," but §9.4 has no separate
+approve-shares endpoint. Read as: `WorkOrder.Accept()` (already built) is
+the Prorab's confirmation, and `Amount` gets populated once §8.0's
+`CalculatedAmount` exists (Step 3) — not invented here.
+
+Verified with 6 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 6/6 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): shares summing to exactly 100 succeed; a sum ≠ 100 is
+rejected; resubmitting replaces rather than appends; a worker outside the
+order's brigade is rejected; a duplicate worker in the same set is
+rejected; setting shares after the order leaves `InProgress` is rejected.
+Docker still unavailable — suite count unchanged (104 total, 69 pass, 35
+need Docker); no new permanent tests this step.
+
 **Phase 4 — Материалы: functionally ✅ COMPLETE for now (backend).**
 Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 4, Step 6
-**Next step:** Phase 5, Step 1 [BE] — `WorkOrderPayoutShare` + инвариант
-`Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER
-§5.13, §1.1
+**Last completed:** Phase 5, Step 1
+**Next step:** Phase 5, Step 2 [BOT] — флоу распределения долей при
+закрытии наряда *(отложено — см. §15)*. Next actionable backend step:
+Phase 5, Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые
+табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1266,7 +1303,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
 
-- [ ] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
+- [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
