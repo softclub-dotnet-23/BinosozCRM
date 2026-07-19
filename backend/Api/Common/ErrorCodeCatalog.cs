@@ -23,6 +23,11 @@ namespace Api.Common;
 // as a clean 409, same family as CONCURRENCY_CONFLICT (an existing-state
 // conflict, not a validation failure or a missing row).
 //
+// WORKER_HAS_OPEN_TASKS (Phase 3 Step 3): not in §9.2's table — §8.9's
+// termination lifecycle blocks Worker.Terminate outright while the worker
+// has an IndividualTask with Status != Done ("не удалять молча, там может
+// быть незакрытая работа").
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -40,6 +45,7 @@ public static class ErrorCodeCatalog
         ["PASSWORD_CHANGE_REQUIRED"] = StatusCodes.Status403Forbidden,
         ["VALIDATION_FAILED"] = StatusCodes.Status400BadRequest,
         ["WORKER_UNDERAGE"] = StatusCodes.Status400BadRequest,
+        ["WORKER_HAS_OPEN_TASKS"] = StatusCodes.Status400BadRequest,
         ["BRIGADE_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORKER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,

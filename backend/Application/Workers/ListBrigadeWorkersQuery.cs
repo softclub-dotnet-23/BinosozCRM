@@ -6,7 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Workers;
 
-public sealed record ListBrigadeWorkersQuery(Guid BrigadeId, int Page, int PageSize) : IRequest<Result<PagedResult<WorkerDto>>>;
+// MASTER §8.9: a terminated Worker "исчезает из активных списков, из
+// истории — нет" — this is that active list, so it excludes IsActive=false
+// workers by default. IncludeInactive opts back in for the "история" half
+// (no separate audit endpoint exists to view terminated workers otherwise).
+public sealed record ListBrigadeWorkersQuery(Guid BrigadeId, int Page, int PageSize, bool IncludeInactive = false)
+    : IRequest<Result<PagedResult<WorkerDto>>>;
 
 public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     : IRequestHandler<ListBrigadeWorkersQuery, Result<PagedResult<WorkerDto>>>
@@ -18,8 +23,12 @@ public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context
             return Result.Failure<PagedResult<WorkerDto>>(new Error("BRIGADE_NOT_FOUND", "Brigade not found."));
 
         var query = context.Workers
-            .Where(w => w.BrigadeId == request.BrigadeId)
-            .OrderBy(w => w.FullName);
+            .Where(w => w.BrigadeId == request.BrigadeId);
+
+        if (!request.IncludeInactive)
+            query = query.Where(w => w.IsActive);
+
+        query = query.OrderBy(w => w.FullName);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query

@@ -14,12 +14,60 @@
 `Phase2-summary.md` written; the phase isn't actually finished, just
 unblocked from further backend work until the bot returns).
 **Phase:** 3 — Явка, отсутствия, премии
-**Last completed:** Phase 3, Step 2
-**Next step:** Phase 3, Step 3 [BE] — `Worker.TerminationDate` + lifecycle
-увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
+**Last completed:** Phase 3, Step 3 — **partial**: open-task guard +
+active-list filtering only. Checklist item stays **unchecked** — the
+step's own "финальный расчёт" clause needs §8.0's `CalculatedAmount` and
+`PayrollAdvance` settlement, neither of which exist yet (Phase 5 Steps
+3/6/7). Same "build what's actually buildable, flag the rest" call as
+Phase 2 Step 9.
+**Next step:** Phase 3, Steps 4–6 are `[BOT]` and deferred (2026-07-18
+decision) — next actionable backend step is Step 7 [BE] — тесты:
+`LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо
+прогула → MASTER §8.1, §8.9. Step 3's remainder (финальный расчёт) stays
+blocked until Phase 5's `CalculatedAmount`/`PayrollAdvance` land.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 84 tests, confirmed via `dotnet test` (58 pass locally, 26 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 3, Step 3 [BE] — `Worker.TerminationDate` lifecycle (partial).**
+`TerminateWorkerCommand` already existed (Phase 1 Step 2) but was bare —
+no guards, no lifecycle. §8.9 lists five things that happen on
+termination; this step covers what's actually buildable right now:
+
+1. **Open `IndividualTask` blocks termination** — new
+   `WORKER_HAS_OPEN_TASKS` (400): `TerminateWorkerCommandHandler` now
+   checks for any `IndividualTask` assigned to the worker with `Status !=
+   Done` and refuses outright, per §8.9's "не удалять молча — там может
+   быть незакрытая работа."
+2. **`WorkOrderPayoutShare` rows stay untouched** — no code needed; that
+   entity has no Application layer yet (Phase 5 Step 1), so there was
+   nothing to accidentally touch in the first place.
+5. **`IsActive = false` drops the worker from active lists, not history**
+   — `Worker.Terminate()` already set `IsActive = false` (Phase 1);
+   `ListBrigadeWorkersQuery` now filters to `IsActive = true` by default,
+   with a new `IncludeInactive` opt-in (no separate audit/history endpoint
+   exists to view terminated workers otherwise).
+
+**Explicitly NOT built — items 3 and 4, genuinely blocked, not a scope
+shortcut:** "текущий `PayrollEntry` формируется... досрочно" and
+"непогашенные авансы попадают в этот финальный расчёт" both need §8.0's
+`CalculatedAmount` formula and `PayrollAdvance` settlement — neither
+exists anywhere in Application yet (`WorkOrderPayoutShare`,
+`CalculatedAmount`, `PayrollAdvance`, `PayrollEntry.Approve()` are all
+still-unbuilt Phase 5 Steps 1/3/6/7). Building them now would mean
+implementing payroll calculation as a side effect of a Phase 3 step —
+flagged here so Phase 5's termination tie-in isn't forgotten once
+`CalculatedAmount` lands. **Checklist item stays unchecked** — this is
+part of Step 3, not all of it.
+
+Verified with 2 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 2/2 passed — then deleted, same
+`Microsoft.EntityFrameworkCore.InMemory`-added-then-reverted pattern as
+every other throwaway check this session): an open task blocks
+termination and the worker stays `IsActive`; termination succeeds once the
+task is `Done`, and the worker disappears from the default active-worker
+list while remaining visible via `IncludeInactive`. Docker still
+unavailable — suite count unchanged (84 total, 58 pass, 26 need Docker).
 
 **Phase 3, Step 2 [BE] — `AbsenceRecord`.** Domain entity + EF config
 already existed; built the Application/API surface. New
