@@ -15,6 +15,49 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 7 [BE] — `PayrollEntry.Approve()`: the `FinalAmount`
+formula.** Where all six preceding Phase 5 steps come together.
+`POST /payroll/{id}/approve` (Accountant/Owner) — Domain's
+`PayrollEntry.Approve()` already computed `FinalAmount = CalculatedAmount
+− LatenessDeductionAmount + BonusAmount − AdvanceDeductedAmount +
+AdjustmentAmount`; this step wires the endpoint. An optional
+`AdjustmentAmount`/`AdjustmentReason` rides on the same call — no separate
+`/adjust` route in §9.4, and `Adjust()` is Draft-only anyway — folded in
+via `Adjust()` immediately before `Approve()`.
+
+**Same `WithErrorCode()` gotcha caught again, same fix as Step 1.**
+Initially wrote the "nonzero adjustment needs a reason" check as a
+FluentValidation rule; caught that `ValidationBehavior` would run it
+*before* the handler and return the generic `VALIDATION_FAILED` instead
+of the catalog-specified `PAYROLL_ADJUSTMENT_REASON_REQUIRED` — removed
+it, checked explicitly in the handler instead.
+
+§8.8's "каждому учтённому авансу проставляется `SettledInPayrollEntryId`"
+— every `PayrollAdvance` matching the exact same criteria
+`AdvanceDeductedAmountCalculator` used at draft time gets stamped with
+the entry's id, in the same transaction as `Approve()`, so it stops
+counting toward any future period's draft.
+
+`POST /payroll/{id}/pay` — writes an explicit `AdminAuditLog`
+(`PayrollPaid`), same reasoning as Step 6's `AdvanceIssued` (the
+interceptor only watches modified rows on other entities, not a
+`PayrollEntry.Status` change). Both endpoints explicitly guard against
+acting on an already-`Paid` entry with `PAYROLL_ALREADY_PAID`, rather
+than falling through to Domain's generic transition-guard code.
+
+Verified with 8 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 8/8 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session — caught and fixed my own test-setup bug along the
+way, an advance dated after the test period that correctly rolled to
+"next period" per the rule instead of settling) — critically, **MASTER's
+own combined worked example checks out exactly**: `7040 − 43.33 + 200 −
+3000 = 4196.67`. Also verified: negative `FinalAmount` is preserved,
+never clamped; advances settle correctly at Approve; a missing
+adjustment reason on a nonzero amount is rejected; Approve/Pay both
+reject an already-paid entry. Docker still unavailable — suite count
+unchanged (104 total, 69 pass, 35 need Docker).
+
 **Phase 5, Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` +
 `SettledInPayrollEntryId`.** `POST /payroll-advances` (Accountant/Owner)
 issues a `PayrollAdvance`, writing an explicit `AdminAuditLog` entry
@@ -188,10 +231,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 6
-**Next step:** Phase 5, Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount`
-= Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный
-результат допустим**, не обнулять → MASTER §8.8
+**Last completed:** Phase 5, Step 7
+**Next step:** Phase 5, Step 8 [BE] — фоновая задача: черновики за период +
+алерт, если не сформировалась → MASTER §11.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1440,7 +1482,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
-- [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
+- [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
