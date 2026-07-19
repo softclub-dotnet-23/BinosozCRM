@@ -4,19 +4,39 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 9a (Zone A) — WorkOrder/IndividualTask
-state machine + brigade-isolation tests. **Phase 2's backend scope is now
-fully done** — Steps 6-8 [BOT] and 9b [BOT] all stay deferred together
-(см. §15); next work is Phase 3.
-**Next step:** Phase 3, Step 1 [BE] Zone B — `Timesheet` + `LateMinutes`
-→ MASTER §5.20, §8.1 (Zone B — Shahrom's)
+**Phase:** 3 — Явка, отсутствия, премии
+**Last completed:** Phase 3, Step 1 (Zone B) — `Timesheet` + `LateMinutes`
+**Next step:** Phase 3, Step 2 [BE] Zone B — `AbsenceRecord`: день с
+отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400
+→ MASTER §5.21, §8.9
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **41/41 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 1 (Zone B) — `Timesheet` + `LateMinutes`.**
+`Application/Timesheets/` — `CheckInTimesheetCommand` (Brigadir, own-brigade
+worker only), `CheckOutTimesheetCommand`, `CreateManualTimesheetCommand`
+(Prorab+, `EnteredManually=true` — the no-Telegram fallback for open
+question №9), `ApproveTimesheetCommand`, List/Get with Prorab-object /
+Brigadir-own-brigade isolation. `Api/Controllers/TimesheetsController.cs`
+— every route is literally named in §9.4, no inference needed this step.
+`Timesheet` Domain entity + config (incl. the `LateMinutes` formula itself,
+`CheckIn`/`CheckOut`/`Approve`) already existed from Phase 0 — this step is
+Application/Api only. "Already checked in" reuses the `(WorkerId, Date)`
+DB uniqueness constraint directly rather than a separate flag.
+
+Verified with a throwaway check against real Postgres (7/7, deleted after):
+both §8.1 worked numeric examples match exactly (15min late/grace=0 →
+`LateMinutes=15`; 40min late/grace=5 → `35`); grace exceeding lateness
+clamps to 0, not negative; `LateMinutes` is `null` (not `0`) when
+`Worker.ShiftStartTime` is unset, confirmed the DTO doesn't coalesce that
+away; double check-in same day → `TIMESHEET_ALREADY_CHECKED_IN`;
+cross-brigade check-in → `WORKER_NOT_FOUND` (404, not 403); `CheckOut`
+computes `HoursWorked`. Real permanent tests are Step 7's job (mirrors
+Phase 2 Step 9's split), not written now. Full suite: 41/41, no regressions.
 
 **Step 9a (Zone A) — WorkOrder/IndividualTask state machine + brigade-isolation tests.**
 Split the same way Phase 1 Step 7 was — the BE-testable half now, the
@@ -807,7 +827,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 3 — Явка, отсутствия, премии
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
 
-- [ ] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
+- [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
 - [ ] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
 - [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4

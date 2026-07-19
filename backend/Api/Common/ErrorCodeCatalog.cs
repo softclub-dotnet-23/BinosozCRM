@@ -62,6 +62,7 @@ public static class ErrorCodeCatalog
         ["INDIVIDUAL_TASK_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["TIMESHEET_ALREADY_CHECKED_IN"] = StatusCodes.Status400BadRequest,
         ["TIMESHEET_ABSENCE_CONFLICT"] = StatusCodes.Status400BadRequest,
+        ["TIMESHEET_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
