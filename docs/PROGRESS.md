@@ -4,16 +4,28 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 4 (Zone B) — `MaterialShortageReported`
-**Next step:** Phase 4, Step 6 [BE] Zone B — тесты: авто-переход при
-частичной/полной/пере-поставке → MASTER §8.2 (Step 5 [BOT] отложен, см. §15)
+**Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
+**Last completed:** Phase 4, Step 6 (Zone B) — тесты: авто-переход при
+частичной/полной/пере-поставке
+**Next step:** Phase 5, Step 1 [BE] Zone B — `WorkOrderPayoutShare` +
+инвариант `Σ SharePercent = 100` → MASTER §5.13, §1.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — **60/60 passing**, confirmed for
+**Tests:** `Tests/Api.IntegrationTests` — **68/68 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 6 (Zone B) — тесты: авто-переход по `Σ Qty`.**
+`MaterialDeliveryAutoTransitionTests.cs` — promotes Step 3's throwaway
+scenarios to permanent coverage: `Theory` over partial/full/over-delivery
+(40/100/150 against Qty=100, `IsOverDelivered` asserted per case),
+accumulating two partials to `Delivered`, force-close from
+`PartiallyDelivered`, unlinked delivery (no request, no `UpdatedRequest`),
+cross-object rejection (`MATERIAL_REQUEST_NOT_FOUND`), and delivery
+against a not-yet-`Ordered` request (`MATERIAL_REQUEST_INVALID_TRANSITION`).
+No new gaps found — Step 3's implementation held as-is. Full suite: 68/68
+(60 prior + 8 new), no regressions.
 
 **Step 4 (Zone B) — `MaterialShortageReported`.**
 Extended Ahmad's `IRealtimeNotifier`/`SignalRRealtimeNotifier` (shared
@@ -998,7 +1010,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [x] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
+- [x] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
