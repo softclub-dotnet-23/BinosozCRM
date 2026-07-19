@@ -5,10 +5,11 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 8 (Zone B) — фоновая задача: черновики за
-период
-**Next step:** Phase 5, Step 9 [BE] Zone B — `GET /objects/{id}/cost-breakdown`
-→ MASTER §8.10
+**Last completed:** Phase 5, Step 9 (Zone B) — `GetObjectCostBreakdownQuery`
+(материалы + ФОТ), **не подключён к `/objects/{id}/cost-breakdown` —
+нужен от Ахмада**, см. write-up
+**Next step:** Phase 5, Step 10 [BE] Zone B — тесты на числовых примерах
+§8.0/§8.1/§8.8 → MASTER §8.0, §8.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1152,6 +1153,55 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 9 (Zone B) — `GetObjectCostBreakdownQuery`.**
+`Application/Payroll/GetObjectCostBreakdownQuery.cs` — `ObjectActualCost =
+Σ MaterialDelivery(UnitCost × Qty) + Σ PayrollAllocation` (§8.10).
+**Piecework:** direct — sums `WorkOrderPayoutShare.Amount` (the
+Prorab-confirmed snapshot from Step 1, not a live recomputation the way
+`CreatePayrollEntryCommand`'s own Piecework calc works — §8.10 explicitly
+says "точно, без допущений", the confirmed figure). **Hourly:** the
+Paid `PayrollEntry.CalculatedAmount` for each period, split across every
+object the worker logged hours on that period, proportional to each
+object's share of their total worked hours — reads §8.10's two Hourly
+bullets together ("Timesheet.ObjectId + HoursWorked" and "оплачиваемое
+отсутствие раскладывается пропорционально часам" — the *whole*
+`CalculatedAmount`, absence add-on included, follows the worked-hours
+ratio, since absence itself carries no `ObjectId` to split by directly).
+**Both halves gated on `PayrollEntry.Status = Paid`** — §8.10's own
+requirement ("Зарплата учтена только за закрытые периоды"), carried
+through to callers as `ObjectCostBreakdownDto.Note`, a fixed
+Russian-language string, since there's no web panel to render a UI
+disclaimer in.
+
+**Zone boundary, pre-resolved by the team-split doc itself — no ask
+needed this time.** §9.4 names this `GET /objects/{id}/cost-breakdown`, an
+`/objects/` route that belongs in `ObjectsController.cs` +
+`Application/Objects/` (Zone A). The team-split doc §4 already spells out
+this exact mirror case explicitly: "A вызывает готовые query B, не пишет
+свою версию расчёта." Built the query only — **не подключён к HTTP-эндпоинту.
+нужно от Ахмада:** `GET /objects/{id}/cost-breakdown` in
+`ObjectsController.cs` (Prorab+, per §9.4), calling
+`GetObjectCostBreakdownQuery` — no new logic needed there, just the route
++ role gate.
+
+**Flagged interpretation:** a worker with zero worked hours in an
+otherwise-Paid period (100% paid absence that period) has no hours ratio
+to allocate their earnings against and is skipped for this object-level
+view — MASTER doesn't cover this edge case, and their wage still counts
+in `PayrollEntry.FinalAmount` company-wide, just not attributed to any
+one object here.
+
+Verified against real Postgres (2/2, deleted after): a scenario with two
+`ConstructionObject`s, two `MaterialDelivery` rows on the target
+(10×5 + 3×20 = 110, a third delivery on the *other* object correctly
+excluded), a Paid Piecework worker's confirmed 500 share counted, a
+second Piecework worker's confirmed 300 share excluded (their
+`PayrollEntry` still `Draft`), and a Paid Hourly worker with 6h on the
+target object + 4h on the other object out of a 1000 `CalculatedAmount`
+period → allocated exactly `1000 × (6/10) = 600` to the target. Total:
+materials 110 + payroll (500 + 600) = **1210** exactly. Plus: an unknown
+`ObjectId` returns `OBJECT_NOT_FOUND`. Full suite: 70/70, no regressions.
+
 **Step 8 (Zone B) — фоновая задача: черновики за период.**
 First background job in this project — no `Hangfire`/`BackgroundService`
 infrastructure existed anywhere yet (Phase 3's shift-reminder job is still
@@ -1348,7 +1398,7 @@ regressions.
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` *(Settle() itself is Step 7's job — see write-up)* → MASTER §5.23, §8.8
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять *(Adjust() сам ещё не построен — см. write-up)* → MASTER §8.8
 - [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
-- [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
+- [x] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) *(query готова, эндпоинт — Zone A, см. write-up)* → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 - [ ] Step 11 [BE] — `PayrollEntry.Adjust()`: `POST /payroll/{id}/adjust`, Accountant-only, `AdjustmentReason` обязателен при `AdjustmentAmount ≠ 0` (`PAYROLL_ADJUSTMENT_REASON_REQUIRED`, уже в каталоге), только пока `Draft` → MASTER §8.8, §9.2 *(добавлено 2026-07-19 — реальный пробел в разбивке шагов: ни один из Steps 1-10 не строит эту сторону формулы, найдено при review перед коммитом Step 7)*
 
