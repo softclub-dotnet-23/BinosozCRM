@@ -53,6 +53,19 @@ public sealed class CreateTimesheetCommandHandler(IApplicationDbContext context,
         if (await context.Timesheets.AnyAsync(t => t.WorkerId == request.WorkerId && t.Date == request.Date, cancellationToken))
             return Result.Failure<TimesheetDto>(new Error("TIMESHEET_ALREADY_CHECKED_IN", "A timesheet already exists for this worker on this date."));
 
+        // §8.9's conflict guard, same as CheckInCommandHandler — only
+        // relevant when this correction is actually recording a real
+        // check-in (a blank/CheckOut-only entry doesn't claim the worker
+        // showed up, so there's nothing to conflict with an absence over).
+        if (request.CheckInAt is not null)
+        {
+            var hasConflictingAbsence = await context.AbsenceRecords.AnyAsync(
+                a => a.WorkerId == request.WorkerId && a.DateFrom <= request.Date && a.DateTo >= request.Date,
+                cancellationToken);
+            if (hasConflictingAbsence)
+                return Result.Failure<TimesheetDto>(new Error("TIMESHEET_ABSENCE_CONFLICT", "Worker has an AbsenceRecord covering this date."));
+        }
+
         var company = await context.Companies.FirstAsync(cancellationToken);
 
         var timesheet = Timesheet.Create(worker.CompanyId, worker.Id, request.ObjectId, request.Date, worker.ShiftStartTime, enteredManually: true);

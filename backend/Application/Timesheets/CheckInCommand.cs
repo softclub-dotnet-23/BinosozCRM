@@ -48,6 +48,16 @@ public sealed class CheckInCommandHandler(IApplicationDbContext context, ICurren
         var checkInAt = DateTimeOffset.UtcNow;
         var date = DateOnly.FromDateTime(checkInAt.UtcDateTime);
 
+        // §8.9: a day covered by AbsenceRecord is a "уважительное
+        // отсутствие" — a real check-in landing on that same day is the
+        // conflict §8.9 says not to silently guess at, so it's rejected
+        // here rather than quietly overwriting the absence with attendance.
+        var hasConflictingAbsence = await context.AbsenceRecords.AnyAsync(
+            a => a.WorkerId == request.WorkerId && a.DateFrom <= date && a.DateTo >= date,
+            cancellationToken);
+        if (hasConflictingAbsence)
+            return Result.Failure<TimesheetDto>(new Error("TIMESHEET_ABSENCE_CONFLICT", "Worker has an AbsenceRecord covering this date."));
+
         var timesheet = await context.Timesheets
             .FirstOrDefaultAsync(t => t.WorkerId == request.WorkerId && t.Date == date, cancellationToken);
 

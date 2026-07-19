@@ -20,6 +20,7 @@ public interface IApplicationDbContext
     DbSet<IndividualTask> IndividualTasks { get; }
     DbSet<TaskLog> TaskLogs { get; }
     DbSet<Timesheet> Timesheets { get; }
+    DbSet<AbsenceRecord> AbsenceRecords { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

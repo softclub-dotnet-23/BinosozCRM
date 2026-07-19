@@ -14,13 +14,53 @@
 `Phase2-summary.md` written; the phase isn't actually finished, just
 unblocked from further backend work until the bot returns).
 **Phase:** 3 — Явка, отсутствия, премии
-**Last completed:** Phase 3, Step 1
-**Next step:** Phase 3, Step 2 [BE] — `AbsenceRecord`: день с отсутствием
-не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER
-§5.21, §8.9
+**Last completed:** Phase 3, Step 2
+**Next step:** Phase 3, Step 3 [BE] — `Worker.TerminationDate` + lifecycle
+увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 84 tests, confirmed via `dotnet test` (58 pass locally, 26 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 3, Step 2 [BE] — `AbsenceRecord`.** Domain entity + EF config
+already existed; built the Application/API surface. New
+`AbsencesController`: `GET,POST /absences` — Prorab+/Accountant only, per
+§8.9's "создаёт прораб или бухгалтер (не бригадир — нужен
+документ/решение)" — the only controller in this codebase with zero
+Brigadir-reachable actions.
+
+**Judgment call, documented in code — no separate `/absences/{id}/approve`
+endpoint exists in §9.4's table**, unlike `WorkOrder`/`Timesheet`. Read
+that as: the creator's decision *is* the approval, since only
+Prorab+/Accountant can create an `AbsenceRecord` at all — `Approve()` is
+called immediately inside `CreateAbsenceRecordCommandHandler` rather than
+leaving `ApprovedByUserId` permanently `null` with no way to ever set it.
+
+**The two-way conflict from §8.9** ("человек отмечен И в отпуске —
+конфликт, 400: либо отметка ошибочна, либо отсутствие. Не угадывать."):
+`TIMESHEET_ABSENCE_CONFLICT` (already in the error catalog from Step 1,
+unused until now) fires from both directions —
+`CreateAbsenceRecordCommandHandler` rejects filing an absence over a date
+range that already has a real check-in, and `CheckInCommandHandler` (plus
+`CreateTimesheetCommand`'s backdated-correction path, when it's actually
+recording a check-in) rejects a check-in landing on a day already covered
+by an `AbsenceRecord`. Neither guesses which side is wrong — both are
+rejected outright, per the literal "не угадывать."
+
+**`ListAbsenceRecordsQuery` is company-wide, not object-scoped** — another
+judgment call: §9.4 lists `GET /absences` without an "(own)"/object
+qualifier (unlike `WorkOrder`'s explicit "(own, read)"), and
+`AbsenceRecord` has no `ObjectId` field to scope by in the first place —
+the automatic `CompanyId` filter is the only isolation axis available.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, including a temporary
+`Microsoft.EntityFrameworkCore.InMemory` reference added and reverted from
+`Directory.Packages.props`/the test csproj, no trace left): filing an
+absence over an existing check-in is rejected; checking in during a filed
+absence is rejected; non-overlapping dates succeed cleanly on both sides.
+Docker still unavailable — suite count unchanged (84 total, 58 pass, 26
+need Docker); numeric-example tests for lateness/absence interaction are
+Step 7's job.
 
 **Phase 3, Step 1 [BE] — `Timesheet` + `LateMinutes` computed at
 check-in.** Domain entity + `TimesheetConfiguration` already existed
@@ -963,7 +1003,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
 
 - [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
-- [ ] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
+- [x] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
 - [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
