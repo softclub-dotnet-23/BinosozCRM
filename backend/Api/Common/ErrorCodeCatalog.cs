@@ -81,6 +81,7 @@ public static class ErrorCodeCatalog
         ["MATERIAL_CONSUMPTION_REPORT_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["MATERIAL_REQUEST_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["MATERIAL_REQUEST_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
+        ["MATERIAL_DELIVERY_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,

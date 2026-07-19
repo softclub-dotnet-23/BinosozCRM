@@ -5,16 +5,28 @@
 
 ## Current Status
 **Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 2 (Zone B) — `MaterialRequest` +
-`QtyDelivered` + статус `PartiallyDelivered`
-**Next step:** Phase 4, Step 3 [BE] Zone B — `MaterialDelivery` +
-**авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
+**Last completed:** Phase 4, Step 3 (Zone B) — `MaterialDelivery` +
+авто-переход по `Σ Qty`
+**Next step:** Phase 4, Step 4 [BE] Zone B — `MaterialShortageReported`
+при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **60/60 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 3 (Zone B) — `MaterialDelivery` + авто-переход по `Σ Qty`.**
+`Application/MaterialDeliveries/` (Create/List/Get, Prorab+ only — no
+Brigadir per §9.4) + `MaterialDeliveriesController`. `RecordDelivery()`
+(Domain, Phase 0) drives the auto-transition when a delivery links to a
+request; added a same-object consistency check and an `IsOverDelivered`
+flag on `MaterialRequestDto` for §9.2's `MATERIAL_REQUEST_OVERDELIVERY`
+("200, UI warning, not an error") — no UI to warn in, so it's a response
+field instead. Verified via Theory + 4 Facts against real Postgres (7/7,
+deleted): partial/full/over-delivery transitions, accumulating partials,
+unlinked deliveries, cross-object rejection, wrong-status rejection.
+Permanent tests are Step 6's job. Full suite: 60/60, no regressions.
 
 **Step 2 (Zone B) — `MaterialRequest` + `QtyDelivered` + `PartiallyDelivered`.**
 Domain already had every transition method needed (`Approve`, `Reject`,
@@ -971,7 +983,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 - [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
-- [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
+- [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2

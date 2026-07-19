@@ -23,6 +23,7 @@ public interface IApplicationDbContext
     DbSet<AbsenceRecord> AbsenceRecords { get; }
     DbSet<MaterialConsumptionReport> MaterialConsumptionReports { get; }
     DbSet<MaterialRequest> MaterialRequests { get; }
+    DbSet<MaterialDelivery> MaterialDeliveries { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
