@@ -15,6 +15,45 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 3 [BE] — `CalculatedAmount`, the "критичный" §8.0
+formula.** New `CalculatedAmountCalculator` (Application/Payroll,
+internal) implements both branches exactly:
+
+- **Hourly**: Σ(`Timesheet.HoursWorked × Worker.PayRate`) over the period,
+  counting only `ApprovedAt IS NOT NULL` timesheets.
+- **Piecework**: driven from the worker's own `WorkOrderPayoutShare` rows
+  (Step 1), each order gated on `Status ∈ {Accepted, Closed}` and
+  `CompletedDate` inside the period; `OrderTotal = Σ ReportedQty ×
+  UnitPrice` (fact, never `PlannedQty`), `WorkerAmount = OrderTotal ×
+  SharePercent/100`.
+- **Paid absences** (shared by both): `IsPaid=true` `AbsenceRecord` days
+  overlapping the period × an average daily rate (`Σ HoursWorked over the
+  last 3 months / worked days × PayRate`, falling back to `8h × PayRate`
+  under 10 days of history).
+
+`POST /payroll` (Accountant/Owner) — `GeneratePayrollDraftCommand`
+generates or recomputes a `Draft` `PayrollEntry` per active worker for a
+period, idempotently: re-running preserves `LatenessDeductionAmount`/
+`BonusAmount`/`AdvanceDeductedAmount` on any entry still `Draft` (those
+three are Steps 4/5/6, not built yet), and skips entries already
+`Approved`/`Paid` entirely. Per §8.0's explicit closing rule, a
+zero-activity worker still gets a `Draft` row at `CalculatedAmount = 0`,
+never a silent omission. `GET /payroll` — company-wide list.
+
+Verified with 5 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 5/5 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session) — critically, **both of MASTER's own worked examples
+check out exactly**: Hourly → `160×40 + 2×8×40 = 7040` сомони; Piecework
+split → `5400 × {50%,30%,20%} = 2700/1620/1080` on a plastering order.
+Also verified: zero activity still creates a `Draft` row at 0 rather than
+omitting the worker; an unapproved timesheet contributes nothing;
+regenerating a draft recomputes `CalculatedAmount` without duplicating the
+row or clobbering a `BonusAmount` a later step had already set. Docker
+still unavailable — suite count unchanged (104 total, 69 pass, 35 need
+Docker); no new permanent tests this step (§8.0/§8.1/§8.8 numeric-example
+tests are Step 10's job).
+
 **Phase 5, Step 1 [BE] — `WorkOrderPayoutShare` + Σ`SharePercent = 100`
 invariant.** `PUT /work-orders/{id}/payout-shares` (Brigadir, own brigade,
 gated on `WorkOrder.Status == InProgress`) — replaces the entire share set
@@ -56,11 +95,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 1
-**Next step:** Phase 5, Step 2 [BOT] — флоу распределения долей при
-закрытии наряда *(отложено — см. §15)*. Next actionable backend step:
-Phase 5, Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые
-табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
+**Last completed:** Phase 5, Step 3
+**Next step:** Phase 5, Step 4 [BE] — `LatenessDeductionAmount` за период
+→ MASTER §8.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1305,7 +1342,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
+- [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
