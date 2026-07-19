@@ -5,15 +5,46 @@
 
 ## Current Status
 **Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 1 (Zone B) — `MaterialConsumptionReport`
-**Next step:** Phase 4, Step 2 [BE] Zone B — `MaterialRequest` +
-`QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
+**Last completed:** Phase 4, Step 2 (Zone B) — `MaterialRequest` +
+`QtyDelivered` + статус `PartiallyDelivered`
+**Next step:** Phase 4, Step 3 [BE] Zone B — `MaterialDelivery` +
+**авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **60/60 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 2 (Zone B) — `MaterialRequest` + `QtyDelivered` + `PartiallyDelivered`.**
+Domain already had every transition method needed (`Approve`, `Reject`,
+`MarkOrdered`, `RecordDelivery`, `ForceDeliver`) — Ahmad had clearly
+anticipated this exact state machine in Phase 0. `Application/MaterialRequests/`
+— Create (Brigadir, own brigade), Approve/Reject/MarkOrdered/ForceClose
+(Prorab+, object-isolated), List/Get. `Api/Controllers/MaterialRequestsController.cs`
+— asymmetric split per §9.4 (`Brigadir(C) / Prorab+(R)`), same pattern as
+`MaterialConsumptionReport`.
+
+**Flagged, not silently worked around — a real Domain gap:** §7.3/§9.4 both
+require an "обязательный комментарий" on force-close, but `MaterialRequest`
+has no `Comment`/`Reason` field, and `ForceDeliver()` takes no such
+parameter. The comment is validated as required at the API boundary (so
+the contract matches MASTER) but is currently discarded, not persisted.
+**нужно от Ахмада:** add a `Comment` field to `MaterialRequest`.
+
+**Flagged, built anyway:** `/ordered` (Approved→Ordered) has no named §9.4
+endpoint — same "state machine needs it, table doesn't name it" gap as
+WorkOrder's Assign/Start/Close in Phase 2 Step 1. `RecordDelivery` (the
+actual Σ-Qty auto-transition) is untouched — that's Step 3.
+
+Verified with a throwaway check against real Postgres (5/5, deleted
+after): full happy path Requested→Approved→Ordered; re-approving an
+already-approved request fails cleanly, not an exception; `Reject` works
+from `Approved`, not just `Requested` — Domain's guard is wider than the
+ASCII diagram's arrow first suggested; force-close correctly blocked
+before `PartiallyDelivered`, succeeds after (simulating Step 3's
+not-yet-built delivery recording directly); non-Brigadir caller gets
+`BRIGADE_NOT_FOUND` on create. Full suite: 60/60, no regressions.
 
 **Step 1 (Zone B) — `MaterialConsumptionReport`.**
 `Application/MaterialConsumptionReports/` — `UpsertMaterialConsumptionReportCommand`
@@ -939,7 +970,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** независима от Phase 3, идёт после ядра.
 
 - [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
-- [ ] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
+- [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4

@@ -33,6 +33,13 @@ namespace Api.Common;
 // it. Cross-aggregate guard, so it lives in the Application handler, not
 // Worker.Terminate() itself (a plain Domain mutator, no Result).
 //
+// MATERIAL_REQUEST_NOT_FOUND / MATERIAL_REQUEST_INVALID_TRANSITION (Phase 4
+// Step 2): same "not in §9.2's table" pattern as WORK_ORDER_*. Note:
+// force-close's "обязательный комментарий" (§7.3/§9.4) is validated at the
+// Application boundary but currently has nowhere to persist — MaterialRequest
+// has no Comment field. Flagged as "нужно от Ахмада" in
+// ForceCloseMaterialRequestCommand, not silently dropped without a trace.
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -72,6 +79,8 @@ public static class ErrorCodeCatalog
         ["TIMESHEET_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["ABSENCE_RECORD_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["MATERIAL_CONSUMPTION_REPORT_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["MATERIAL_REQUEST_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["MATERIAL_REQUEST_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
