@@ -4,19 +4,42 @@
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
 ## Current Status
-**Phase:** 3 — Явка, отсутствия, премии
-**Last completed:** Phase 3, Step 3 (Zone B) — `Worker.TerminationDate` +
-lifecycle увольнения
-**Next step:** Phase 3, Steps 4-6 [BOT] отложены (см. §15) — переходим к
-Step 7 [BE] Zone B — тесты: `LateMinutes` на числовых примерах §8.1,
-grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9 (no bot
-dependency, unlike Phase 2's Step 9 — safe to do now)
+**Phase:** 4 — Материалы
+**Last completed:** Phase 3, Step 7 (Zone B) — тесты: `LateMinutes`
+числовые примеры, grace-период, отсутствие вместо прогула. **Phase 3's
+backend scope is now fully done** — Steps 4-6 [BOT] stay deferred (см.
+§15); next work is Phase 4.
+**Next step:** Phase 4, Step 1 [BE] Zone B — `MaterialConsumptionReport`
+(уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — **41/41 passing**, confirmed for
+**Tests:** `Tests/Api.IntegrationTests` — **60/60 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 7 (Zone B) — тесты: `LateMinutes`, grace-период, отсутствие вместо прогула.**
+Promoted Steps 1-2's throwaway verification into permanent, committed
+tests — same split Phase 2 Step 9 used. `TimesheetTests.cs` (7 tests,
+including a 9-case `[Theory]` covering both §8.1 worked examples
+individually — every value from the 15/0/40/10 lateness set at grace=0
+and grace=5, plus a separate grace-exceeds-lateness clamp check) +
+`AbsenceRecordTests.cs` (6 tests, the bidirectional "не угадывать"
+conflict guard from Step 2).
+
+**Caught a real bug while writing these — in the test helper, not the
+implementation.** `TimesheetTests`' seed helper used `shiftStartTime ??
+new TimeOnly(8, 0)`, which silently coalesced an explicitly-passed `null`
+back to 8:00 — so the "`LateMinutes` is null when `ShiftStartTime` unset"
+test was actually exercising a worker *with* a shift time configured, and
+only failed once written as a real assertion instead of a throwaway.
+Fixed by replacing the nullable-with-`??`-fallback pattern with an
+explicit `hasShiftStartTime` bool parameter, which can't be silently
+defeated the same way — worth remembering as a general trap for any
+future test helper mixing optional nullable params with `??` defaults.
+
+Full suite: **60/60** (41 previous + 19 new), no regressions. This closes
+out Phase 3's entire backend scope — Steps 4-6 (`[BOT]`) remain deferred.
 
 **Step 3 (Zone B) — `Worker.TerminationDate` + lifecycle увольнения.**
 Retrofitted two Phase 1 Step 2 files — `IndividualTask` didn't exist back
@@ -884,7 +907,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §15)* → MASTER §8.7, §10.4
-- [ ] Step 7 [BE] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
+- [x] Step 7 [BE] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
 
 ## Phase 4 — Материалы
 **Goal:** независима от Phase 3, идёт после ядра.
@@ -898,6 +921,16 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 ## Phase 5 — Зарплата
 **Goal:** зависит от всего. Здесь считаются реальные деньги реальных людей.
+
+**Незакрытый хвост из Phase 3 Step 3:** `TerminateWorkerCommand` сейчас
+реализует только 2 из 5 пунктов увольнения по MASTER §8.9 (блокировка по
+открытым `IndividualTask` + `IsActive=false`/уход из ростера). Как только
+`PayrollEntry` появится здесь (Step 3/7) — нужно вернуться в
+`TerminateWorkerCommand` и добавить пункты 3-4: досрочное формирование
+`PayrollEntry` за период до `TerminationDate` включительно, и зачёт
+непогашенных `PayrollAdvance` в этот финальный расчёт (отрицательный
+`FinalAmount` — это долг, не обнулять). Без этого увольнение технически
+работает, но не закрывает расчёт с человеком.
 
 - [ ] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
