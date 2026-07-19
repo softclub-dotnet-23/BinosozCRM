@@ -5,16 +5,40 @@
 
 ## Current Status
 **Phase:** 3 — Явка, отсутствия, премии
-**Last completed:** Phase 3, Step 1 (Zone B) — `Timesheet` + `LateMinutes`
-**Next step:** Phase 3, Step 2 [BE] Zone B — `AbsenceRecord`: день с
-отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400
-→ MASTER §5.21, §8.9
+**Last completed:** Phase 3, Step 2 (Zone B) — `AbsenceRecord`
+**Next step:** Phase 3, Step 3 [BE] Zone B — `Worker.TerminationDate` +
+lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **41/41 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 2 (Zone B) — `AbsenceRecord`.**
+`Application/AbsenceRecords/` — `CreateAbsenceRecordCommand` (Owner/Prorab/
+Accountant, never Brigadir — §8.9: "нужен документ/решение"), List/Get.
+Creation *is* the approval decision — `Approve()` called immediately by the
+creator, since §9.4 lists no separate approve endpoint for this entity
+(unlike `Timesheet`). Optional `Document` upload reuses the exact
+`IPhotoStorageService`/signed-URL mechanism from `WorkOrderProgress` (§8.9:
+"тот же механизм"). **Limitation, flagged not fixed:** allow-list is still
+image-only (jpeg/png/webp) — a real medical certificate might be a PDF;
+widening the allow-list is a deliberate call, not made here.
+
+Also retrofitted Step 1's own `CheckInTimesheetCommand`/
+`CreateManualTimesheetCommand`: §8.9's "Пересечение с `Timesheet` ...
+конфликт, 400 ... не угадывать" is bidirectional — Step 1 only had the
+forward check (creating an absence while a timesheet already exists); now
+both directions reject with `TIMESHEET_ABSENCE_CONFLICT`, whichever record
+is attempted second, regardless of order.
+
+Verified with a throwaway check against real Postgres (6/6, deleted
+after): create succeeds and auto-approves; forward conflict rejected;
+**reverse conflict** (check-in against an existing `AbsenceRecord`)
+rejected — the case Step 1 alone would have missed; document upload
+round-trips storage-key → signed-URL; `DateTo < DateFrom` and `Reason`
+length validation. Full suite: 41/41, no regressions.
 
 **Step 1 (Zone B) — `Timesheet` + `LateMinutes`.**
 `Application/Timesheets/` — `CheckInTimesheetCommand` (Brigadir, own-brigade
@@ -828,7 +852,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
 
 - [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
-- [ ] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
+- [x] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
 - [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4

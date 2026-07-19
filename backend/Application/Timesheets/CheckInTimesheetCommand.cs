@@ -48,6 +48,15 @@ public sealed class CheckInTimesheetCommandHandler(IApplicationDbContext context
         if (await context.Timesheets.AnyAsync(t => t.WorkerId == request.WorkerId && t.Date == today, cancellationToken))
             return Result.Failure<TimesheetDto>(new Error("TIMESHEET_ALREADY_CHECKED_IN", "Worker already checked in today."));
 
+        // MASTER §8.9: the same "attendance vs. absence, don't guess" 400
+        // applies in this direction too — checking in during a date an
+        // AbsenceRecord already covers is exactly the conflict it names.
+        var hasApprovedAbsence = await context.AbsenceRecords.AnyAsync(
+            a => a.WorkerId == request.WorkerId && a.DateFrom <= today && a.DateTo >= today, cancellationToken);
+        if (hasApprovedAbsence)
+            return Result.Failure<TimesheetDto>(new Error(
+                "TIMESHEET_ABSENCE_CONFLICT", "Worker has an approved absence covering today."));
+
         var company = await context.Companies.FirstAsync(c => c.Id == worker.CompanyId, cancellationToken);
 
         var timesheet = Timesheet.Create(worker.CompanyId, worker.Id, request.ObjectId, today, worker.ShiftStartTime);

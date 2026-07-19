@@ -48,6 +48,13 @@ public sealed class CreateManualTimesheetCommandHandler(IApplicationDbContext co
         if (await context.Timesheets.AnyAsync(t => t.WorkerId == request.WorkerId && t.Date == request.Date, cancellationToken))
             return Result.Failure<TimesheetDto>(new Error("TIMESHEET_ALREADY_CHECKED_IN", "A timesheet for this worker and date already exists."));
 
+        // MASTER §8.9: same conflict as the check-in path — see that file's comment.
+        var hasApprovedAbsence = await context.AbsenceRecords.AnyAsync(
+            a => a.WorkerId == request.WorkerId && a.DateFrom <= request.Date && a.DateTo >= request.Date, cancellationToken);
+        if (hasApprovedAbsence)
+            return Result.Failure<TimesheetDto>(new Error(
+                "TIMESHEET_ABSENCE_CONFLICT", "Worker has an approved absence covering this date."));
+
         var company = await context.Companies.FirstAsync(c => c.Id == worker.CompanyId, cancellationToken);
 
         var timesheet = Timesheet.Create(worker.CompanyId, worker.Id, request.ObjectId, request.Date, worker.ShiftStartTime, enteredManually: true);
