@@ -52,9 +52,15 @@ namespace Api.Common;
 // existing Domain guard — POST /payroll is an upsert (create-or-recalculate,
 // see CreatePayrollEntryCommand), and a second call against an
 // already-Approved/Paid entry must fail cleanly, not silently overwrite a
-// locked-in FinalAmount. PAYROLL_ENTRY_INVALID_TRANSITION (Domain already
-// defines it, for Approve()/Pay()) isn't wired to an Application handler
-// yet — Step 7's job.
+// locked-in FinalAmount.
+//
+// PAYROLL_ENTRY_INVALID_TRANSITION (Phase 5 Step 7): Domain's own guard on
+// Approve()/Pay(), now wired up. PAYROLL_ENTRY_RECALCULATION_REQUIRED
+// (Phase 5 Step 7, not in §9.2's table): ApprovePayrollEntryCommand's own
+// safety check — if an advance was issued (or settled elsewhere) after this
+// entry's AdvanceDeductedAmount was last computed, the two sums no longer
+// match, and approving would lock in a stale FinalAmount. Caller must
+// recalculate via POST /payroll first.
 //
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
@@ -104,6 +110,8 @@ public static class ErrorCodeCatalog
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ENTRY_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ENTRY_NOT_DRAFT"] = StatusCodes.Status400BadRequest,
+        ["PAYROLL_ENTRY_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
+        ["PAYROLL_ENTRY_RECALCULATION_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
         ["PRORAB_NOT_ASSIGNED_TO_OBJECT"] = StatusCodes.Status404NotFound,
         ["PRORAB_ALREADY_ASSIGNED"] = StatusCodes.Status409Conflict,

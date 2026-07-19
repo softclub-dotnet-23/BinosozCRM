@@ -5,11 +5,10 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 6 (Zone B) — `PayrollAdvance` +
-`AdvanceDeductedAmount`
-**Next step:** Phase 5, Step 7 [BE] Zone B — `PayrollEntry.Approve()`:
-`FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment →
-MASTER §8.8
+**Last completed:** Phase 5, Step 7 (Zone B) — `PayrollEntry.Approve()` +
+`Pay()`, `FinalAmount`
+**Next step:** Phase 5, Step 8 [BE] Zone B — фоновая задача: черновики за
+период + алерт, если не сформировалась → MASTER §11.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1153,6 +1152,53 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 7 (Zone B) — `PayrollEntry.Approve()` + `Pay()`.**
+`Application/Payroll/ApprovePayrollEntryCommand.cs` (`POST
+/payroll/{id}/approve`) calls the existing `PayrollEntry.Approve()`
+(Domain, Phase 0 — already computes `FinalAmount` exactly per §8.8's
+formula, negative values already left alone, not clamped), then settles
+every advance the entry's `AdvanceDeductedAmount` was actually computed
+from (`§8.8`: "каждому учтённому авансу проставляется
+SettledInPayrollEntryId"). `PayPayrollEntryCommand.cs` (`POST
+/payroll/{id}/pay`) built alongside it — §9.4 lists them on the same line
+("approve | pay"), and leaving `Pay()` permanently unreachable would leave
+`PayrollEntryStatus`'s own state machine (`Draft → Approved → Paid`)
+incomplete. Writes `AdminAuditLog(PayrollPaid)` explicitly, same reason as
+Step 6's `AdvanceIssued` — the interceptor only watches `Modified`, and
+`PayrollEntry.Status` goes from `Approved` to `Paid` via a plain mutator,
+not tracked there anyway. Both endpoints are `Owner,Accountant` — §9.4 and
+§12 agree this time (Owner's "RA" includes the "A" here), no conflict like
+Create's.
+
+**New safety check, not directly stated in MASTER but a real gap
+otherwise:** before approving, re-queries the same unsettled-advance set
+`CreatePayrollEntryCommand` used and compares the sum to the entry's
+stored `AdvanceDeductedAmount`. If they've diverged — a new advance
+issued, or another entry raced to settle one, since the Draft was last
+computed — rejects with the new `PAYROLL_ENTRY_RECALCULATION_REQUIRED`
+rather than silently locking in a `FinalAmount` that no longer reflects
+reality. Caller must `POST /payroll` again first.
+
+**Correctly out of scope, flagged not built:** `PayrollEntry.Adjust()`
+(Domain, already exists — manual correction with a mandatory reason, per
+§8.8's "Бухгалтер решает — перенести на следующий период
+(`AdjustmentAmount`) или удержать") has no §9.4-named endpoint and no
+caller yet. `AdjustmentAmount` stays at 0 for every entry produced so
+far — a real, separate feature, not required for `Approve()`/`Pay()` to
+work correctly, and not invented here without a named endpoint to match.
+
+Verified against real Postgres (5/5, deleted after): approving settles the
+counted advance (`SettledInPayrollEntryId` now points at this entry) and
+correctly locks a **negative** `FinalAmount` (-10000, a 10000 advance
+against 0 earned — not clamped to zero); approving a non-`Draft` entry
+fails (`PAYROLL_ENTRY_INVALID_TRANSITION`); an advance issued *after* the
+draft was computed blocks approval (`PAYROLL_ENTRY_RECALCULATION_REQUIRED`);
+`Pay()` before `Approve()` fails the same way, succeeds after, and writes
+the `AdminAuditLog(PayrollPaid)` row; a full worked-example run through
+the real `Approve` command (not calling Domain directly, unlike Step 6's
+check) with `CalculatedAmount` 7040 and a 3000 advance produces
+`FinalAmount = 4040.00` exactly. Full suite: 70/70, no regressions.
+
 **Step 6 (Zone B) — `PayrollAdvance` + `AdvanceDeductedAmount`.**
 `Application/PayrollAdvances/` — `CreatePayrollAdvanceCommand` (`POST
 /payroll-advances`, Accountant/Owner — §9.4 and §12 agree this time, no
@@ -1252,10 +1298,11 @@ regressions.
 - [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7 *(только payroll-сторона — см. заметку ниже)*
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` *(Settle() itself is Step 7's job — see write-up)* → MASTER §5.23, §8.8
-- [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
+- [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять *(Adjust() сам ещё не построен — см. write-up)* → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
+- [ ] Step 11 [BE] — `PayrollEntry.Adjust()`: `POST /payroll/{id}/adjust`, Accountant-only, `AdjustmentReason` обязателен при `AdjustmentAmount ≠ 0` (`PAYROLL_ADJUSTMENT_REASON_REQUIRED`, уже в каталоге), только пока `Draft` → MASTER §8.8, §9.2 *(добавлено 2026-07-19 — реальный пробел в разбивке шагов: ни один из Steps 1-10 не строит эту сторону формулы, найдено при review перед коммитом Step 7)*
 
 ## Phase 6 — Полировка и запуск
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.

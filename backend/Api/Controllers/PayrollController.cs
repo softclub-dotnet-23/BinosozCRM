@@ -11,7 +11,9 @@ namespace Api.Controllers;
 // row only, enforced in the handlers). Create is Accountant-only, per §12's
 // literal role matrix (Owner is R+A there, not C) — an explicit business
 // decision, since §9.4's endpoint list names Owner for POST too; see
-// PROGRESS.md Phase 5 Step 3.
+// PROGRESS.md Phase 5 Step 3. Approve/Pay are Owner+Accountant, per §9.4's
+// literal text and §12's "RA" for Owner (the "A" is exactly this) — no
+// conflict this time, unlike Create.
 [ApiController]
 [Route("api/v1/payroll")]
 [Authorize(Roles = "Owner,Accountant,Brigadir")]
@@ -40,6 +42,22 @@ public sealed class PayrollController(ISender sender) : ControllerBase
     {
         var command = new CreatePayrollEntryCommand(request.WorkerId, request.PeriodStart, request.PeriodEnd);
         var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{payrollEntryId:guid}/approve")]
+    [Authorize(Roles = "Owner,Accountant")]
+    public async Task<IActionResult> Approve(Guid payrollEntryId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ApprovePayrollEntryCommand(payrollEntryId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{payrollEntryId:guid}/pay")]
+    [Authorize(Roles = "Owner,Accountant")]
+    public async Task<IActionResult> Pay(Guid payrollEntryId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new PayPayrollEntryCommand(payrollEntryId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }
