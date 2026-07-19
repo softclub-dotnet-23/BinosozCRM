@@ -19,7 +19,10 @@ public sealed class AcceptWorkOrderCommandValidator : AbstractValidator<AcceptWo
     }
 }
 
-public sealed class AcceptWorkOrderCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class AcceptWorkOrderCommandHandler(
+    IApplicationDbContext context,
+    ICurrentUserService currentUser,
+    IWorkOrderRealtimeNotifier notifier)
     : IRequestHandler<AcceptWorkOrderCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(AcceptWorkOrderCommand request, CancellationToken cancellationToken)
@@ -45,6 +48,8 @@ public sealed class AcceptWorkOrderCommandHandler(IApplicationDbContext context,
             currentUser.UserId!.Value);
 
         await context.SaveChangesAsync(cancellationToken);
+
+        await notifier.NotifyStatusChangedAsync(order.CompanyId, order.Id, fromStatus.ToString(), order.Status.ToString(), cancellationToken);
 
         return Result.Success(WorkOrderDto.FromEntity(order));
     }

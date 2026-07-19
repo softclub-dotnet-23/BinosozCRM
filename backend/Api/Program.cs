@@ -1,8 +1,11 @@
 using System.Text;
 using Api.Common;
+using Api.Hubs;
 using Api.Middleware;
 using Api.RateLimiting;
+using Api.Realtime;
 using Application;
+using Application.Common.Interfaces;
 using Application.Common.Options;
 using Application.Seed;
 using Application.Workers;
@@ -55,9 +58,31 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };
+
+        // SignalR's browser client can't set an Authorization header on the
+        // WebSocket handshake — it sends the access token as a query-string
+        // parameter instead. Only accept that fallback for the hub's own
+        // path, never for regular REST requests.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs/work-orders"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddSignalR();
+builder.Services.AddScoped<IWorkOrderRealtimeNotifier, SignalRWorkOrderNotifier>();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -144,6 +169,7 @@ app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 
 app.MapControllers();
+app.MapHub<WorkOrdersHub>("/hubs/work-orders");
 
 // /health = liveness only, no dependency checks (Predicate excludes all
 // registered checks) — orchestrator just wants "is the process alive".

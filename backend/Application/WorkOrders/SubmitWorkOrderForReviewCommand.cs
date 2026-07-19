@@ -33,7 +33,10 @@ public sealed class SubmitWorkOrderForReviewCommandValidator : AbstractValidator
     }
 }
 
-public sealed class SubmitWorkOrderForReviewCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class SubmitWorkOrderForReviewCommandHandler(
+    IApplicationDbContext context,
+    ICurrentUserService currentUser,
+    IWorkOrderRealtimeNotifier notifier)
     : IRequestHandler<SubmitWorkOrderForReviewCommand, Result<WorkOrderDto>>
 {
     public async Task<Result<WorkOrderDto>> Handle(SubmitWorkOrderForReviewCommand request, CancellationToken cancellationToken)
@@ -77,6 +80,8 @@ public sealed class SubmitWorkOrderForReviewCommandHandler(IApplicationDbContext
             currentUser.UserId!.Value);
 
         await context.SaveChangesAsync(cancellationToken);
+
+        await notifier.NotifyStatusChangedAsync(order.CompanyId, order.Id, fromStatus.ToString(), order.Status.ToString(), cancellationToken);
 
         return Result.Success(WorkOrderDto.FromEntity(order));
     }
