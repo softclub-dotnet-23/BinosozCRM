@@ -29,6 +29,10 @@ public sealed class PostgresFixture : IAsyncLifetime
     public const string SeedOwner2Password = "test-seed-owner-2-password";
     public const string SeedOwner3Password = "test-seed-owner-3-password";
 
+    // For CustomWebApplicationFactory — the one HTTP-level test host needs
+    // the same container every CreateDbContext() call already points at.
+    public string ConnectionString => _container.GetConnectionString();
+
     public async Task InitializeAsync()
     {
         await _container.StartAsync();

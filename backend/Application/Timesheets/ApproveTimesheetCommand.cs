@@ -10,6 +10,9 @@ namespace Application.Timesheets;
 // MASTER §8.0: only Prorab-approved timesheets (ApprovedAt IS NOT NULL)
 // count toward payroll later — approval itself is Phase 5's dependency,
 // this step only provides the action.
+// Role restriction lives on TimesheetsController's Approve action
+// ([Authorize(Roles = "Prorab")], Owner excluded) — see that controller's
+// comment for why, corrected in Phase 5 Step 1.
 public sealed record ApproveTimesheetCommand(Guid TimesheetId) : IRequest<Result<TimesheetDto>>;
 
 public sealed class ApproveTimesheetCommandValidator : AbstractValidator<ApproveTimesheetCommand>

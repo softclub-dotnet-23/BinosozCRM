@@ -40,6 +40,13 @@ namespace Api.Common;
 // has no Comment field. Flagged as "нужно от Ахмада" in
 // ForceCloseMaterialRequestCommand, not silently dropped without a trace.
 //
+// WORK_ORDER_PAYOUT_SHARES_LOCKED / WORK_ORDER_PAYOUT_SHARE_WRONG_BRIGADE
+// (Phase 5 Step 1): not in §9.2's table — §7.3's boundary case ("доли можно
+// переписать, пока не Accepted") implies a lock after Accepted that isn't
+// spelled out as its own error code; WRONG_BRIGADE mirrors
+// INDIVIDUAL_TASK_WRONG_BRIGADE's precedent (a share for a worker outside
+// the work order's own brigade is a 400, not silently accepted).
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -67,6 +74,8 @@ public static class ErrorCodeCatalog
         ["WORK_ORDER_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORK_ORDER_SHARES_INVALID"] = StatusCodes.Status400BadRequest,
+        ["WORK_ORDER_PAYOUT_SHARES_LOCKED"] = StatusCodes.Status400BadRequest,
+        ["WORK_ORDER_PAYOUT_SHARE_WRONG_BRIGADE"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NO_PROGRESS"] = StatusCodes.Status400BadRequest,
         ["WORK_ORDER_NOT_IN_PROGRESS"] = StatusCodes.Status400BadRequest,
         ["PHOTO_TOO_LARGE"] = StatusCodes.Status400BadRequest,

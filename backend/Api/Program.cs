@@ -176,3 +176,9 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 app.MapHealthChecks("/health/ready");
 
 app.Run();
+
+// Exposes the top-level-statement Program for WebApplicationFactory<Program>
+// in Api.IntegrationTests — the auto-generated Program class is internal by
+// default, which generic type argument resolution from another assembly
+// can't see.
+public partial class Program;

@@ -5,12 +5,14 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 4, Step 6 (Zone B) — тесты: авто-переход при
-частичной/полной/пере-поставке
-**Next step:** Phase 5, Step 1 [BE] Zone B — `WorkOrderPayoutShare` +
-инвариант `Σ SharePercent = 100` → MASTER §5.13, §1.1
+**Last completed:** Phase 5, Step 1 (Zone B) — `WorkOrderPayoutShare` +
+инвариант `Σ SharePercent = 100`
+**Next step:** Phase 5, Step 2 [BOT] — флоу распределения долей при закрытии
+наряда *(отложено — см. §15)* → следующий актуальный шаг: Phase 5, Step 3
+[BE] Zone B — `CalculatedAmount` (Hourly + Piecework + оплачиваемые
+отсутствия) → MASTER §8.0
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — **68/68 passing**, confirmed for
+**Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
@@ -1025,7 +1027,80 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 `FinalAmount` — это долг, не обнулять). Без этого увольнение технически
 работает, но не закрывает расчёт с человеком.
 
-- [ ] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
+**Step 1 (Zone B) — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100`.**
+`Application/WorkOrderPayoutShares/` — `PUT .../payout-shares` (Brigadir,
+own brigade): full-set replace, not per-row, so the 100% invariant is
+checked atomically per §5.13's own note; rejects if the work order is
+already `Accepted`/`Closed` (new code `WORK_ORDER_PAYOUT_SHARES_LOCKED`) or
+any worker is outside the brigade (new code
+`WORK_ORDER_PAYOUT_SHARE_WRONG_BRIGADE`, same precedent as
+`INDIVIDUAL_TASK_WRONG_BRIGADE`). Rewriting an already-approved set clears
+the stale `ApprovedByUserId`/`Amount` — a Brigadir editing shares after
+Rejected→InProgress rework must get re-approved, not keep a snapshot from
+the old numbers. `POST .../payout-shares/approve` (Prorab+): snapshots
+`Amount = Σ(WorkOrderProgress.ReportedQty) × UnitPrice × SharePercent/100`
+per share (§8.0's Piecework formula, reused here as a per-order snapshot —
+Step 3 will later aggregate it across a whole payroll period). `GET` open
+to all four roles with the usual own-brigade/own-object narrowing.
+
+**Flagged, built anyway (same "state machine needs it, table doesn't name
+it" pattern as WorkOrder's Assign/Start/Close and MaterialRequest's
+/ordered):** §9.4 names only the `PUT`; the `approve` endpoint doesn't
+appear there, but §12's role matrix explicitly grants Prorab "A" and
+`WorkOrderPayoutShare.Approve()` already existed in Domain expecting an
+amount, so building it was the smaller gap than leaving Domain's method
+uncallable.
+
+**Asked, then corrected by an explicit business decision:** §12's role
+matrix lists `WorkOrderPayoutShare` as Owner:`R` / Prorab:`RA` — Owner
+without approve rights, unlike almost every other row where Owner ⊇
+Prorab. First pass followed the codebase's existing precedent instead
+(Timesheet's `ApproveTimesheetCommand`/`TimesheetsController` already lets
+Owner through on an identically-shaped table row) — flagged to the user
+before committing. **Decision: follow §12 literally for both.**
+`WorkOrderPayoutSharesController.Approve` is now `[Authorize(Roles =
+"Prorab")]` (Owner excluded), and the same pre-existing gap in
+`TimesheetsController.Approve` was corrected the same way, same session —
+it previously inherited the class-level `"Owner,Prorab"` policy.
+
+**New test infrastructure — first HTTP-level test in this project.**
+Every prior test (all 68) calls a MediatR handler directly against
+`PostgresFixture`, bypassing `[Authorize]` entirely — that pattern
+structurally cannot prove a role restriction actually blocks a request,
+since nothing inside either handler checks role (only the controller
+attribute does). Added `CustomWebApplicationFactory : WebApplicationFactory<Program>`
+(`Program.cs` gained a trailing `public partial class Program;` so the
+test assembly can reference the top-level-statement entry point) and
+`ApproveEndpointRoleAuthorizationTests.cs`, asserting `403 Forbidden` for
+an Owner-role JWT (minted directly via `JwtTokenService`, no DB row
+needed — a role check rejects before the handler or DB is ever touched)
+against both `/work-orders/{id}/payout-shares/approve` and
+`/timesheets/{id}/approve`. **Gotcha hit and fixed:** config supplied via
+`ConfigureWebHost`/`ConfigureAppConfiguration` was silently too late —
+`Program.cs`'s `AddInfrastructure(builder.Configuration)` reads the
+connection string eagerly, before `builder.Build()`, which is before
+`WebApplicationFactory`'s host interception can layer anything in. Fixed
+by setting process environment variables in the factory's constructor
+instead (same mechanism `PostgresFixture` already uses for
+`SEED_OWNER_*_PASSWORD`) — read fresh by `CreateBuilder(args)` whenever
+`Main()` actually runs, which is deferred until the first `CreateClient()`
+call. Also had to force `ASPNETCORE_ENVIRONMENT=Testing`: the default
+"Development" environment would have loaded `appsettings.Development.json`,
+which carries a real local-dev Postgres connection string that silently
+out-ranked the Testcontainers one.
+
+Verified against real Postgres (7/7, deleted after): valid 100% split
+saves; 90% split rejected (`WORK_ORDER_SHARES_INVALID`); a worker from
+another brigade rejected (`WORK_ORDER_PAYOUT_SHARE_WRONG_BRIGADE`); a
+brigadir from a different brigade gets `WORK_ORDER_NOT_FOUND` (404, not
+403); approve computes and snapshots the correct `Amount`
+(`45m² × 120 × 100% = 5400.00`), and a subsequent rewrite clears that
+snapshot back to `null`; approving with zero shares set is rejected;
+shares can no longer be written once the work order is `Accepted`. Plus
+the 2 new permanent HTTP-level authorization tests. Full suite: 70/70, no
+regressions.
+
+- [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1

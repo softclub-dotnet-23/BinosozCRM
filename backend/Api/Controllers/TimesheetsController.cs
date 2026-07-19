@@ -8,9 +8,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace Api.Controllers;
 
 // MASTER §9.4: GET,POST /timesheets (Prorab+ / Brigadir-own read), POST
-// /timesheets/check-in and /{id}/check-out (Brigadir), /{id}/approve
-// (Prorab+). Every endpoint here is literally named in §9.4 — no
-// inference needed this step.
+// /timesheets/check-in and /{id}/check-out (Brigadir). Every endpoint here
+// is literally named in §9.4 — no inference needed this step.
+// /{id}/approve is Prorab-only, per §12's literal role-matrix row
+// (`Timesheet | R | RA | ...` — Owner is R only, no A). Previously allowed
+// Owner too via the class-level policy; corrected to match §12 exactly as
+// an explicit business decision made alongside the identical
+// WorkOrderPayoutShare.Approve gap (Phase 5 Step 1, see PROGRESS.md) —
+// this codebase's usual "Owner ⊇ Prorab" default does not apply here.
 [ApiController]
 [Route("api/v1/timesheets")]
 [Authorize(Roles = "Owner,Prorab")]
@@ -62,6 +67,7 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{timesheetId:guid}/approve")]
+    [Authorize(Roles = "Prorab")]
     public async Task<IActionResult> Approve(Guid timesheetId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new ApproveTimesheetCommand(timesheetId), cancellationToken);
