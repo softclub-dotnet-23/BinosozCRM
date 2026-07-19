@@ -7,17 +7,49 @@
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 5
-**Next step:** Phase 2, Step 6 [BOT] — `TelegramLinkCode` + `TelegramLink` +
-`/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2. Steps 6–8 are
-all `[BOT]` and deferred by the same 2026-07-18 decision — the next
-actually-actionable backend work is whatever's left of Step 9 [FULL]
-(transition/isolation tests are backend-testable now; the bot-idempotency
-half of Step 9 stays blocked until the bot returns). Flag this for the user
-before picking either.
+**Last completed:** Phase 2, Step 9 — **backend-testable half only**
+(transition + isolation tests). Checklist item stays **unchecked**: §10.3's
+bot-idempotency tests are still blocked on the same 2026-07-18 bot
+deferral as Steps 6–8. Decided with the user: do the backend half now
+rather than block all of Step 9 on the bot's return.
+**Next step:** Phase 2's remaining `[BE]` work is exhausted — everything
+left unchecked (Steps 6–8 `[BOT]`, the bot-idempotency slice of Step 9) is
+blocked on the bot deferral. Needs a decision with the user: revisit the
+bot deferral, or move on to Phase 3 backend-only steps and treat Phase 2 as
+functionally done for now.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 22 tests, confirmed via `dotnet test` (5 pass locally, 17 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 84 tests, confirmed via `dotnet test` (58 pass locally, 26 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 2, Step 9 [FULL] — тесты (backend half only).** MASTER §7.1/§7.2
+call for "все переходы (разрешённые + запрещённые), изоляция бригады
+(404)"; §10.3's bot-idempotency tests are out of reach until the bot
+deferral is revisited. Built the two halves that are actually testable
+today, 62 new tests total:
+
+- `WorkOrderStateMachineTests.cs` / `IndividualTaskStateMachineTests.cs`
+  (pure domain, no DB — 53 tests): every allowed edge of both state
+  machines plus every disallowed edge from every reachable state via
+  `[Theory]`, including `WorkOrder.Rework`/`Close` and
+  `IndividualTask.ProposeBonus`/`ApproveBonus` — none of which have an API
+  handler yet, but the entity guards exist and needed covering per §7.1/
+  §7.2's literal "все переходы." Caught my own wrong assumption while
+  writing these: `IndividualTask.CompletedEarly` is `DueAt is not null &&
+  completedAt < DueAt.Value` — with no `DueAt` at all that's `false`, not
+  `null` (nullable represents "not yet computed pre-`Done`," not
+  "unknown"). Test was wrong, not the code; fixed the test.
+- `WorkOrderIsolationTests.cs` / `IndividualTaskIsolationTests.cs` (real
+  Postgres via `PostgresFixture`, mirrors Phase 1 Step 7's style — 9 tests):
+  Prorab object-assignment isolation and Brigadir cross-brigade rejection
+  (404, not 403) for the handlers Steps 1–3 actually built, plus `TaskLog`
+  correctness — right `FromStatus`/`ToStatus` pairs, `Reject`'s reason
+  landing in `Comment`, two log rows in the right order across
+  Assign→Start.
+
+Suite total: 84 (was 22) — 58 pass locally (Docker-free), 26 need Docker
+(17 pre-existing + 9 new), confirmed every one of the 26 fails in ~1ms with
+`DockerUnavailableException`, not a real assertion failure. **Checklist
+item left unchecked** — this is half of Step 9, not all of it.
 
 **Phase 2, Step 5 [BE] — SignalR-хаб, группы из claims, события после
 `SaveChanges`.** New `WorkOrdersHub` (`Api/Hubs`) at `/hubs/work-orders`,
