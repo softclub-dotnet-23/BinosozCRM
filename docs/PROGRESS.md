@@ -5,16 +5,28 @@
 
 ## Current Status
 **Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 3 (Zone B) — `MaterialDelivery` +
-авто-переход по `Σ Qty`
-**Next step:** Phase 4, Step 4 [BE] Zone B — `MaterialShortageReported`
-при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
+**Last completed:** Phase 4, Step 4 (Zone B) — `MaterialShortageReported`
+**Next step:** Phase 4, Step 6 [BE] Zone B — тесты: авто-переход при
+частичной/полной/пере-поставке → MASTER §8.2 (Step 5 [BOT] отложен, см. §15)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **60/60 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 4 (Zone B) — `MaterialShortageReported`.**
+Extended Ahmad's `IRealtimeNotifier`/`SignalRRealtimeNotifier` (shared
+SignalR infra, Phase 2 Step 5) with the event, wired into
+`UpsertMaterialConsumptionReportCommand` — fires whenever a report lands
+with `QtyShortage > 0`, including on the update path, strictly after
+`SaveChanges`. **Scope decision, flagged:** broadcasts to the whole
+company group, same reach as `WorkOrderStatusChanged` — no per-role/
+per-object SignalR targeting exists yet, and building one just for this
+event would be disproportionate. Verified (Theory + Fact, 3/3 against
+real Postgres, deleted after): no notify without shortage, correct
+payload on shortage, re-notify on a correcting update that introduces
+one. Full suite: 60/60, no regressions.
 
 **Step 3 (Zone B) — `MaterialDelivery` + авто-переход по `Σ Qty`.**
 `Application/MaterialDeliveries/` (Create/List/Get, Prorab+ only — no
@@ -984,7 +996,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 - [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
-- [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
+- [x] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
