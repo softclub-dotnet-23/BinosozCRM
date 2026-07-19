@@ -1,5 +1,6 @@
 using Application.Common;
 using Application.Common.Interfaces;
+using Application.Common.Notifications;
 using Domain.Common;
 using Domain.Entities;
 using FluentValidation;
@@ -35,7 +36,8 @@ public sealed class UpsertMaterialConsumptionReportCommandValidator : AbstractVa
     }
 }
 
-public sealed class UpsertMaterialConsumptionReportCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class UpsertMaterialConsumptionReportCommandHandler(
+    IApplicationDbContext context, ICurrentUserService currentUser, IRealtimeNotifier notifier)
     : IRequestHandler<UpsertMaterialConsumptionReportCommand, Result<MaterialConsumptionReportDto>>
 {
     public async Task<Result<MaterialConsumptionReportDto>> Handle(
@@ -55,19 +57,32 @@ public sealed class UpsertMaterialConsumptionReportCommandHandler(IApplicationDb
                  && r.MaterialName == request.MaterialName && r.Date == today,
             cancellationToken);
 
+        MaterialConsumptionReport report;
         if (existing is not null)
         {
             existing.UpdateUsage(request.QtyUsed, request.QtyShortage, request.Comment);
-            await context.SaveChangesAsync(cancellationToken);
-            return Result.Success(MaterialConsumptionReportDto.FromEntity(existing));
+            report = existing;
+        }
+        else
+        {
+            report = MaterialConsumptionReport.Create(
+                currentUser.CompanyId!.Value, request.ObjectId, ownBrigadeId.Value, currentUser.UserId!.Value,
+                today, request.MaterialName, request.Unit, request.QtyUsed, request.QtyShortage, request.Comment);
+            context.MaterialConsumptionReports.Add(report);
         }
 
-        var report = MaterialConsumptionReport.Create(
-            currentUser.CompanyId!.Value, request.ObjectId, ownBrigadeId.Value, currentUser.UserId!.Value,
-            today, request.MaterialName, request.Unit, request.QtyUsed, request.QtyShortage, request.Comment);
-
-        context.MaterialConsumptionReports.Add(report);
         await context.SaveChangesAsync(cancellationToken);
+
+        // MASTER §8.2: fired every time a report lands with QtyShortage > 0
+        // — including on the update path (a Brigadir correcting the
+        // evening's numbers into a shortage they hadn't reported yet).
+        // Strictly after SaveChanges, per §9.4's "события после SaveChanges".
+        if (report.QtyShortage > 0)
+        {
+            var notification = new MaterialShortageReportedNotification(
+                report.Id, report.ObjectId, report.MaterialName, report.Unit, report.QtyShortage, report.Date);
+            await notifier.NotifyMaterialShortageReportedAsync(report.CompanyId, notification, cancellationToken);
+        }
 
         return Result.Success(MaterialConsumptionReportDto.FromEntity(report));
     }

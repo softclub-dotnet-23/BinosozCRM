@@ -10,4 +10,12 @@ public interface IRealtimeNotifier
 {
     Task NotifyWorkOrderStatusChangedAsync(
         Guid companyId, Guid brigadeId, WorkOrderStatusChangedNotification notification, CancellationToken cancellationToken);
+
+    // MASTER §8.2: "событие MaterialShortageReported прорабу сразу, не
+    // дожидаясь оформления заявки." Broadcast to the whole company group
+    // (same reach as WorkOrderStatusChanged) — no per-object/per-Prorab
+    // targeting exists yet for SignalR groups, and building one just for
+    // this event would be disproportionate scope for a single notification.
+    Task NotifyMaterialShortageReportedAsync(
+        Guid companyId, MaterialShortageReportedNotification notification, CancellationToken cancellationToken);
 }

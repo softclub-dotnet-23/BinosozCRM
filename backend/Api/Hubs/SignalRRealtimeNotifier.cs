@@ -17,4 +17,11 @@ public sealed class SignalRRealtimeNotifier(IHubContext<WorkOrdersHub> hubContex
         await hubContext.Clients.Group(WorkOrderHubGroups.Brigade(brigadeId))
             .SendAsync("WorkOrderStatusChanged", notification, cancellationToken);
     }
+
+    public async Task NotifyMaterialShortageReportedAsync(
+        Guid companyId, MaterialShortageReportedNotification notification, CancellationToken cancellationToken)
+    {
+        await hubContext.Clients.Group(WorkOrderHubGroups.Company(companyId))
+            .SendAsync("MaterialShortageReported", notification, cancellationToken);
+    }
 }
