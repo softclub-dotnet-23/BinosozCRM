@@ -15,6 +15,38 @@ blocked on the 2026-07-18 bot deferral. No phase-summary files written for
 either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
+**Phase 5, Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` +
+`SettledInPayrollEntryId`.** `POST /payroll-advances` (Accountant/Owner)
+issues a `PayrollAdvance`, writing an explicit `AdminAuditLog` entry
+(`AdvanceIssued`) — the existing `AdminAuditSaveChangesInterceptor` only
+watches *modified* rows on `User`/`Worker`/`Brigade` for its current
+actions, not newly-created rows of a different entity, so this is logged
+directly in the handler rather than extending the interceptor for one
+more event shape.
+
+New `AdvanceDeductedAmountCalculator`: Σ unsettled
+(`SettledInPayrollEntryId IS NULL`) advances with `IssuedAt ≤ PeriodEnd`,
+implementing §8.8's formula exactly — an advance issued after `PeriodEnd`
+correctly rolls into the next period rather than this one. Wired into
+`GeneratePayrollDraftCommandHandler` alongside the other three
+calculators — draft generation now sets all four of `CalculatedAmount`/
+`LatenessDeductionAmount`/`BonusAmount`/`AdvanceDeductedAmount` together,
+no field left half-computed.
+
+`SettledInPayrollEntryId` itself only gets *set* at `PayrollEntry
+.Approve()` time — that's Step 7's job, not built here; this step only
+reads the field to exclude already-settled advances from a new draft.
+
+Verified with 4 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 4/4 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): issuing an advance writes the audit log entry; an
+unsettled advance within the period reduces the draft; an advance issued
+after `PeriodEnd` doesn't count for that period; a settled advance
+(simulating what Step 7 will do) drops out of future recomputation
+entirely. Docker still unavailable — suite count unchanged (104 total, 69
+pass, 35 need Docker).
+
 **Phase 5, Step 5 [BE] — подтверждение премии → `BonusAmount` в расчёт по
 `CompletedAt`.** Bonus proposal rides on `/complete` itself — a judgment
 call, documented in code: §9.4 lists no separate "propose bonus" endpoint,
@@ -156,9 +188,10 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 5
-**Next step:** Phase 5, Step 6 [BE] — `PayrollAdvance` +
-`AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
+**Last completed:** Phase 5, Step 6
+**Next step:** Phase 5, Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount`
+= Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный
+результат допустим**, не обнулять → MASTER §8.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1406,7 +1439,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
-- [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
+- [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10

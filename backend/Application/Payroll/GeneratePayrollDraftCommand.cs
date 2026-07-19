@@ -18,12 +18,11 @@ namespace Application.Payroll;
 //
 // Idempotent per (WorkerId, PeriodStart, PeriodEnd): re-running this for
 // the same period recomputes CalculatedAmount, LatenessDeductionAmount
-// (Step 4), and BonusAmount (Step 5) on any entry still in Draft,
-// preserving whatever AdvanceDeductedAmount it already has (Step 6, not
-// built yet). An entry that's already Approved or Paid is left untouched
-// entirely — PayrollEntry.UpdateDraft's own guard would reject the write
-// anyway, but skipping it here avoids wasting a query result on a status
-// that will simply fail.
+// (Step 4), BonusAmount (Step 5), and AdvanceDeductedAmount (Step 6) on
+// any entry still in Draft. An entry that's already Approved or Paid is
+// left untouched entirely — PayrollEntry.UpdateDraft's own guard would
+// reject the write anyway, but skipping it here avoids wasting a query
+// result on a status that will simply fail.
 public sealed record GeneratePayrollDraftCommand(DateOnly PeriodStart, DateOnly PeriodEnd) : IRequest<Result<List<PayrollEntryDto>>>;
 
 public sealed class GeneratePayrollDraftCommandValidator : AbstractValidator<GeneratePayrollDraftCommand>
@@ -60,17 +59,15 @@ public sealed class GeneratePayrollDraftCommandHandler(IApplicationDbContext con
             var calculatedAmount = await CalculatedAmountCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
             var latenessDeductionAmount = await LatenessDeductionCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
             var bonusAmount = await BonusAmountCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
+            var advanceDeductedAmount = await AdvanceDeductedAmountCalculator.ComputeAsync(context, worker, request.PeriodEnd, cancellationToken);
 
             if (existing is null)
             {
                 existing = PayrollEntry.Create(worker.CompanyId, worker.Id, request.PeriodStart, request.PeriodEnd);
                 context.PayrollEntries.Add(existing);
-                existing.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, 0);
             }
-            else
-            {
-                existing.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, existing.AdvanceDeductedAmount);
-            }
+
+            existing.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, advanceDeductedAmount);
 
             results.Add(PayrollEntryDto.FromEntity(existing));
         }
