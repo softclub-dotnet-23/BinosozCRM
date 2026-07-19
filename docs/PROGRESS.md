@@ -16,12 +16,51 @@ either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
 **Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 1
-**Next step:** Phase 4, Step 2 [BE] — `MaterialRequest` + `QtyDelivered` +
-статус `PartiallyDelivered` → MASTER §5.17, §7.3
+**Last completed:** Phase 4, Step 2
+**Next step:** Phase 4, Step 3 [BE] — `MaterialDelivery` + **авто-переход**
+заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 99 tests, confirmed via `dotnet test` (69 pass locally, 30 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 4, Step 2 [BE] — `MaterialRequest` + `QtyDelivered` +
+`PartiallyDelivered` status.** Domain entity + EF config already existed,
+including the full §7.3 state machine (`Approve`/`Reject`/`MarkOrdered`/
+`RecordDelivery`/`ForceDeliver`). Built the Application/API surface for
+this step's own scope: `POST,GET /material-requests` (Brigadir creates,
+own brigade; Prorab+ reads only — same literal `Brigadir(C) / Prorab+(R)`
+split as Step 1's consumption reports), `POST /{id}/approve|reject`
+(Prorab+, new `MaterialRequestAccess` mirrors `WorkOrderAccess` — scoped by
+`ProrabObjectAssignment` on the request's `ObjectId`).
+
+**`Reject` takes no reason here** — unlike `WorkOrder.Reject`, neither
+§9.4 nor §7.3 require one for `MaterialRequest`, and there's no
+`TaskLog`-equivalent audit trail for this entity to write it into, so
+nothing was invented to match `WorkOrder`'s pattern.
+
+**Deliberately not built — `MarkOrdered`, `/force-close`, anything
+delivery-driven.** `RecordDelivery`'s precondition (`Ordered` or
+`PartiallyDelivered`) can't be reached without `MaterialDelivery`, which
+doesn't have an Application layer yet — that's Step 3's job. Exposing
+`/force-close` now would guard a transition (`PartiallyDelivered →
+Delivered`) nothing can ever trigger yet, same reasoning Phase 2 Step 1
+used to defer `WorkOrder`'s transition endpoints until `TaskLog` existed.
+
+New `MATERIAL_REQUEST_NOT_FOUND` (404) and `MATERIAL_REQUEST_INVALID_TRANSITION`
+(400, matches the existing fallback but listed explicitly for consistency
+with `WORK_ORDER_INVALID_TRANSITION`/`INDIVIDUAL_TASK_INVALID_TRANSITION`)
+added to `ErrorCodeCatalog`.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): create → approve transitions `Requested → Approved`
+correctly; reject then a subsequent approve attempt fails with
+`MATERIAL_REQUEST_INVALID_TRANSITION`; a Prorab with an assignment
+elsewhere (not on this request's object) is blocked with
+`PRORAB_NOT_ASSIGNED_TO_OBJECT`. Docker still unavailable — suite count
+unchanged (99 total, 69 pass, 30 need Docker); auto-transition tests are
+Step 6's job.
 
 **Phase 4, Step 1 [BE] — `MaterialConsumptionReport`.** Domain entity +
 EF config (including the unique `(BrigadeId, ObjectId, MaterialName,
@@ -1120,7 +1159,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** независима от Phase 3, идёт после ядра.
 
 - [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
-- [ ] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
+- [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4

@@ -11,8 +11,9 @@ namespace Api.Common;
 // CUSTOMER_NOT_FOUND / OBJECT_NOT_FOUND (Phase 1 Step 1), ESTIMATE_ITEM_NOT_FOUND
 // (Phase 2 Step 1), INDIVIDUAL_TASK_NOT_FOUND (Phase 2 Step 2, a task
 // belonging to another brigade — §4's "не видит чужие бригады (404, не
-// 403)"), TIMESHEET_NOT_FOUND (Phase 3 Step 1, same reasoning): same pattern
-// as WORK_ORDER_NOT_FOUND / PRORAB_NOT_ASSIGNED_TO_OBJECT — a route or body
+// 403)"), TIMESHEET_NOT_FOUND (Phase 3 Step 1), MATERIAL_REQUEST_NOT_FOUND
+// (Phase 4 Step 2), same reasoning throughout: same pattern as
+// WORK_ORDER_NOT_FOUND / PRORAB_NOT_ASSIGNED_TO_OBJECT — a route or body
 // reference to another company's/brigade's row (or no row at all) reads as
 // 404, not 400/403, per MASTER §11.5 rule 2. Not in §9.2's table either,
 // same as PASSWORD_CHANGE_REQUIRED above.
@@ -62,6 +63,8 @@ public static class ErrorCodeCatalog
         ["TIMESHEET_ALREADY_CHECKED_IN"] = StatusCodes.Status400BadRequest,
         ["TIMESHEET_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["TIMESHEET_ABSENCE_CONFLICT"] = StatusCodes.Status400BadRequest,
+        ["MATERIAL_REQUEST_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
+        ["MATERIAL_REQUEST_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,

@@ -22,6 +22,7 @@ public interface IApplicationDbContext
     DbSet<Timesheet> Timesheets { get; }
     DbSet<AbsenceRecord> AbsenceRecords { get; }
     DbSet<MaterialConsumptionReport> MaterialConsumptionReports { get; }
+    DbSet<MaterialRequest> MaterialRequests { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
