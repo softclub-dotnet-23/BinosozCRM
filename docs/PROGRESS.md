@@ -6,7 +6,11 @@
 ## Current Status
 **Phase:** 6 — Полировка и запуск (Phase 5 — все 11 BE-шагов закрыты;
 Step 2 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 11 (Zone B) — `PayrollEntry.Adjust()`
+**Last completed:** Phase 5, Step 11 (Zone B) — `PayrollEntry.Adjust()`.
+Also, out of sequence (Ahmad, coordination priority over the next step per
+the `ahmad` skill's own rule): `MaterialRequest.Comment` — closes the
+"нужно от Ахмада" gap flagged since Phase 4 Step 2, see that entry below
+for the write-up.
 **Next step:** Phase 6, Step 1 [BE] — `GET /dashboard/work-status` →
 MASTER §8.6. **Не Zone B**: по team-split doc (§6) Phase 6 "не
 разделяется по зонам", но Steps 1/2/5 конкретно — `WorkOrder`/
@@ -71,6 +75,24 @@ has no `Comment`/`Reason` field, and `ForceDeliver()` takes no such
 parameter. The comment is validated as required at the API boundary (so
 the contract matches MASTER) but is currently discarded, not persisted.
 **нужно от Ахмада:** add a `Comment` field to `MaterialRequest`.
+
+**Resolved (Ahmad, 2026-07-19, out of sequence — see Current Status):**
+added `MaterialRequest.Comment` (nullable `varchar(1000)`) and changed
+`ForceDeliver()` to `ForceDeliver(string comment)`
+(`AddCommentToMaterialRequest` migration — one `AddColumn`, additive,
+no backfill). This is a breaking Domain signature change with exactly one
+call site (`ForceCloseMaterialRequestCommand.cs`), so the two changes are
+atomic — the solution doesn't build split across a commit boundary
+otherwise. Per explicit user approval, Ahmad also made the one-line
+call-site fix in Shahrom's file (`materialRequest.ForceDeliver(request.Comment)`)
+as a one-time cross-zone exception, not a standing practice.
+
+**Follow-up (Shahrom, same day, explicit user request):**
+`MaterialRequestDto`/`FromEntity` now exposes `Comment` too — the field
+was persisted-but-write-only for exactly one turn between Ahmad's fix and
+this one. Verified against real Postgres (1/1, deleted after): a
+force-closed request's comment round-trips through the DTO exactly.
+Full suite: 79/79, no regressions.
 
 **Flagged, built anyway:** `/ordered` (Approved→Ordered) has no named §9.4
 endpoint — same "state machine needs it, table doesn't name it" gap as

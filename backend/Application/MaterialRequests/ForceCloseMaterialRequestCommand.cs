@@ -10,16 +10,11 @@ namespace Application.MaterialRequests;
 // MASTER §9.4: "POST /material-requests/{id}/force-close Prorab+ ←
 // недопоставка, комментарий обязателен." §7.3: "Прораб может вручную
 // закрыть в Delivered при недопоставке ... с обязательным комментарием."
-//
-// GAP, flagged not silently worked around: MaterialRequest (§5.17) has no
-// Comment/Reason field at all, and Domain's ForceDeliver() takes no
-// comment parameter — there is nowhere on this entity to persist the
-// "обязательный комментарий" MASTER requires. Comment is still required
-// here (FluentValidation) so the API contract matches MASTER's stated
-// rule, but it is currently validated and then discarded, not stored.
-// нужно от Ахмада: MaterialRequest needs a Comment (or similar) field to
-// actually hold this justification — Domain/Persistence-Configurations is
-// exclusively his to touch.
+// MaterialRequest.Comment + ForceDeliver(string) landed from Ahmad
+// (Domain/Persistence/migration — his files) same session this gap was
+// flagged; this line updated to match as a one-time cross-zone exception,
+// since the two changes are atomic (the solution doesn't build split
+// across a commit boundary otherwise).
 public sealed record ForceCloseMaterialRequestCommand(Guid MaterialRequestId, string Comment) : IRequest<Result<MaterialRequestDto>>;
 
 public sealed class ForceCloseMaterialRequestCommandValidator : AbstractValidator<ForceCloseMaterialRequestCommand>
@@ -44,7 +39,7 @@ public sealed class ForceCloseMaterialRequestCommandHandler(IApplicationDbContex
         if (allowedObjectIds is not null && !allowedObjectIds.Contains(materialRequest.ObjectId))
             return Result.Failure<MaterialRequestDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
-        var result = materialRequest.ForceDeliver();
+        var result = materialRequest.ForceDeliver(request.Comment);
         if (result.IsFailure)
             return Result.Failure<MaterialRequestDto>(result.Error);
 

@@ -17,11 +17,15 @@ public sealed record MaterialRequestDto(
     DateTimeOffset RequestedAt,
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? DeliveredAt,
+    string? Comment,
     bool IsOverDelivered)
 {
     // MASTER §9.2: MATERIAL_REQUEST_OVERDELIVERY is explicitly "200, не
     // ошибка — предупреждение в UI". With no web panel, this DTO field is
     // the warning — the caller (bot/script) decides how to surface it.
+    // Comment: set only by ForceClose (§7.3's "обязательный комментарий")
+    // — Ahmad's MaterialRequest.Comment field landed 2026-07-19, this DTO
+    // was write-only until now.
     public static MaterialRequestDto FromEntity(MaterialRequest request) => new(
         request.Id,
         request.ObjectId,
@@ -36,5 +40,6 @@ public sealed record MaterialRequestDto(
         request.RequestedAt,
         request.ApprovedAt,
         request.DeliveredAt,
+        request.Comment,
         request.QtyDelivered > request.Qty);
 }

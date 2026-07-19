@@ -18,6 +18,7 @@ public sealed class MaterialRequest : AuditableEntity, ICompanyOwned, ISoftDelet
     public DateTimeOffset RequestedAt { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
     public DateTimeOffset? DeliveredAt { get; private set; }
+    public string? Comment { get; private set; }
     public bool IsDeleted { get; set; }
 
     private MaterialRequest() { }
@@ -87,12 +88,13 @@ public sealed class MaterialRequest : AuditableEntity, ICompanyOwned, ISoftDelet
         return Result.Success();
     }
 
-    public Result ForceDeliver()
+    public Result ForceDeliver(string comment)
     {
         if (Status != MaterialRequestStatus.PartiallyDelivered)
             return InvalidTransition();
 
         Status = MaterialRequestStatus.Delivered;
+        Comment = comment;
         return Result.Success();
     }
 
