@@ -17,6 +17,40 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Phase 6, Step 1 [BE] — `GET /dashboard/work-status`.** First step of the
+"polish + launch-readiness" phase. Single handler aggregating
+`WorkOrder.Status` and `IndividualTask.Status` together, per §8.6: status
+counts for each entity, plus separate overdue counts (`DueDate`/`DueAt` in
+the past, status not final — `Accepted`/`Closed` for `WorkOrder`, `Done`
+for `IndividualTask`). Read-only, no actions — matches §8.6's explicit
+"действия — в карточке конкретной сущности."
+
+Optional `objectId`/`brigadeId` query filters. `IndividualTask` has no
+direct `ObjectId`, so an object filter scopes it through its optional
+`WorkOrderId` link — a standalone personal task (no linked `WorkOrder`) is
+excluded when filtering by object, the natural reading rather than an
+invented rule.
+
+**Isolation, a documented judgment call**: `WorkOrder` counts respect
+`ProrabObjectAssignment` (the established Prorab isolation axis) — an
+explicit `objectId` filter is checked against it
+(`PRORAB_NOT_ASSIGNED_TO_OBJECT` if not allowed). `IndividualTask` counts
+are company-wide for Prorab+ — this codebase has no established
+per-object isolation rule for `IndividualTask` at all (it's Brigadir-own-
+brigade scoped everywhere else it appears, never Prorab-object scoped),
+and an aggregate count carries far less exposure risk than a data-access
+endpoint would, so nothing was invented to fill that gap.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): status counts and overdue detection aggregate
+correctly across both entities in a mixed scenario; the object filter
+correctly scopes `IndividualTask` through its linked `WorkOrder` and
+excludes both other-object and standalone tasks; Prorab isolation on an
+explicit object filter is enforced. Docker still unavailable — suite
+count unchanged (108 total, 69 pass, 39 need Docker).
+
 **Phase 5, Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8.**
 New permanent `PayrollNumericExampleTests.cs` (real Postgres via
 `PostgresFixture`, mirrors the session's established isolation-test
@@ -334,10 +368,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 5, Step 10 — **Phase 5 is now functionally
-complete for backend** (all 10 steps done except Step 2 `[BOT]`, deferred).
-**Next step:** Phase 6, Step 1 [BE] — `GET /dashboard/work-status`
-(агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
+**Last completed:** Phase 6, Step 1
+**Next step:** Phase 6, Step 2 [BE] — фоновая задача просрочки и
+уведомления → MASTER §9.4
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1594,7 +1627,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 6 — Полировка и запуск
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.
 
-- [ ] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
+- [x] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
 - [ ] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
 - [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) *(отложено — см. §15)* → MASTER §10.3
 - [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §15)* → MASTER §10.6
