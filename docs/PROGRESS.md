@@ -5,10 +5,10 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 7 (Zone B) — `PayrollEntry.Approve()` +
-`Pay()`, `FinalAmount`
-**Next step:** Phase 5, Step 8 [BE] Zone B — фоновая задача: черновики за
-период + алерт, если не сформировалась → MASTER §11.8
+**Last completed:** Phase 5, Step 8 (Zone B) — фоновая задача: черновики за
+период
+**Next step:** Phase 5, Step 9 [BE] Zone B — `GET /objects/{id}/cost-breakdown`
+→ MASTER §8.10
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1152,6 +1152,54 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 8 (Zone B) — фоновая задача: черновики за период.**
+First background job in this project — no `Hangfire`/`BackgroundService`
+infrastructure existed anywhere yet (Phase 3's shift-reminder job is still
+`[BOT]`-deferred). **Asked, then decided: plain `BackgroundService`, not
+Hangfire** — MASTER's stack table allows either, and Hangfire would mean
+new job-storage tables/a dashboard for a project with exactly one job so
+far. `Api/BackgroundJobs/PayrollDraftBackgroundService.cs` is a thin
+`PeriodicTimer` loop (runs once immediately at startup, then every 24h);
+all the real logic lives in `Application/Payroll/PayrollDraftGenerator.cs`,
+directly unit-testable without the hosting lifecycle.
+
+**Deliberately self-healing, not boundary-triggered.** §11.8's own
+justification for alerting — "черновик зарплаты не сформировался =
+бухгалтер не заметит до конца месяца" — argues against a design that only
+fires exactly on the period-boundary day (a missed run, e.g. server down
+that day, would silently skip that period forever). Instead,
+`GetMostRecentlyEndedPeriod(today, periodType)` always computes a valid
+period regardless of which day `today` happens to be — every run
+recomputes "whichever period most recently ended" and upserts Drafts for
+it via the same `CreatePayrollEntryCommand` every manual `POST /payroll`
+call uses, for every `IsActive` worker. A day that's mid-period is a safe
+no-op re-run (upsert), not a skip.
+
+**"Alert" scoped to what this project actually has:** Serilog structured
+`LogError`, not a push/paging channel — no such service exists anywhere
+in this codebase yet (Phase 6 Step 7's own "мониторинг" step is still the
+one that's supposed to build real alerting). A per-worker
+`CreatePayrollEntryCommand` failure other than the benign
+`PAYROLL_ENTRY_NOT_DRAFT` (an already-Approved/Paid entry — expected once
+an Accountant has moved it forward, not a failure) logs at Error; a
+whole-run exception (e.g. DB unreachable) is caught and logged the same
+way, one level up.
+
+**Flagged interpretation:** `SemiMonthly`'s exact day split (1st-15th /
+16th-end-of-month) isn't spelled out in MASTER — the standard convention,
+defaulted here since §15's 12 open questions don't cover it.
+
+Verified against real Postgres (6/6, deleted after): `GetMostRecentlyEndedPeriod`
+against 5 cases spanning both period types and multiple "today" values
+within the same period (confirming the self-healing property — day 15 and
+day 20 of August both correctly resolve to the same just-ended
+1st-15th `SemiMonthly` period); an end-to-end run against a real company
+with 2 active + 1 terminated worker creates exactly 2 Drafts, none for
+the terminated worker, and a second run doesn't duplicate (`PayrollEntry`'s
+own unique constraint plus the upsert). Confirmed no side effects on the
+two existing `WebApplicationFactory`-based tests, which now boot the full
+app with this job registered — full suite 70/70, no regressions.
+
 **Step 7 (Zone B) — `PayrollEntry.Approve()` + `Pay()`.**
 `Application/Payroll/ApprovePayrollEntryCommand.cs` (`POST
 /payroll/{id}/approve`) calls the existing `PayrollEntry.Approve()`
@@ -1299,7 +1347,7 @@ regressions.
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7 *(только payroll-сторона — см. заметку ниже)*
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` *(Settle() itself is Step 7's job — see write-up)* → MASTER §5.23, §8.8
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять *(Adjust() сам ещё не построен — см. write-up)* → MASTER §8.8
-- [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
+- [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
 - [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 - [ ] Step 11 [BE] — `PayrollEntry.Adjust()`: `POST /payroll/{id}/adjust`, Accountant-only, `AdjustmentReason` обязателен при `AdjustmentAmount ≠ 0` (`PAYROLL_ADJUSTMENT_REASON_REQUIRED`, уже в каталоге), только пока `Draft` → MASTER §8.8, §9.2 *(добавлено 2026-07-19 — реальный пробел в разбивке шагов: ни один из Steps 1-10 не строит эту сторону формулы, найдено при review перед коммитом Step 7)*

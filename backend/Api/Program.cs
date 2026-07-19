@@ -1,4 +1,5 @@
 using System.Text;
+using Api.BackgroundJobs;
 using Api.Common;
 using Api.Hubs;
 using Api.Middleware;
@@ -6,6 +7,7 @@ using Api.RateLimiting;
 using Application;
 using Application.Common.Interfaces;
 using Application.Common.Options;
+using Application.Payroll;
 using Application.Seed;
 using Infrastructure;
 using Infrastructure.Persistence;
@@ -122,6 +124,12 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>();
+
+// MASTER §11.8: first background job in this project — plain
+// BackgroundService, not Hangfire (no job-storage infra exists yet), an
+// explicit choice — see PROGRESS.md Phase 5 Step 8.
+builder.Services.AddScoped<PayrollDraftGenerator>();
+builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 
 var app = builder.Build();
 
