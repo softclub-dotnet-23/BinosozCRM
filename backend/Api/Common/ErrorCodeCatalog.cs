@@ -27,6 +27,12 @@ namespace Api.Common;
 // WORK_ORDER_INVALID_TRANSITION. The other two enforce §11.9's photo rules
 // (size limit, allow-list MIME) at the Application boundary.
 //
+// WORKER_HAS_OPEN_TASKS (Phase 3 Step 3): not in §9.2's table — §8.9's
+// termination lifecycle, point 1: a Worker with an open (Status != Done)
+// IndividualTask can't be terminated until a Brigadir closes or reassigns
+// it. Cross-aggregate guard, so it lives in the Application handler, not
+// Worker.Terminate() itself (a plain Domain mutator, no Result).
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -44,6 +50,7 @@ public static class ErrorCodeCatalog
         ["PASSWORD_CHANGE_REQUIRED"] = StatusCodes.Status403Forbidden,
         ["VALIDATION_FAILED"] = StatusCodes.Status400BadRequest,
         ["WORKER_UNDERAGE"] = StatusCodes.Status400BadRequest,
+        ["WORKER_HAS_OPEN_TASKS"] = StatusCodes.Status400BadRequest,
         ["BRIGADE_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORKER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,

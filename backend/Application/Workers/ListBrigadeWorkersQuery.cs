@@ -17,8 +17,13 @@ public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context
         if (!brigadeExists)
             return Result.Failure<PagedResult<WorkerDto>>(new Error("BRIGADE_NOT_FOUND", "Brigade not found."));
 
+        // MASTER §8.9 point 5: a terminated Worker (IsActive=false)
+        // "disappears from active lists" — this roster is exactly that
+        // list. Not removed from history (§8.9's own wording) — just not
+        // shown here; a future payroll-history view would query Workers
+        // directly rather than through this brigade-roster endpoint.
         var query = context.Workers
-            .Where(w => w.BrigadeId == request.BrigadeId)
+            .Where(w => w.BrigadeId == request.BrigadeId && w.IsActive)
             .OrderBy(w => w.FullName);
 
         var totalCount = await query.CountAsync(cancellationToken);

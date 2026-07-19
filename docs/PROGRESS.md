@@ -5,15 +5,42 @@
 
 ## Current Status
 **Phase:** 3 — Явка, отсутствия, премии
-**Last completed:** Phase 3, Step 2 (Zone B) — `AbsenceRecord`
-**Next step:** Phase 3, Step 3 [BE] Zone B — `Worker.TerminationDate` +
-lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
+**Last completed:** Phase 3, Step 3 (Zone B) — `Worker.TerminationDate` +
+lifecycle увольнения
+**Next step:** Phase 3, Steps 4-6 [BOT] отложены (см. §15) — переходим к
+Step 7 [BE] Zone B — тесты: `LateMinutes` на числовых примерах §8.1,
+grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9 (no bot
+dependency, unlike Phase 2's Step 9 — safe to do now)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **41/41 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 3 (Zone B) — `Worker.TerminationDate` + lifecycle увольнения.**
+Retrofitted two Phase 1 Step 2 files — `IndividualTask` didn't exist back
+then, so this guard genuinely couldn't have been built earlier:
+`TerminateWorkerCommand` now blocks termination if the worker has an open
+`IndividualTask` (new code `WORKER_HAS_OPEN_TASKS`); `ListBrigadeWorkersQuery`
+now filters out `IsActive == false`, so a terminated worker "disappears
+from active lists" (§8.9 point 5) without touching `IsDeleted`.
+
+**§8.9 lists 5 termination points — only 2 are actually buildable right
+now:** open-task block (done) and `IsActive=false`/roster filtering
+(done). **Not implemented, flagged not skipped:** early `PayrollEntry`
+formation for the period up to `TerminationDate`, and outstanding
+`PayrollAdvance` rollup into that final calc — both need `PayrollEntry`'s
+Application layer, which doesn't exist yet (Phase 5). Terminating a worker
+today does **not** produce a final payroll draft. Also: §8.9's "closes or
+reassigns" escape hatch for the open task only has "closes" (`Complete`)
+actually built — no `ReassignIndividualTaskCommand` exists yet.
+
+Verified with a throwaway check against real Postgres (4/4, deleted
+after): termination succeeds with no open tasks; blocked with one open
+(`WORKER_HAS_OPEN_TASKS`); succeeds once that task is completed;
+terminated worker vanishes from the brigade roster. Full suite: 41/41, no
+regressions.
 
 **Step 2 (Zone B) — `AbsenceRecord`.**
 `Application/AbsenceRecords/` — `CreateAbsenceRecordCommand` (Owner/Prorab/
@@ -853,7 +880,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
 - [x] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
-- [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
+- [x] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §15)* → MASTER §8.7, §10.4
