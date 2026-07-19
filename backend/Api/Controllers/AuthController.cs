@@ -49,4 +49,21 @@ public sealed class AuthController(ISender sender) : ControllerBase
         var result = await sender.Send(new ChangePasswordCommand(userId, request.CurrentPassword, request.NewPassword), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.AuthForgotPassword)]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ForgotPasswordCommand(request.Phone), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ResetPasswordCommand(request.Token, request.NewPassword), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

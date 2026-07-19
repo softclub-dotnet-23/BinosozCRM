@@ -17,6 +17,53 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Phase 6, Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password`.**
+`POST /auth/forgot-password` always returns success regardless of whether
+the phone exists ("не раскрывать, кто есть в системе") — generates a
+crypto-random `PasswordResetToken` (1h TTL, hashed, same
+`RefreshTokenGenerator` shape as refresh tokens) only when a matching
+active user exists, rate-limited 3/hour per phone (extended
+`LoginRateLimitKeyMiddleware` to also partition this route, alongside
+`/auth/login`). `POST /auth/reset-password` verifies hash/TTL/one-time-use,
+changes the password, and revokes every active refresh token for that
+user — reusing the exact chain-revoke pattern `RefreshTokenCommand` uses
+for stolen-token detection — matching §11.2's "смена пароля + отзыв ВСЕХ
+refresh-токенов."
+
+**A real gap, not silently worked around**: §11.2's actual delivery
+channel is the Telegram bot (deferred). New `IPasswordResetDeliveryService`
+/`LoggingPasswordResetDeliveryService` — never puts the plaintext token in
+an HTTP response (that would defeat hashing it at all); logs it only in
+Development (never Production, where a log aggregator isn't the safe
+place for secrets); elsewhere it logs a warning that a token exists but
+has no channel to reach the user until the bot lands.
+
+**Two real bugs caught and fixed while writing throwaway tests**:
+
+1. `RefreshTokenGenerator.Hash` threw an unhandled `FormatException` on
+   any non-base64 input — a garbage token on `/auth/refresh`,
+   `/auth/logout`, or this new `/auth/reset-password` would 500 instead
+   of failing cleanly as "not found." Fixed by falling back to hashing
+   the raw UTF-8 bytes on decode failure (can never collide with a real
+   token's hash, since every token this codebase issues is valid
+   base64). Fixes the two pre-existing endpoints too, not just the new
+   ones.
+2. My own test read a `PasswordResetToken` back without
+   `IgnoreQueryFilters()`, so the automatic `CompanyId` filter (using a
+   null current-user) silently matched nothing — a test bug, not a
+   production one; fixed the test.
+
+Verified with 6 throwaway xUnit tests against a temporary InMemory-backed
+real `ApplicationDbContext` (written, run — 6/6 passed after the two
+fixes above — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): unknown phone still returns success without calling
+delivery; known phone creates a correctly-TTL'd token and calls delivery;
+`TelegramLink` presence is correctly detected and reported; a valid token
+changes the password and revokes all refresh tokens; token reuse is
+rejected; garbage token input is rejected cleanly. Docker still
+unavailable — suite count unchanged (108 total, 69 pass, 39 need Docker).
+
 **Phase 6, Step 2 [BE] — background task: overdue detection +
 notifications.** New `IOverdueNotifier` (Application) /
 `SignalROverdueNotifier` (Api) — fires `WorkOrderOverdue`/
@@ -404,11 +451,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 2
-**Next step:** Phase 6, Steps 3–4 are `[BOT]` and deferred. Next
-actionable backend step: Phase 6, Step 5 [BE] —
-`/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`,
-TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
+**Last completed:** Phase 6, Step 5
+**Next step:** Phase 6, Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention
+30д, вне сервера) + **проверка восстановления** → MASTER §11.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1669,7 +1714,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
 - [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) *(отложено — см. §15)* → MASTER §10.3
 - [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §15)* → MASTER §10.6
-- [ ] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
+- [x] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
 - [ ] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
 - [ ] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
 - [ ] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11

@@ -1,4 +1,5 @@
 using System.Text;
+using Api.Auth;
 using Api.BackgroundServices;
 using Api.Common;
 using Api.Hubs;
@@ -86,6 +87,7 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<IWorkOrderRealtimeNotifier, SignalRWorkOrderNotifier>();
 builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNotifier>();
 builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
+builder.Services.AddScoped<IPasswordResetDeliveryService, LoggingPasswordResetDeliveryService>();
 
 builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 builder.Services.AddHostedService<OverdueCheckBackgroundService>();
@@ -111,6 +113,22 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = 5,
             Window = TimeSpan.FromMinutes(15),
+            QueueLimit = 0
+        });
+    });
+
+    // MASTER §11.2: "3 запроса/час на телефон" — partitioned by phone
+    // alone (not IP+phone like login), matching the literal wording.
+    options.AddPolicy(RateLimitPolicies.AuthForgotPassword, httpContext =>
+    {
+        var phone = httpContext.Items.TryGetValue(LoginRateLimitKeyMiddleware.PhoneItemKey, out var value)
+            ? value as string
+            : null;
+
+        return RateLimitPartition.GetFixedWindowLimiter(phone ?? "unknown", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 3,
+            Window = TimeSpan.FromHours(1),
             QueueLimit = 0
         });
     });
