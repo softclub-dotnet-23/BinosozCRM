@@ -85,8 +85,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IWorkOrderRealtimeNotifier, SignalRWorkOrderNotifier>();
 builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNotifier>();
+builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
 
 builder.Services.AddHostedService<PayrollDraftBackgroundService>();
+builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
 builder.Services.AddRateLimiter(options =>
 {

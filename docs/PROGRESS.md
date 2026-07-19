@@ -17,6 +17,42 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Phase 6, Step 2 [BE] — background task: overdue detection +
+notifications.** New `IOverdueNotifier` (Application) /
+`SignalROverdueNotifier` (Api) — fires `WorkOrderOverdue`/
+`IndividualTaskOverdue` events, reusing the existing `WorkOrdersHub`
+company group, same real-time pattern as `IMaterialShortageNotifier`/
+`IWorkOrderRealtimeNotifier`. §10.3's Telegram routing (by `TelegramLink`)
+is explicitly **not** built here — that's Step 3, `[BOT]`, deferred; this
+step only raises the event.
+
+`OverdueCheckBackgroundService` (Api/BackgroundServices) — same shape as
+`PayrollDraftBackgroundService` (Phase 5 Step 8): plain `BackgroundService`,
+checks once every 24h, per-company `ApplicationDbContext` via
+`SystemCompanyCurrentUserService`, exceptions caught and logged
+per-company. **Fires only for items due exactly yesterday**, not "any day
+in the past" — since there's no persisted "already notified" field on
+`WorkOrder`/`IndividualTask`, this is what keeps the job from re-firing
+the same notification every single day an item stays overdue. Overdue
+itself is defined identically to Step 1's dashboard: `Accepted`/`Closed`
+excluded for `WorkOrder`, `Done` excluded for `IndividualTask`.
+
+Extracted the per-company check into a `public static CheckCompanyAsync`
+(rather than `private`) specifically to make it directly testable against
+a real `ApplicationDbContext` — same precedent as `LocalFileStorageService`
+(Phase 2 Step 4).
+
+Verified with 1 focused throwaway xUnit test against a temporary
+InMemory-backed real `ApplicationDbContext` (written, run — passed —
+then deleted, same add-then-revert `Microsoft.EntityFrameworkCore.InMemory`
+pattern as every other throwaway check this session), covering all four
+boundary cases in one scenario: fires for an overdue `New` order;
+correctly excludes a `Closed` order (final status), an order due today
+(not yet overdue), and an order overdue two days ago (already fired on
+its own day) — plus the equivalent `IndividualTask` pair (overdue vs.
+`Done`). Docker still unavailable — suite count unchanged (108 total, 69
+pass, 39 need Docker).
+
 **Phase 6, Step 1 [BE] — `GET /dashboard/work-status`.** First step of the
 "polish + launch-readiness" phase. Single handler aggregating
 `WorkOrder.Status` and `IndividualTask.Status` together, per §8.6: status
@@ -368,9 +404,11 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 1
-**Next step:** Phase 6, Step 2 [BE] — фоновая задача просрочки и
-уведомления → MASTER §9.4
+**Last completed:** Phase 6, Step 2
+**Next step:** Phase 6, Steps 3–4 are `[BOT]` and deferred. Next
+actionable backend step: Phase 6, Step 5 [BE] —
+`/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`,
+TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
 **Updated:** 2026-07-19
@@ -1628,7 +1666,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.
 
 - [x] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
-- [ ] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
+- [x] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
 - [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) *(отложено — см. §15)* → MASTER §10.3
 - [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §15)* → MASTER §10.6
 - [ ] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
