@@ -16,7 +16,16 @@ public sealed class SeedDataService(IApplicationDbContext context, IPasswordHash
     {
         var options = seedOptions.Value;
 
-        var companyExists = await context.Companies.AnyAsync(cancellationToken);
+        // Scoped to the configured Company.Id, not "any company at all" —
+        // equivalent in production (single-Company deployment, always the
+        // same configured id), but the broader check made this a silent
+        // no-op whenever a *different* Company row already existed (e.g.
+        // the isolated per-test tenants integration tests create), so a
+        // fresh environment's real seed data would just never get created.
+        // Found while adding Phase 2 Step 9's tests, which was the first
+        // time enough other tests' Company rows accumulated in the shared
+        // test database to expose it.
+        var companyExists = await context.Companies.AnyAsync(c => c.Id == options.Company.Id, cancellationToken);
         if (!companyExists)
         {
             context.Companies.Add(Company.Create(options.Company.Id, options.Company.Name));

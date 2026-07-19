@@ -5,18 +5,47 @@
 
 ## Current Status
 **Phase:** 2 — Наряды и задачи (ядро)
-**Last completed:** Phase 2, Step 5 (Zone A) — SignalR-хаб
-**Next step:** Phase 2, Steps 6-8 [BOT] отложены (см. §15) — переходим к
-Step 9 [FULL] — тесты: все переходы (разрешённые + запрещённые), изоляция
-бригады (404). **Note:** Step 9's own description also names "идемпотентность
-бота" — that part can't be done while Steps 6-8 stay deferred; likely needs
-splitting the same way Phase 1 Step 7 did (BE half now, BOT half later)
+**Last completed:** Phase 2, Step 9a (Zone A) — WorkOrder/IndividualTask
+state machine + brigade-isolation tests. **Phase 2's backend scope is now
+fully done** — Steps 6-8 [BOT] and 9b [BOT] all stay deferred together
+(см. §15); next work is Phase 3.
+**Next step:** Phase 3, Step 1 [BE] Zone B — `Timesheet` + `LateMinutes`
+→ MASTER §5.20, §8.1 (Zone B — Shahrom's)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — **23/23 passing**, confirmed for
+**Tests:** `Tests/Api.IntegrationTests` — **41/41 passing**, confirmed for
 real against Testcontainers/Postgres
 **Updated:** 2026-07-19
 
 See `docs/phase-summaries/Phase1-summary.md` for what Phase 1 built as a whole.
+
+**Step 9a (Zone A) — WorkOrder/IndividualTask state machine + brigade-isolation tests.**
+Split the same way Phase 1 Step 7 was — the BE-testable half now, the
+bot-idempotency half (§10.3) parked alongside Steps 6-8's deferral, not
+"soon", since there's no bot to test idempotency against until that
+deferral lifts. `Tests/Api.IntegrationTests/WorkOrderStateMachineTests.cs`
+(7 tests) + `IndividualTaskStateMachineTests.cs` (6 tests), real
+Testcontainers/Postgres, no throwaways this time — this is exactly the
+step where the state-machine coverage becomes permanent: full happy path
+New→Assigned→InProgress→OnReview→Accepted→Closed; the Reject→Rework→
+resubmit cycle; a table-driven check that all 6 non-Assign transitions
+fail cleanly (`Result.Failure`, never an exception) from a freshly-created
+`WorkOrder` still in `New`; `Submit` blocked with no `WorkOrderProgress`;
+`Reject` without a reason fails FluentValidation; brigade isolation on
+both entities (a Brigadir from a different brigade gets `*_NOT_FOUND`, 404
+not 403); Prorab-object isolation on `Assign`; `IndividualTask`'s
+`CompletedEarly` true/false on both sides of `DueAt`; double-`Start`
+rejected; `Complete`-before-`Start` rejected.
+
+Also recovered: this step had been started and interrupted in an earlier
+session (background test run left with no completion record) — found the
+three files already drafted on disk, verified them properly (full build,
+ran them against real Postgres, then the full suite) rather than trusting
+they were correct as found. All correct as-is; no changes needed.
+`NoOpRealtimeNotifier.cs` (public, shared) added alongside them — every
+WorkOrder transition handler needs an `IRealtimeNotifier` since Step 5,
+and SignalR delivery itself isn't what these tests are checking.
+
+Full suite: **41/41** (23 previous + 18 new), no regressions.
 
 **Step 5 (Zone A) — SignalR hub.**
 `Api/Hubs/WorkOrdersHub.cs` (`/hubs/work-orders`, `[Authorize]`): group
@@ -772,7 +801,8 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 6 [BOT] — `TelegramLinkCode` (TTL 15мин, хеш, одноразовый), `TelegramLink`, `/start CODE` *(отложено — см. §15)* → MASTER §5.25, §10.2
 - [ ] Step 7 [BOT] — **secret_token на webhook** + **идемпотентность через `INSERT` в `TelegramUpdateLog`** + всегда 200 *(отложено — см. §15)* → MASTER §5.26, §10.3
 - [ ] Step 8 [BOT] — «Мои наряды»: отметка выполнения (валидация остатка), фото, отправка на проверку *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 9 [FULL] — тесты: все переходы (разрешённые + запрещённые), изоляция бригады (404), идемпотентность бота → MASTER §7.1, §7.2, §10.3
+- [x] Step 9a [BE] — тесты: все переходы (разрешённые + запрещённые), изоляция бригады (404) → MASTER §7.1, §7.2
+- [ ] Step 9b [BOT] — тесты: идемпотентность бота *(отложено — см. §15, вместе со Steps 6-8)* → MASTER §10.3
 
 ## Phase 3 — Явка, отсутствия, премии
 **Goal:** зависит от `Worker` (Phase 1) и инфраструктуры статусов (Phase 2).
