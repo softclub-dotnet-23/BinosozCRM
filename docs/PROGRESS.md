@@ -6,26 +6,52 @@
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
-**Phase 2 — Наряды и задачи (ядро): functionally ✅ COMPLETE for now
-(backend).** All `[BE]` steps done (1–5, 9's backend half); Steps 6–8
-`[BOT]` and Step 9's bot-idempotency slice stay unchecked, blocked on the
-2026-07-18 bot deferral — moved on to Phase 3 backend steps per the user's
-2026-07-19 decision, not a phase-summary-worthy completion (no
-`Phase2-summary.md` written; the phase isn't actually finished, just
-unblocked from further backend work until the bot returns).
-**Phase 3 — Явка, отсутствия, премии: functionally ✅ COMPLETE for now
-(backend).** Steps 1/2/7 done; Step 3 partial (its "финальный расчёт"
-clause blocked on Phase 5's `CalculatedAmount`/`PayrollAdvance`, same as
-noted below); Steps 4–6 `[BOT]` unchecked, blocked on the 2026-07-18 bot
-deferral. No `Phase3-summary.md` — not actually finished, same
-"functionally complete for now" status as Phase 2.
+**Phases 2 & 3: functionally ✅ COMPLETE for now (backend only).** All
+`[BE]` steps done except: Phase 2 Step 9's bot-idempotency slice, Phase 3
+Step 3's "финальный расчёт" clause (blocked on Phase 5's
+`CalculatedAmount`/`PayrollAdvance`, neither built yet). Every `[BOT]`
+step across both phases (Phase 2: 6–8, Phase 3: 4–6) stays unchecked,
+blocked on the 2026-07-18 bot deferral. No phase-summary files written for
+either — genuinely not finished, just unblocked for further backend work
+per the user's 2026-07-19 decision to keep going rather than wait on the
+bot.
 **Phase:** 4 — Материалы
-**Last completed:** Phase 3, Step 7
-**Next step:** Phase 4, Step 1 [BE] — `MaterialConsumptionReport`
-(уникальность на день → update, не дубль) → MASTER §5.18, §8.2
+**Last completed:** Phase 4, Step 1
+**Next step:** Phase 4, Step 2 [BE] — `MaterialRequest` + `QtyDelivered` +
+статус `PartiallyDelivered` → MASTER §5.17, §7.3
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 99 tests, confirmed via `dotnet test` (69 pass locally, 30 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 4, Step 1 [BE] — `MaterialConsumptionReport`.** Domain entity +
+EF config (including the unique `(BrigadeId, ObjectId, MaterialName,
+Date)` index and an `UpdateUsage` method) already existed; built the
+Application/API surface. `POST /material-consumption-reports` (Brigadir,
+own brigade — resolved via the existing `BrigadeAccess` helper): finds the
+existing report for `(BrigadeId, ObjectId, MaterialName, Date)` and calls
+`UpdateUsage` if found, else creates — §8.2's "повторный отчёт за тот же
+материал/день — обновление существующей записи, не дубль" implemented
+literally.
+
+`GET /material-consumption-reports` — Prorab+ only, scoped by
+`ProrabObjectAssignment` (same pattern as `WorkOrder`/`Timesheet`). No
+Brigadir read carve-out here, unlike `WorkOrder`'s "(own, read)" — §9.4
+literally splits this endpoint `Brigadir(C) / Prorab+(R)` with no read
+access for Brigadir at all.
+
+**Deliberately not built this step** — Steps 2/4's job, not this one's:
+the `QtyShortage > 0` → one-click `MaterialRequest` proposal, and the
+`MaterialShortageReported` SignalR event. `MaterialRequest` itself doesn't
+have an Application layer yet.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same
+add-then-revert `Microsoft.EntityFrameworkCore.InMemory` pattern as every
+other throwaway check this session): a second same-day report for the
+same material updates the existing row rather than duplicating it;
+different material or different day both correctly create a new row.
+Docker still unavailable — suite count unchanged (99 total, 69 pass, 30
+need Docker); auto-transition tests are Step 6's job.
 
 **Phase 3, Step 7 [BE] — тесты: `LateMinutes` numeric examples, grace
 period, absence-instead-of-no-show.** Two new permanent test files:
@@ -1093,7 +1119,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 ## Phase 4 — Материалы
 **Goal:** независима от Phase 3, идёт после ядра.
 
-- [ ] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
+- [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 - [ ] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
