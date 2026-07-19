@@ -13,21 +13,53 @@
 2026-07-19 decision, not a phase-summary-worthy completion (no
 `Phase2-summary.md` written; the phase isn't actually finished, just
 unblocked from further backend work until the bot returns).
-**Phase:** 3 — Явка, отсутствия, премии
-**Last completed:** Phase 3, Step 3 — **partial**: open-task guard +
-active-list filtering only. Checklist item stays **unchecked** — the
-step's own "финальный расчёт" clause needs §8.0's `CalculatedAmount` and
-`PayrollAdvance` settlement, neither of which exist yet (Phase 5 Steps
-3/6/7). Same "build what's actually buildable, flag the rest" call as
-Phase 2 Step 9.
-**Next step:** Phase 3, Steps 4–6 are `[BOT]` and deferred (2026-07-18
-decision) — next actionable backend step is Step 7 [BE] — тесты:
-`LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо
-прогула → MASTER §8.1, §8.9. Step 3's remainder (финальный расчёт) stays
-blocked until Phase 5's `CalculatedAmount`/`PayrollAdvance` land.
+**Phase 3 — Явка, отсутствия, премии: functionally ✅ COMPLETE for now
+(backend).** Steps 1/2/7 done; Step 3 partial (its "финальный расчёт"
+clause blocked on Phase 5's `CalculatedAmount`/`PayrollAdvance`, same as
+noted below); Steps 4–6 `[BOT]` unchecked, blocked on the 2026-07-18 bot
+deferral. No `Phase3-summary.md` — not actually finished, same
+"functionally complete for now" status as Phase 2.
+**Phase:** 4 — Материалы
+**Last completed:** Phase 3, Step 7
+**Next step:** Phase 4, Step 1 [BE] — `MaterialConsumptionReport`
+(уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 84 tests, confirmed via `dotnet test` (58 pass locally, 26 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 99 tests, confirmed via `dotnet test` (69 pass locally, 30 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 3, Step 7 [BE] — тесты: `LateMinutes` numeric examples, grace
+period, absence-instead-of-no-show.** Two new permanent test files:
+
+- `TimesheetLateMinutesTests.cs` (pure domain, no DB — 11 tests):
+  `Timesheet.CheckIn` exercised directly with deterministic timestamps
+  against §8.1's exact worked example set (15/0/40/10 minutes late), both
+  grace=0 and grace=5 configurations, plus edge cases the worked examples
+  don't cover: arriving within the grace period clamps to 0 rather than
+  going negative (`max(0, lateMinutes) - grace` needs the *second*
+  `Math.Max(0, ...)` the formula implies), arriving early is 0 not
+  negative, and `LateMinutes` stays `null` (not `0`) when
+  `Worker.ShiftStartTime` isn't configured — same §8.1 rule Step 1's
+  throwaway check first verified, now permanent.
+- `AbsenceTimesheetConflictTests.cs` (real Postgres via `PostgresFixture`
+  — 4 tests): permanentizes the two-way `TIMESHEET_ABSENCE_CONFLICT` guard
+  built in Steps 1/2 — filing an absence over an existing check-in and
+  checking in during a filed absence are both rejected; non-overlapping
+  dates succeed on both sides; `IsPaid=true`/`IsPaid=false` absences are
+  recorded distinctly (§8.9's "`IsPaid=false` → не входит никуда" needs
+  that distinction to survive into Phase 5's payroll consumption).
+
+**Σ`LateMinutes`/`LatenessDeductionAmount` aggregation across a pay
+period is out of scope** — that needs a period-level query that doesn't
+exist yet (Phase 5 Step 4). This step tests the per-check-in computation
+§8.1 actually specifies, not the payroll rollup.
+
+Build clean, 0 warnings. Suite: 99 total (was 84) — 69 pass locally (all
+11 new domain tests included), 30 need Docker (26 pre-existing + 4 new
+Postgres-backed); confirmed every failure is the expected
+`DockerUnavailableException` fail-fast, not a real assertion failure.
+**Phase 3 is now functionally complete for backend** — Steps 4–6 `[BOT]`
+stay deferred, Step 3's "финальный расчёт" clause stays blocked on Phase
+5, same as Phase 2's situation.
 
 **Phase 3, Step 3 [BE] — `Worker.TerminationDate` lifecycle (partial).**
 `TerminateWorkerCommand` already existed (Phase 1 Step 2) but was bare —
@@ -1056,7 +1088,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §15)* → MASTER §8.7, §10.4
-- [ ] Step 7 [BE] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
+- [x] Step 7 [BE] — тесты: `LateMinutes` на числовых примерах §8.1, grace-период, отсутствие вместо прогула → MASTER §8.1, §8.9
 
 ## Phase 4 — Материалы
 **Goal:** независима от Phase 3, идёт после ядра.
