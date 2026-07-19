@@ -47,6 +47,15 @@ namespace Api.Common;
 // INDIVIDUAL_TASK_WRONG_BRIGADE's precedent (a share for a worker outside
 // the work order's own brigade is a 400, not silently accepted).
 //
+// PAYROLL_ENTRY_NOT_FOUND / PAYROLL_ENTRY_NOT_DRAFT (Phase 5 Step 3): same
+// "not in §9.2's table" pattern. NOT_DRAFT surfaces PayrollEntry.UpdateDraft()'s
+// existing Domain guard — POST /payroll is an upsert (create-or-recalculate,
+// see CreatePayrollEntryCommand), and a second call against an
+// already-Approved/Paid entry must fail cleanly, not silently overwrite a
+// locked-in FinalAmount. PAYROLL_ENTRY_INVALID_TRANSITION (Domain already
+// defines it, for Approve()/Pay()) isn't wired to an Application handler
+// yet — Step 7's job.
+//
 // Codes an entity raises that aren't in this list yet (e.g. individual
 // entity-specific transition guards not called out in §9.2) fall through to
 // the 400 default below — §9.2 documents the interesting/non-obvious cases,
@@ -93,6 +102,8 @@ public static class ErrorCodeCatalog
         ["MATERIAL_DELIVERY_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
+        ["PAYROLL_ENTRY_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["PAYROLL_ENTRY_NOT_DRAFT"] = StatusCodes.Status400BadRequest,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
         ["PRORAB_NOT_ASSIGNED_TO_OBJECT"] = StatusCodes.Status404NotFound,
         ["PRORAB_ALREADY_ASSIGNED"] = StatusCodes.Status409Conflict,

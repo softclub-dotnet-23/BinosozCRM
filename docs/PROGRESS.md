@@ -5,12 +5,10 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 1 (Zone B) — `WorkOrderPayoutShare` +
-инвариант `Σ SharePercent = 100`
-**Next step:** Phase 5, Step 2 [BOT] — флоу распределения долей при закрытии
-наряда *(отложено — см. §15)* → следующий актуальный шаг: Phase 5, Step 3
-[BE] Zone B — `CalculatedAmount` (Hourly + Piecework + оплачиваемые
-отсутствия) → MASTER §8.0
+**Last completed:** Phase 5, Step 3 (Zone B) — `CalculatedAmount` (Hourly +
+Piecework + оплачиваемые отсутствия)
+**Next step:** Phase 5, Step 4 [BE] Zone B — `LatenessDeductionAmount` за
+период → MASTER §8.1
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1100,9 +1098,63 @@ shares can no longer be written once the work order is `Accepted`. Plus
 the 2 new permanent HTTP-level authorization tests. Full suite: 70/70, no
 regressions.
 
+**Step 3 (Zone B) — `CalculatedAmount`.**
+`Application/Payroll/CreatePayrollEntryCommand.cs` (`POST /payroll`,
+Accountant-only — see business decision below) — an **upsert**, not a pure
+create: `PayrollEntry(WorkerId, PeriodStart, PeriodEnd)` is UNIQUE (§6), and
+§9.4 names no separate recalculate endpoint, so a second call for the same
+(Worker, Period) recomputes `CalculatedAmount` in place via the existing
+`PayrollEntry.UpdateDraft()`, rejecting cleanly (new code
+`PAYROLL_ENTRY_NOT_DRAFT`) once the entry has moved past `Draft`.
+`LatenessDeductionAmount`/`BonusAmount`/`AdvanceDeductedAmount` are hardcoded
+to 0 for now — **Steps 4/5/6 will retrofit this same handler** to compute
+and pass them into the same `UpdateDraft()` call, same pattern as
+`TerminateWorkerCommand` being retrofitted across Phase 3/5. Branches on
+`Worker.PayRateType`: Hourly sums `Timesheet.HoursWorked × PayRate` for
+`ApprovedAt IS NOT NULL` rows in the period; Piecework sums, per matching
+`WorkOrder` (`Status ∈ {Accepted, Closed}`, `CompletedDate` in period),
+`Σ(WorkOrderProgress.ReportedQty) × UnitPrice × SharePercent/100` —
+recomputed fresh from `SharePercent`, not read from
+`WorkOrderPayoutShare.Amount` (that field is Step 1's Prorab-confirmation
+snapshot; §8.0's formula is stated directly in terms of `SharePercent`).
+Both branches add paid-absence days × average daily rate (3-month
+`Timesheet` lookback, `<10` days of history falls back to `8h × PayRate`).
+Added `ListPayrollEntriesQuery`/`GetPayrollEntryQuery` (`GET /payroll`,
+`GET /payroll/{id}`) with Brigadir "own row" isolation — matched by
+`Worker.UserId`, a different axis than the `BrigadeId`-based isolation used
+everywhere else, since a Brigadir is a `Worker` themselves here, not
+looking at their brigade's data.
+
+**Asked, then resolved by explicit business decision — a direct MASTER
+self-contradiction:** §9.4's endpoint list says `POST /payroll` is
+"Accountant, Owner"; §12's role matrix says `PayrollEntry` is Owner:`RA`
+(no Create) / Accountant:`CRUA` — Owner can read and approve/pay but not
+generate a draft. Flagged before writing the controller; **decision: follow
+§12 literally, `POST /payroll` is Accountant-only.** `[Authorize(Roles =
+"Accountant")]` on `PayrollController.Create`; List/Get stay open to
+Owner/Accountant/Brigadir(own).
+
+**Gap, flagged not silently worked around:** `IApplicationDbContext` was
+missing `PayrollEntries` even though the concrete `ApplicationDbContext`
+(Ahmad's, Phase 0) already exposes it — added the one-line interface
+projection myself, since `Application/Common/Interfaces/` isn't under the
+Domain/Persistence-Configurations hard boundary and the concrete
+implementation already satisfied it.
+
+Verified against real Postgres (4/4, deleted after) — reproducing MASTER
+§8.0's own worked examples exactly, per AGENTS.md's instruction to match
+worked examples, not just the general shape: Hourly (40/h rate, 20×8h
+approved + 2 paid sick days at the same 8h average) → **7040.00**
+exactly; Piecework (plastering, 120/m², 45m² reported → OrderTotal 5400,
+split 50/30/20) → **2700.00 / 1620.00 / 1080.00** exactly; a worker with
+no timesheets and no work orders still gets a `Draft` entry at
+`CalculatedAmount = 0` (not a failure); recalculating an already-`Approved`
+entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
+regressions.
+
 - [x] Step 1 [BE] — `WorkOrderPayoutShare` + инвариант `Σ SharePercent = 100` (проверка набора разом, не построчно) → MASTER §5.13, §1.1
 - [ ] Step 2 [BOT] — флоу распределения долей при закрытии наряда (остаток, блок при ≠100%) *(отложено — см. §15)* → MASTER §10.4
-- [ ] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
+- [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [ ] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [ ] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8

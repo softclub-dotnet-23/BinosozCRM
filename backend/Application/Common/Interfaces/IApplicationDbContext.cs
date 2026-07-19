@@ -24,6 +24,7 @@ public interface IApplicationDbContext
     DbSet<MaterialConsumptionReport> MaterialConsumptionReports { get; }
     DbSet<MaterialRequest> MaterialRequests { get; }
     DbSet<MaterialDelivery> MaterialDeliveries { get; }
+    DbSet<PayrollEntry> PayrollEntries { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
