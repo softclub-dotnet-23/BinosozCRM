@@ -8,11 +8,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace Api.Controllers;
 
 // MASTER §9.4/§7.3: POST /material-requests — Brigadir(C), own brigade.
-// GET — Prorab+(R). /approve, /reject — Prorab+. /force-close and the
-// MaterialDelivery-driven auto-transitions aren't wired yet — Step 3's job
-// (MaterialDelivery doesn't exist in Application yet either, and
-// force-close's precondition, PartiallyDelivered, can't be reached without
-// it).
+// GET — Prorab+(R). /approve, /reject, /mark-ordered — Prorab+.
+// /mark-ordered isn't in §9.4's literal table (only /approve, /reject,
+// /force-close are) — added anyway, same class of gap as WorkOrder's
+// /assign, /start (Phase 2 Step 1): without it, Approved -> Ordered is
+// unreachable via the API, and MaterialDelivery.RecordDelivery (Step 3)
+// requires exactly that status. /force-close is still not exposed —
+// MASTER §8.2 requires "обязательный комментарий (пишется в
+// AdminAuditLog)", but AdminAuditAction's enum (§5.16) has no matching
+// action and MaterialRequest has no field to hold the comment itself —
+// a real MASTER/Domain gap, flagged in PROGRESS.md, not silently worked
+// around.
 [ApiController]
 [Route("api/v1/material-requests")]
 [Authorize]
@@ -51,6 +57,14 @@ public sealed class MaterialRequestsController(ISender sender) : ControllerBase
     public async Task<IActionResult> Reject(Guid materialRequestId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new RejectMaterialRequestCommand(materialRequestId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{materialRequestId:guid}/mark-ordered")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> MarkOrdered(Guid materialRequestId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new MarkMaterialRequestOrderedCommand(materialRequestId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }

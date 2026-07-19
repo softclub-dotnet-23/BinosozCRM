@@ -16,12 +16,55 @@ either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
 **Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 2
-**Next step:** Phase 4, Step 3 [BE] — `MaterialDelivery` + **авто-переход**
-заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
+**Last completed:** Phase 4, Step 3
+**Next step:** Phase 4, Step 4 [BE] — `MaterialShortageReported` при
+`QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 99 tests, confirmed via `dotnet test` (69 pass locally, 30 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 4, Step 3 [BE] — `MaterialDelivery` + auto-transition.** Domain
+entity + EF config already existed. `POST,GET /material-deliveries`
+(Prorab+): creating a delivery with a `MaterialRequestId` calls
+`MaterialRequest.RecordDelivery` in the same handler — the entity itself
+does §8.2's Σ-quantity math (`0 < ΣQty < Request.Qty → PartiallyDelivered`,
+`ΣQty ≥ Request.Qty → Delivered`), genuinely automatic per §8.2's
+"переход автоматический, не ручной." A delivery with no
+`MaterialRequestId` is a valid unplanned purchase, recorded with nothing
+else touched, per §8.2's own note.
+
+**Added `POST /material-requests/{id}/mark-ordered` (Prorab+)** — a real
+gap, same class as `WorkOrder`'s `/assign`/`/start` from Phase 2 Step 1:
+not in §9.4's literal table (only `/approve`, `/reject`, `/force-close`
+are listed), but without it `Approved → Ordered` was unreachable via the
+API, and `RecordDelivery` requires exactly that status — no delivery
+could ever be recorded against an approved-but-not-ordered request.
+Verified this directly: a throwaway test confirms delivering against a
+request stuck at `Approved` fails with `MATERIAL_REQUEST_INVALID_TRANSITION`.
+
+**`/force-close` still not exposed — a genuine MASTER/Domain gap, not a
+scope shortcut.** §8.2 requires the force-close comment "пишется в
+`AdminAuditLog`", but `AdminAuditAction`'s enum (§5.16:
+`UserCreated`/`RoleChanged`/`UserDeactivated`/`BrigadirAssigned`/
+`PayRateChanged`/`PayrollPaid`/`AdvanceIssued`) has no matching action,
+and `MaterialRequest` itself has no field to hold the comment at all.
+Adding either would mean changing Domain/enums under this step's time
+budget without being confident it's the right modeling call — flagged for
+a `docs`/architecture pass instead of forced through.
+
+Verified with 5 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 5/5 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): a partial delivery lands on `PartiallyDelivered`;
+two deliveries summing to the full quantity land on `Delivered`;
+overdelivery is allowed and still reads as `Delivered` (§8.2: "не ошибка
+... подсвечивается в UI" — the highlighting itself is a UI concern, no
+backend code needed); a request-less delivery is valid; delivering
+against an `Approved`-but-not-`Ordered` request fails as described above.
+Docker still unavailable — suite count unchanged (99 total, 69 pass, 30
+need Docker); auto-transition tests are Step 6's job (this step's
+throwaway checks covered the same ground for verification, but aren't
+permanent).
 
 **Phase 4, Step 2 [BE] — `MaterialRequest` + `QtyDelivered` +
 `PartiallyDelivered` status.** Domain entity + EF config already existed,
@@ -1160,7 +1203,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 - [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
-- [ ] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
+- [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
 - [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
