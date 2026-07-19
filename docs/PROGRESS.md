@@ -5,10 +5,11 @@
 
 ## Current Status
 **Phase:** 5 — Зарплата (Phase 4 [BE] scope complete; Step 5 [BOT] отложен, см. §15)
-**Last completed:** Phase 5, Step 5 (Zone B) — `BonusAmount` в расчёт по
-`CompletedAt` (payroll-side only — approve-эндпоинт нужен от Ахмада, см. ниже)
-**Next step:** Phase 5, Step 6 [BE] Zone B — `PayrollAdvance` +
-`AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
+**Last completed:** Phase 5, Step 6 (Zone B) — `PayrollAdvance` +
+`AdvanceDeductedAmount`
+**Next step:** Phase 5, Step 7 [BE] Zone B — `PayrollEntry.Approve()`:
+`FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment →
+MASTER §8.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — **70/70 passing**, confirmed for
 real against Testcontainers/Postgres
@@ -1152,6 +1153,49 @@ no timesheets and no work orders still gets a `Draft` entry at
 entry is rejected (`PAYROLL_ENTRY_NOT_DRAFT`). Full suite: 70/70, no
 regressions.
 
+**Step 6 (Zone B) — `PayrollAdvance` + `AdvanceDeductedAmount`.**
+`Application/PayrollAdvances/` — `CreatePayrollAdvanceCommand` (`POST
+/payroll-advances`, Accountant/Owner — §9.4 and §12 agree this time, no
+conflict) sets `IssuedAt = UtcNow` server-side, same "reported at"
+precedent as `WorkOrderProgress`/`MaterialDelivery` (not client-supplied —
+an Accountant claiming a backdated advance would be a form of payroll
+manipulation). Writes an explicit `AdminAuditLog(AdvanceIssued)` row in
+the same handler — §8.8's "пишется в AdminAuditLog" can't reuse the
+existing `AdminAuditSaveChangesInterceptor` (Phase 1 Step 5), which only
+watches `EntityState.Modified`, never `Added`, and lives under
+`Infrastructure/Persistence/` (Zone A's hard boundary, not touched).
+`ListPayrollAdvancesQuery` (`GET /payroll-advances`) with the same
+Brigadir-"own row" isolation as `PayrollEntry` (Step 3).
+
+Retrofitted `CreatePayrollEntryCommand` a fourth time with
+`CalculateAdvanceDeductedAmountAsync`: sums every still-`SettledInPayrollEntryId
+== null` advance with `IssuedAt <= PeriodEnd` — deliberately no lower
+bound, so an old unpaid advance keeps appearing period after period until
+settled (§8.8's literal formula). `UpdateDraft()`'s `advanceDeductedAmount`
+argument is no longer hardcoded to 0; only `AdjustmentAmount` is
+untouched — Step 7's job, and it's manual/Accountant-entered, not
+computed.
+
+**Correctly out of scope, not attempted:** marking `SettledInPayrollEntryId`
+on each counted advance happens "при Approve" per §8.8's own text — that's
+`PayrollEntry.Approve()`, Step 7's explicit checklist item, not this
+step's `UpdateDraft()`/recalculation path (which must stay idempotent and
+side-effect-free on `PayrollAdvance` rows, since it can be called
+repeatedly before Approve).
+
+Verified against real Postgres (5/5, deleted after): an unsettled advance
+issued before `PeriodEnd` is deducted; an already-settled one (linked to a
+different `PayrollEntry`) is excluded; two unsettled advances sum
+together (1000+500=1500); an advance issued in the *current* period
+correctly excludes from the *previous*, already-closed period. Plus a
+full end-to-end worked-example check reusing Steps 3-5's exact numbers
+(`CalculatedAmount` 7040, lateness 43.33, bonus 200) with this step's
+3000 advance, calling `PayrollEntry.Approve()` directly (Domain method,
+already exists — Step 7's own command isn't built) to confirm
+`FinalAmount = 7040 − 43.33 + 200 − 3000 = 4196.67` exactly, matching
+§8.8's own worked example — the same number Step 10's eventual permanent
+test is supposed to reproduce. Full suite: 70/70, no regressions.
+
 **Step 5 (Zone B) — `BonusAmount`.** Retrofitted `CreatePayrollEntryCommand`
 again with `CalculateBonusAmountAsync`: sums `IndividualTask.BonusAmount`
 for tasks assigned to this worker where `BonusApprovedByUserId IS NOT NULL`
@@ -1207,7 +1251,7 @@ regressions.
 - [x] Step 3 [BE] — **`CalculatedAmount`**: Hourly (только принятые табели) и Piecework (факт × доля) + оплачиваемые отсутствия → MASTER §8.0
 - [x] Step 4 [BE] — `LatenessDeductionAmount` за период → MASTER §8.1
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7 *(только payroll-сторона — см. заметку ниже)*
-- [ ] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
+- [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` *(Settle() itself is Step 7's job — see write-up)* → MASTER §5.23, §8.8
 - [ ] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
 - [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
 - [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10

@@ -8,18 +8,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Payroll;
 
-// MASTER §8.0/§8.1/§8.7 — the base salary figure plus its lateness and
-// bonus adjustments; Steps 6-7 finish the rest.
+// MASTER §8.0/§8.1/§8.7/§8.8 — every UpdateDraft() component except
+// AdjustmentAmount (Step 7's job, manual/Accountant-only, not computed).
 // §9.4 names only `POST /payroll` (no separate recalculate endpoint), and
 // PayrollEntry(WorkerId, PeriodStart, PeriodEnd) is UNIQUE (§6) — so this is
 // an upsert: first call for a (Worker, Period) creates the Draft, a later
 // call recomputes every amount in place (e.g. a Timesheet gets approved
 // late, after the first draft). Rejected once the entry has moved past
 // Draft — PayrollEntry.UpdateDraft() already enforces that.
-// AdvanceDeductedAmount is still 0 — Step 6 will retrofit this same
-// handler to compute and pass it, same pattern as
-// TerminateWorkerCommand/ListBrigadeWorkersQuery being retrofitted across
-// steps (see PROGRESS.md Phase 3 Step 3).
 public sealed record CreatePayrollEntryCommand(Guid WorkerId, DateOnly PeriodStart, DateOnly PeriodEnd)
     : IRequest<Result<PayrollEntryDto>>;
 
@@ -53,6 +49,7 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
 
         var latenessDeductionAmount = await CalculateLatenessDeductionAsync(worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
         var bonusAmount = await CalculateBonusAmountAsync(worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
+        var advanceDeductedAmount = await CalculateAdvanceDeductedAmountAsync(worker, request.PeriodEnd, cancellationToken);
 
         PayrollEntry entry;
         if (existingEntry is null)
@@ -65,7 +62,7 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
             entry = existingEntry;
         }
 
-        var updateResult = entry.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, advanceDeductedAmount: 0);
+        var updateResult = entry.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, advanceDeductedAmount);
         if (updateResult.IsFailure)
             return Result.Failure<PayrollEntryDto>(updateResult.Error);
 
@@ -204,5 +201,23 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
             .Where(t => t.AssignedToWorkerId == worker.Id && t.BonusApprovedByUserId != null
                         && t.CompletedAt != null && t.CompletedAt >= periodStartUtc && t.CompletedAt < periodEndExclusiveUtc)
             .SumAsync(t => (decimal?)(t.BonusAmount ?? 0), cancellationToken) ?? 0m;
+    }
+
+    // MASTER §8.8: every still-unsettled advance issued on or before
+    // PeriodEnd counts — deliberately no lower bound on IssuedAt, so an
+    // old advance nobody's paid off yet keeps showing up period after
+    // period until it's settled. An advance issued after PeriodEnd rolls
+    // into the next period instead, satisfied by the same upper bound.
+    // Marking SettledInPayrollEntryId happens at Approve time (Step 7),
+    // not here — this is Draft-recalculation, which must stay idempotent
+    // and re-runnable without side effects on PayrollAdvance rows.
+    private async Task<decimal> CalculateAdvanceDeductedAmountAsync(
+        Worker worker, DateOnly periodEnd, CancellationToken cancellationToken)
+    {
+        var periodEndExclusiveUtc = new DateTimeOffset(periodEnd.AddDays(1), TimeOnly.MinValue, TimeSpan.Zero);
+
+        return await context.PayrollAdvances
+            .Where(a => a.WorkerId == worker.Id && a.SettledInPayrollEntryId == null && a.IssuedAt < periodEndExclusiveUtc)
+            .SumAsync(a => (decimal?)a.Amount, cancellationToken) ?? 0m;
     }
 }
