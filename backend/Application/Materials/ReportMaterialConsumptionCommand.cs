@@ -13,9 +13,17 @@ namespace Application.Materials;
 // "Граничный случай: повторный отчёт за тот же материал/день — обновление
 // существующей записи, не дубль" — the unique (BrigadeId, ObjectId,
 // MaterialName, Date) index means a second submission for the same day
-// must update, not insert-and-conflict. MaterialShortageReported and the
-// one-click MaterialRequest proposal (§8.2's "если QtyShortage > 0")
-// aren't wired here — that's Steps 2/4's job, not this one.
+// must update, not insert-and-conflict.
+//
+// §8.2's MaterialShortageReported ("сразу, не дожидаясь оформления
+// заявки") fires here, after SaveChanges, whenever QtyShortage > 0 — on
+// both a brand-new report and an update to an existing one (a shortage
+// discovered on a recount is just as real as one caught the first time).
+// The one-click MaterialRequest proposal from the same MASTER sentence is
+// explicitly NOT built here — that's a bot-flow affordance (Phase 4 Step
+// 5, deferred with every other [BOT] step), not a backend endpoint; a
+// Brigadir can already file the request themselves via
+// CreateMaterialRequestCommand (Step 2).
 public sealed record ReportMaterialConsumptionCommand(
     Guid ObjectId,
     DateOnly Date,
@@ -37,7 +45,10 @@ public sealed class ReportMaterialConsumptionCommandValidator : AbstractValidato
     }
 }
 
-public sealed class ReportMaterialConsumptionCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class ReportMaterialConsumptionCommandHandler(
+    IApplicationDbContext context,
+    ICurrentUserService currentUser,
+    IMaterialShortageNotifier shortageNotifier)
     : IRequestHandler<ReportMaterialConsumptionCommand, Result<MaterialConsumptionReportDto>>
 {
     public async Task<Result<MaterialConsumptionReportDto>> Handle(ReportMaterialConsumptionCommand request, CancellationToken cancellationToken)
@@ -78,6 +89,18 @@ public sealed class ReportMaterialConsumptionCommandHandler(IApplicationDbContex
         }
 
         await context.SaveChangesAsync(cancellationToken);
+
+        if (request.QtyShortage > 0)
+        {
+            await shortageNotifier.NotifyShortageAsync(
+                report.CompanyId,
+                report.Id,
+                report.ObjectId,
+                report.BrigadeId,
+                report.MaterialName,
+                request.QtyShortage,
+                cancellationToken);
+        }
 
         return Result.Success(MaterialConsumptionReportDto.FromEntity(report));
     }

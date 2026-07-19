@@ -83,6 +83,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IWorkOrderRealtimeNotifier, SignalRWorkOrderNotifier>();
+builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNotifier>();
 
 builder.Services.AddRateLimiter(options =>
 {

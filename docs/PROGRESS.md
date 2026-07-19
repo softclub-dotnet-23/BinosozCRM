@@ -16,12 +16,43 @@ either — genuinely not finished, just unblocked for further backend work
 per the user's 2026-07-19 decision to keep going rather than wait on the
 bot.
 **Phase:** 4 — Материалы
-**Last completed:** Phase 4, Step 3
-**Next step:** Phase 4, Step 4 [BE] — `MaterialShortageReported` при
-`QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
+**Last completed:** Phase 4, Step 4
+**Next step:** Phase 4, Step 5 [BOT] — «Материалы» bot flow *(отложено —
+см. §15)*. Next actionable backend step: Phase 4, Step 6 [BE] — тесты:
+авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 99 tests, confirmed via `dotnet test` (69 pass locally, 30 need Docker — see below)
 **Updated:** 2026-07-19
+
+**Phase 4, Step 4 [BE] — `MaterialShortageReported`.** New
+`IMaterialShortageNotifier` (Application) / `SignalRMaterialShortageNotifier`
+(Api) — reuses the existing `WorkOrdersHub` from Phase 2 Step 5 (same
+company-scoped group) rather than a new hub, since §9.4 lists all five
+events under one `/hubs/work-orders`. Wired into
+`ReportMaterialConsumptionCommandHandler`: fires **after**
+`SaveChangesAsync`, whenever `QtyShortage > 0`, on both a brand-new report
+and an update to an existing one — a shortage found on a recount is just
+as real as one caught the first time. Matches §8.2's "сразу, не
+дожидаясь оформления заявки" and the same post-save ordering rule as
+`IWorkOrderRealtimeNotifier`.
+
+**The one-click `MaterialRequest` proposal from the same MASTER sentence
+is NOT built here** — that's a bot-flow affordance (Step 5, deferred with
+every other `[BOT]` step this session), not a backend endpoint. A Brigadir
+can already file the request themselves via Step 2's
+`CreateMaterialRequestCommand`; the "proposal, one click, fields
+pre-filled" convenience is specifically UI/bot behavior layered on top of
+that existing endpoint, not new backend logic.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context and a spy notifier (written, run — 3/3 passed — then deleted, same
+add-then-revert `Microsoft.EntityFrameworkCore.InMemory` pattern as every
+other throwaway check this session): the notifier fires exactly once with
+the correct object/brigade/material/qty, confirmed to fire only after the
+report row is already committed; zero shortage never calls it; a shortage
+discovered on a same-day update (first report clean, second report finds
+a shortfall) still fires. Docker still unavailable — suite count unchanged
+(99 total, 69 pass, 30 need Docker).
 
 **Phase 4, Step 3 [BE] — `MaterialDelivery` + auto-transition.** Domain
 entity + EF config already existed. `POST,GET /material-deliveries`
@@ -1204,7 +1235,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 1 [BE] — `MaterialConsumptionReport` (уникальность на день → update, не дубль) → MASTER §5.18, §8.2
 - [x] Step 2 [BE] — `MaterialRequest` + `QtyDelivered` + статус `PartiallyDelivered` → MASTER §5.17, §7.3
 - [x] Step 3 [BE] — `MaterialDelivery` + **авто-переход** заявки по `Σ Qty` (частичная/полная) → MASTER §8.2, §7.3
-- [ ] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
+- [x] Step 4 [BE] — `MaterialShortageReported` при `QtyShortage > 0` — сразу, не дожидаясь заявки → MASTER §8.2
 - [ ] Step 5 [BOT] — «Материалы»: дневной отчёт → при нехватке предложение заявки одним действием *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 6 [BE] — тесты: авто-переход при частичной/полной/пере-поставке → MASTER §8.2
 
