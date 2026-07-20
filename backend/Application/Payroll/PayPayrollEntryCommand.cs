@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.WorkOrders;
 using Domain.Common;
 using Domain.Entities;
 using Domain.Enums;
@@ -24,7 +25,8 @@ public sealed class PayPayrollEntryCommandValidator : AbstractValidator<PayPayro
     }
 }
 
-public sealed class PayPayrollEntryCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class PayPayrollEntryCommandHandler(
+    IApplicationDbContext context, ICurrentUserService currentUser, IWorkOrderRealtimeNotifier notifier)
     : IRequestHandler<PayPayrollEntryCommand, Result<PayrollEntryDto>>
 {
     public async Task<Result<PayrollEntryDto>> Handle(PayPayrollEntryCommand request, CancellationToken cancellationToken)
@@ -48,6 +50,21 @@ public sealed class PayPayrollEntryCommandHandler(IApplicationDbContext context,
             newValueJson: $"{{\"value\":\"{entry.FinalAmount}\"}}"));
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // MASTER §7.1: "Accepted -> Closed - авто после PayrollEntry.Paid за
+        // период" — the automatic half of WorkOrder.Close(). A separate
+        // SaveChangesAsync, deliberately after the one above: the auto-closer
+        // checks every contributing worker's PayrollEntry.Status via a fresh
+        // query, which only sees this worker's own Paid status once it's
+        // actually committed, not just tracked in memory.
+        var closedOrders = await WorkOrderAutoCloser.CloseEligibleOrdersAsync(
+            context, entry.CompanyId, entry.WorkerId, entry.PeriodStart, entry.PeriodEnd, currentUser.UserId!.Value, cancellationToken);
+
+        if (closedOrders.Count > 0)
+            await context.SaveChangesAsync(cancellationToken);
+
+        foreach (var closedOrder in closedOrders)
+            await notifier.NotifyStatusChangedAsync(entry.CompanyId, closedOrder.WorkOrderId, closedOrder.FromStatus, closedOrder.ToStatus, cancellationToken);
 
         return Result.Success(PayrollEntryDto.FromEntity(entry));
     }
