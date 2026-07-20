@@ -17,6 +17,41 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Phase 6, Step 6 [BE] — backups (`pg_dump` + WAL, 30-day retention,
+off-server) + restore verification.** Infrastructure/ops scripting, not
+C# — the .NET build/test suite is unaffected (zero `.cs` files touched).
+
+- `backend/ops/backup/pg_dump_backup.sh` — daily logical backup (`pg_dump
+  -Fc`), synced off-server, retention-pruned locally and remotely.
+- `backend/ops/backup/wal_archive.sh` — invoked per-segment by Postgres'
+  own `archive_command`, syncing each WAL file off-server for
+  point-in-time recovery.
+- `backend/ops/backup/restore_verify.sh` — the §11.8-mandated quarterly
+  check ("непроверенный бэкап не бэкап"): spins up a disposable Postgres
+  container, restores the latest backup into it, checks both table count
+  and `__EFMigrationsHistory` row count (catches a DDL-only dump that
+  never actually captured data), tears the container down regardless of
+  outcome, exits nonzero on failure — alertable the same way
+  `PayrollDraftBackgroundService`/`OverdueCheckBackgroundService` already
+  are.
+- `backend/ops/backup/README.md` — required env vars, cron/systemd wiring
+  for all three scripts, and a real incident-recovery runbook (not just
+  the verification path).
+
+**Deliberately provider-agnostic** — a judgment call: MASTER doesn't name
+a cloud vendor for off-server storage, and hardcoding one would be
+inventing an infra decision nobody made. Uses `rclone` (one tool, 40+
+supported backends) so the destination is a config value, not a script
+rewrite.
+
+**Verification limits, honestly stated**: `docker` and `rclone` aren't
+available in this environment, so all three scripts were only verified
+with `bash -n` (syntax-valid) — no functional smoke test of the actual
+restore path was possible here, same "Docker unavailable" caveat this
+session has documented throughout for Postgres-backed .NET tests. Whoever
+wires these into real cron/systemd should run `restore_verify.sh` once by
+hand against a real backup before trusting the quarterly schedule.
+
 **Phase 6, Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password`.**
 `POST /auth/forgot-password` always returns success regardless of whether
 the phone exists ("не раскрывать, кто есть в системе") — generates a
@@ -451,12 +486,12 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 5
-**Next step:** Phase 6, Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention
-30д, вне сервера) + **проверка восстановления** → MASTER §11.8
+**Last completed:** Phase 6, Step 6
+**Next step:** Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку
+неудачных логинов, упавшую фоновую задачу → MASTER §11.8
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
-**Updated:** 2026-07-19
+**Updated:** 2026-07-20
 
 **Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
 пере-поставке.** New permanent `MaterialDeliveryAutoTransitionTests.cs`
@@ -1715,7 +1750,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) *(отложено — см. §15)* → MASTER §10.3
 - [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §15)* → MASTER §10.6
 - [x] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
-- [ ] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
+- [x] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
 - [ ] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
 - [ ] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
 - [ ] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §16
