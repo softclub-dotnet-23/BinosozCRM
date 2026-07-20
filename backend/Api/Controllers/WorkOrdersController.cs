@@ -62,6 +62,14 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    [HttpGet("{workOrderId:guid}")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    public async Task<IActionResult> Get(Guid workOrderId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetWorkOrderQuery(workOrderId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpPost("{workOrderId:guid}/assign")]
     [Authorize(Roles = "Owner,Prorab")]
     public async Task<IActionResult> Assign(Guid workOrderId, AssignWorkOrderRequest request, CancellationToken cancellationToken)
@@ -150,16 +158,4 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
-    // MASTER §1.1/§5.13/§9.4: PUT /work-orders/{id}/payout-shares —
-    // Brigadir, own brigade. Replaces the entire share set in one call —
-    // §5.13's "Σ SharePercent = 100.00 ровно" is checked against the whole
-    // incoming set, never per-row.
-    [HttpPut("{workOrderId:guid}/payout-shares")]
-    [Authorize(Roles = "Brigadir")]
-    public async Task<IActionResult> SetPayoutShares(Guid workOrderId, SetPayoutSharesRequest request, CancellationToken cancellationToken)
-    {
-        var shares = request.Shares.Select(s => new WorkOrderPayoutShareInput(s.WorkerId, s.SharePercent)).ToList();
-        var result = await sender.Send(new SetWorkOrderPayoutSharesCommand(workOrderId, shares), cancellationToken);
-        return result.ToActionResult(HttpContext);
-    }
 }
