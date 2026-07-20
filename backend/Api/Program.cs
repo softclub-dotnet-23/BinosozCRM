@@ -94,12 +94,34 @@ builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
 builder.Services.AddRateLimiter(options =>
 {
-    options.OnRejected = async (context, cancellationToken) => await ErrorEnvelope.WriteAsync(
-        context.HttpContext,
-        StatusCodes.Status429TooManyRequests,
-        "RATE_LIMITED",
-        "Too many login attempts. Try again later.",
-        cancellationToken);
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        // MASTER §11.8: "алерт на... неудачные логины пачкой" — this IS
+        // that alert. Hitting AuthLogin's own 5-per-15-minutes limit is a
+        // burst by definition (this system's own threshold, not a second
+        // one invented here); logged at Error, not Warning, since a
+        // sustained burst against one phone is exactly the "someone is
+        // trying to break in" signal §11.8 wants surfaced.
+        if (context.HttpContext.Request.Path.Equals("/api/v1/auth/login", StringComparison.OrdinalIgnoreCase))
+        {
+            var rejectLogger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var phone = context.HttpContext.Items.TryGetValue(LoginRateLimitKeyMiddleware.PhoneItemKey, out var value)
+                ? value as string
+                : null;
+
+            rejectLogger.LogError(
+                "Login rate limit exceeded for {Phone} from {IpAddress} — bulk failed-login pattern detected.",
+                phone ?? "unknown", ip);
+        }
+
+        await ErrorEnvelope.WriteAsync(
+            context.HttpContext,
+            StatusCodes.Status429TooManyRequests,
+            "RATE_LIMITED",
+            "Too many login attempts. Try again later.",
+            cancellationToken);
+    };
 
     options.AddPolicy(RateLimitPolicies.AuthLogin, httpContext =>
     {

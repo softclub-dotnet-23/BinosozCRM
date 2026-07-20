@@ -10,9 +10,17 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers;
 
+// MASTER §11.8: "алерт на... неудачные логины пачкой." Every individual
+// failed attempt is logged here (structured, no password) so an external
+// log-based alert rule can key off "N AUTH_INVALID_CREDENTIALS for the
+// same phone within a window" — the burst-threshold breach itself is a
+// separate, louder log line in Program.cs's rate-limiter OnRejected
+// callback, since that's the point where this system already knows a
+// burst just happened (RateLimitPolicies.AuthLogin's own 5-per-15-minutes
+// threshold), not a second threshold invented here.
 [ApiController]
 [Route("api/v1/auth")]
-public sealed class AuthController(ISender sender) : ControllerBase
+public sealed class AuthController(ISender sender, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -21,6 +29,14 @@ public sealed class AuthController(ISender sender) : ControllerBase
     {
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var result = await sender.Send(new LoginCommand(request.Phone, request.Password, ipAddress), cancellationToken);
+
+        if (result.IsFailure)
+        {
+            logger.LogWarning(
+                "Failed login attempt for {Phone} from {IpAddress}: {ErrorCode}",
+                request.Phone, ipAddress, result.Error.Code);
+        }
+
         return result.ToActionResult(HttpContext);
     }
 

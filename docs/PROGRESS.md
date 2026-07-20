@@ -17,6 +17,56 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных
+логинов, упавшую фоновую задачу.** The 5xx and failed-background-job legs
+were already fully covered by existing code (`ExceptionHandlingMiddleware`,
+`PayrollDraftBackgroundService`/`OverdueCheckBackgroundService`); the only
+new work was bulk-failed-login alerting — see full writeup below.
+
+**Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных
+логинов, упавшую фоновую задачу → MASTER §11.8.** Audited all three legs
+before writing anything; two were already fully covered by existing code:
+
+- **5xx** — every 5xx response funnels through `ExceptionHandlingMiddleware`
+  (Phase 0), which already logs at `Error` with structured Method/Path/
+  TraceId. Confirmed `INTERNAL_ERROR` is the only 5xx code in
+  `ErrorCodeCatalog.cs`, so there's no second path that bypasses it. No
+  change needed.
+- **Failed background job** — `PayrollDraftBackgroundService` (Phase 5
+  Step 8) and `OverdueCheckBackgroundService` (Phase 6 Step 2) already
+  wrap each company's run in try/catch and `LogError` on failure without
+  aborting the other companies' runs. No change needed.
+- **Bulk failed logins** — genuinely new: no `ILogger` had ever been
+  injected into `AuthController` or referenced from any `Application/
+  Auth/*.cs` handler. Two additions, keeping `ILogger` scoped to the Api
+  layer only (Application never takes a logging dependency anywhere in
+  this codebase — respected that boundary rather than adding it to
+  `LoginCommandHandler`):
+  1. `AuthController.Login` now logs a `Warning` on every failed attempt
+     (phone, IP, error code — never the password) — raw material for an
+     external log-based rule to detect a burst against one phone.
+  2. `Program.cs`'s rate limiter `OnRejected` callback now logs an `Error`
+     specifically when the request path is `/api/v1/auth/login` — i.e.
+     exactly when `RateLimitPolicies.AuthLogin`'s existing 5-per-15-minutes
+     threshold is exceeded. This *is* the "пачка неудачных логинов" alert:
+     it reuses the threshold the system already encodes rather than
+     inventing a second one.
+
+Verified with two throwaway tests (`ThrowawayLoginAlertingCheck.cs`, hand-
+written `FakeSender : ISender` + `CapturingLogger : ILogger<AuthController>`,
+no ASP.NET test host needed — this codebase has no `WebApplicationFactory`
+precedent anywhere): failed login logs exactly one `Warning` with the right
+phone/error code; successful login logs nothing. Both passed, then the
+file was deleted (`git status --short backend/Tests/` confirmed clean —
+no InMemory package was needed this time, so no `Directory.Packages.props`
+revert either). The rate-limiter branch itself wasn't unit-tested (a
+three-line conditional inside `OnRejected`, no test host to host it in) —
+verified by code review instead.
+
+Build clean, 0 warnings. Test suite unchanged from baseline (69/108 pass
+locally, 39 Docker-gated — same Testcontainers unavailability this session
+has documented throughout).
+
 **Phase 6, Step 6 [BE] — backups (`pg_dump` + WAL, 30-day retention,
 off-server) + restore verification.** Infrastructure/ops scripting, not
 C# — the .NET build/test suite is unaffected (zero `.cs` files touched).
@@ -486,9 +536,9 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 6
-**Next step:** Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку
-неудачных логинов, упавшую фоновую задачу → MASTER §11.8
+**Last completed:** Phase 6, Step 7
+**Next step:** Phase 6, Step 8 [FULL] — security: полный проход по §11 +
+пентест — до первого реального использования на деньгах → MASTER §11
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
 **Updated:** 2026-07-20
