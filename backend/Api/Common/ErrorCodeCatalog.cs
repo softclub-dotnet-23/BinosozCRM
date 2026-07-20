@@ -12,7 +12,8 @@ namespace Api.Common;
 // (Phase 2 Step 1), INDIVIDUAL_TASK_NOT_FOUND (Phase 2 Step 2, a task
 // belonging to another brigade — §4's "не видит чужие бригады (404, не
 // 403)"), TIMESHEET_NOT_FOUND (Phase 3 Step 1), MATERIAL_REQUEST_NOT_FOUND
-// (Phase 4 Step 2), same reasoning throughout: same pattern as
+// (Phase 4 Step 2), COMPANY_NOT_FOUND (punch-list closeout, GET,PUT
+// /companies/current) same reasoning throughout: same pattern as
 // WORK_ORDER_NOT_FOUND / PRORAB_NOT_ASSIGNED_TO_OBJECT — a route or body
 // reference to another company's/brigade's row (or no row at all) reads as
 // 404, not 400/403, per MASTER §11.5 rule 2. Not in §9.2's table either,
@@ -50,6 +51,7 @@ public static class ErrorCodeCatalog
         ["BRIGADE_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORKER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["COMPANY_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["CUSTOMER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["OBJECT_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["ESTIMATE_ITEM_NOT_FOUND"] = StatusCodes.Status404NotFound,

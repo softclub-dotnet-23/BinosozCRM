@@ -13,8 +13,8 @@ phase-summary files written for 2-6 — genuinely not finished (bot work
 outstanding), just unblocked for further backend work per the user's
 2026-07-19 decision to keep going rather than wait on the bot.
 **Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
-(2026-07-20), not implemented — real gaps, deliberately out of scope for
-a docs step, need their own pass before launch:**
+(2026-07-20) — 1 of 3 closed, 2026-07-20:**
+- ~~`GET,PUT /companies/current`~~ — **done**, see writeup below.
 - `WorkOrder.Rework()` and `.Close()` exist in Domain (`backend/Domain/Entities/WorkOrder.cs`)
   but are never called from any handler or controller — a `Rejected`
   order can never return to `InProgress` via the API, and an `Accepted`
@@ -24,9 +24,42 @@ a docs step, need their own pass before launch:**
 - `GET /work-orders/mine` (Brigadir) — documented in §9.4, no matching
   controller action. `WorkOrdersController`'s `GET /work-orders` is
   `Owner,Prorab` only.
-- `GET,PUT /companies/current` (§9.4) — no `CompaniesController` exists at
-  all. Owner currently has no API way to change `Company` thresholds
-  (`LatenessGraceMinutes`, `PieceworkDistributionMode`, etc.) post-seed.
+**Punch-list item 1/3 — `GET,PUT /companies/current` → MASTER §9.4, §5.1.**
+Not a PROGRESS.md checklist step (this was found during Phase 6 Step 9's
+reconciliation, not a numbered step of any phase) — closed at the user's
+explicit request to work through the punch list, starting here.
+
+`Company.UpdateSettings()` already existed in Domain (built alongside the
+entity, never wired to anything) — the actual gap was the entire
+Application/Api surface. Added:
+- `Application/Companies/CompanyDto.cs`, `GetCurrentCompanyQuery.cs`,
+  `UpdateCompanySettingsCommand.cs` — `Company` isn't `ICompanyOwned` (§5's
+  own exclusion list), so both handlers filter explicitly by the caller's
+  `CompanyId` claim rather than relying on a global query filter that
+  doesn't apply here; a caller from another company gets `COMPANY_NOT_FOUND`
+  (404), not another company's settings.
+- `Api/Controllers/CompaniesController.cs` — `GET /companies/current`
+  (`[Authorize]`, any authenticated role, per §9.4's plain "auth"),
+  `PUT /companies/current` (`[Authorize(Roles = "Owner")]`, overriding the
+  class default — only Owner changes thresholds/mode).
+- `COMPANY_NOT_FOUND` added to `ErrorCodeCatalog.cs` (404) — not in §9.2's
+  table, same "route reference to another company's row reads as 404"
+  reasoning as every other `*_NOT_FOUND` code documented there.
+- No `AdminAuditLog` entry — checked §5.16's `Action` enum and §11.7
+  first; company-settings changes aren't in either list (only role change,
+  deactivation, brigadir assignment, `PayRate` change, advance issued,
+  payroll paid), so adding one here would be inventing an audit
+  requirement MASTER doesn't state.
+
+Verified with a throwaway InMemory check (get → update → get again
+reflects new values; a caller from a different company gets
+`COMPANY_NOT_FOUND`) before writing the permanent Postgres test
+(`CompanySettingsTests.cs`, same 3 scenarios) — Docker unavailable
+locally, same caveat as every other permanent test this session.
+
+Build clean, 0 warnings. Test suite: 69/115 pass locally (46 Docker-gated,
+up 3 — no regressions).
+
 **Phase 3, Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения →
 MASTER §8.9.** Closes the gap flagged back when this step was first built
 (Phase 3) and re-flagged in Phase 6 Step 9's reconciliation: points 1, 2,
