@@ -27,9 +27,12 @@ public sealed class AccountActiveMiddleware(RequestDelegate next)
 
             if (isActive != true)
             {
+                // MASTER §9.2: AUTH_ACCOUNT_DEACTIVATED is 400, same code
+                // login already returns for this case (ErrorCodeCatalog.cs) —
+                // kept consistent rather than inventing a 401 variant here.
                 await ErrorEnvelope.WriteAsync(
                     context,
-                    StatusCodes.Status401Unauthorized,
+                    StatusCodes.Status400BadRequest,
                     "AUTH_ACCOUNT_DEACTIVATED",
                     "This account has been deactivated.");
                 return;

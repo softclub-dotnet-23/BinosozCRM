@@ -17,6 +17,67 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
+(2026-07-20), not implemented — real gaps, deliberately out of scope for
+a docs step, need their own pass before launch:**
+- `WorkOrder.Rework()` and `.Close()` exist in Domain (`backend/Domain/Entities/WorkOrder.cs`)
+  but are never called from any handler or controller — a `Rejected`
+  order can never return to `InProgress` via the API, and an `Accepted`
+  order can never reach `Closed`. §7.1 says Close is "авто после
+  `PayrollEntry.Paid`, либо вручную Prorab" — which of the two (or both)
+  needs a decision before implementing, not assumed here.
+- `GET /work-orders/mine` (Brigadir) — documented in §9.4, no matching
+  controller action. `WorkOrdersController`'s `GET /work-orders` is
+  `Owner,Prorab` only.
+- `GET,PUT /companies/current` (§9.4) — no `CompaniesController` exists at
+  all. Owner currently has no API way to change `Company` thresholds
+  (`LatenessGraceMinutes`, `PieceworkDistributionMode`, etc.) post-seed.
+**Phase 6, Step 9 [FULL] — docs: сверка MASTER.md с реальным кодом перед
+запуском → MASTER.md (весь документ).** Read the whole spec (947 lines,
+as the step calls for — not scoped sections), cross-checked every §5
+entity, §6 index, §7 state machine, §9.2 error code, §9.4 endpoint, and a
+sample of §12's role matrix against the actual code (Domain/Application/
+Infrastructure/Api — TelegramBot excluded, 0 source files, deferred since
+2026-07-18, not a discrepancy). Delegated the mechanical cross-referencing
+to a read-only research pass, then verified and acted on it directly.
+
+**Fixed — code bug from Step 8:** `AccountActiveMiddleware` (added last
+step) wrote `401` for `AUTH_ACCOUNT_DEACTIVATED`; MASTER §9.2 and
+`ErrorCodeCatalog.cs` both say `400` — same code `LoginCommand` already
+returns for the same case. Corrected to `400` for consistency, no new
+status code invented.
+
+**Fixed — MASTER.md corrections (code was right, docs were stale):**
+- §6: `WorkOrder(Code) UNIQUE` / `IndividualTask(Code) UNIQUE` contradicted
+  §5.11's own "`Code` (`BR-{N}`, unique **per company**)" — the index list
+  was globally-unique wording left over from an earlier draft. Corrected
+  both to `(CompanyId, Code) UNIQUE`, matching what's actually configured
+  in `Infrastructure/Persistence/Configurations/`.
+- §11.6/§12: documented Prorab as seeing a masked document number
+  (`****4567`); actual code (`WorkerDto.cs:32-46`, built and tested across
+  multiple earlier phases) hides it entirely (`null`) for Prorab instead —
+  stricter than spec, not a security gap. Per your call, updated MASTER to
+  document the real, stricter behavior rather than churn working code and
+  its tests for a cosmetic difference.
+
+**Found, not fixed — logged as a punch list in Current Status above, per
+your call to keep this step docs-only:** three real functional gaps
+(`WorkOrder.Rework()`/`.Close()` unreachable from any handler,
+`GET /work-orders/mine` missing, `GET,PUT /companies/current` missing
+entirely) that are genuine pre-launch feature work, not documentation
+drift — deliberately not implemented here to avoid quietly expanding a
+docs-reconciliation step into unplanned endpoint work.
+
+**Confirmed clean, no discrepancies:** all 27 §5 entities map to Domain
+classes with matching fields; all 4 §7 state machines (WorkOrder,
+IndividualTask, MaterialRequest, PayrollEntry) match their guard methods
+exactly; every §9.2 error code exists in `ErrorCodeCatalog.cs` with the
+documented HTTP status; sampled §12 role-matrix rows (AbsenceRecord,
+PayrollEntry) match their controllers' `[Authorize]` attributes.
+
+Build clean, 0 warnings. Test suite unchanged: 69/109 pass locally, 40
+Docker-gated.
+
 **Phase 6, Step 8 [FULL] — security: full pass over §11 + pentest.** Full
 audit against every §11 subsection; 7/9 already conformant, 2 real gaps
 fixed in code (deactivated-user middleware, a Prorab IDOR on bonus
@@ -608,9 +669,15 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 8
-**Next step:** Phase 6, Step 9 [FULL] — docs: сверка MASTER.md с реальным
-кодом перед запуском → MASTER.md (весь документ)
+**Last completed:** Phase 6, Step 9 — **last `[BE]`/`[FULL]` step of Phase 6.**
+All backend-only work through Phase 6 is now checked off. What remains
+unchecked project-wide: every `[BOT]` step (blocked on the 2026-07-18 bot
+deferral) and the 3-item punch list above from Step 9's reconciliation
+(Rework/Close wiring, `work-orders/mine`, `companies/current`) — neither
+is a "next step" in the usual sequential sense; both need a user decision
+on scope/priority before becoming one.
+**Next step:** none auto-selected — see punch list above and the bot
+deferral; ask the user which to pick up.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
 **Tests:** `Tests/Api.IntegrationTests` — 109 tests, confirmed via `dotnet test` (69 pass locally, 40 need Docker — see below)
 **Updated:** 2026-07-20
@@ -1873,9 +1940,9 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §15)* → MASTER §10.6
 - [x] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
 - [x] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
-- [ ] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
+- [x] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
 - [x] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
-- [ ] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §16
+- [x] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §16
 
 ---
 
