@@ -109,4 +109,11 @@ public sealed class ObjectsController(ISender sender) : ControllerBase
         var result = await sender.Send(new ListObjectProrabsQuery(objectId, clampedPage, clampedPageSize), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpGet("{objectId:guid}/cost-breakdown")]
+    public async Task<IActionResult> GetCostBreakdown(Guid objectId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetObjectCostBreakdownQuery(objectId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

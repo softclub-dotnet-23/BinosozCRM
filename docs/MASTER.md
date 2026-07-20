@@ -283,9 +283,9 @@ PasswordResetToken(TokenHash) UNIQUE
 Worker(BrigadeId), Worker(CompanyId), Worker(DocumentExpiryDate) WHERE DocumentExpiryDate IS NOT NULL
 ProrabObjectAssignment(ProrabUserId, ObjectId) UNIQUE
 ConstructionObject(CompanyId, Status)
-WorkOrder(Code) UNIQUE, WorkOrder(ObjectId, BrigadeId, Status), WorkOrder(DueDate) WHERE Status NOT IN (Accepted, Closed)
+WorkOrder(CompanyId, Code) UNIQUE, WorkOrder(ObjectId, BrigadeId, Status), WorkOrder(DueDate) WHERE Status NOT IN (Accepted, Closed)
 WorkOrderPayoutShare(WorkOrderId), WorkOrderPayoutShare(WorkerId)
-IndividualTask(Code) UNIQUE, IndividualTask(AssignedToWorkerId, Status), IndividualTask(BrigadeId, Status)
+IndividualTask(CompanyId, Code) UNIQUE, IndividualTask(AssignedToWorkerId, Status), IndividualTask(BrigadeId, Status)
 TaskLog(EntityType, EntityId, ChangedAt)
 AdminAuditLog(CompanyId, At), AdminAuditLog(ActorUserId, At)
 MaterialRequest(ObjectId, BrigadeId, Status)
@@ -825,7 +825,7 @@ HTTPS обязателен, HTTP → редирект, HSTS. `Content-Security-P
 
 `Worker.BirthDate`, `DocumentType`, `DocumentExpiryDate`, `Phone` — персональные данные. Раньше лежали открыто, без единого слова о защите.
 
-- **Доступ:** полный номер документа виден только Owner/Accountant. Prorab видит **маскированный** (`****4567`) — ему для приёмки работы полный не нужен. Brigadir — не видит вообще. Маскирование — на уровне **Response DTO** (разные DTO под разные роли), не на стороне клиента.
+- **Доступ:** полный номер документа виден только Owner/Accountant. Prorab и Brigadir не видят его вообще (`null` в Response DTO) — для приёмки работы он не нужен ни тому, ни другому. Реализовано строже первоначального плана (маскированный `****4567` для Prorab) — после ревью решили, что скрыть целиком проще и безопаснее, чем поддерживать частичный формат, которым всё равно никто не пользуется. Маскирование/сокрытие — на уровне **Response DTO** (разные DTO под разные роли), не на стороне клиента.
 - **Логи:** явный `Serilog.Destructure.ByTransforming<WorkerDto>` — исключает PII-поля. Не «постараемся не логировать», а технический запрет.
 - **Шифрование на уровне колонки** (`DocumentType`/`DocumentExpiryDate`) — **вне MVP**, зафиксировано осознанно: при одной компании и одной БД шифрование колонки защищает только от того, у кого уже есть доступ к базе, то есть почти ни от чего, а ключи усложняют бэкапы. Пересмотреть при появлении внешнего хостинга БД. §15 №10.
 - **Экспорт/удаление данных рабочего** по требованию — вне MVP, но `Worker` уже soft-delete, физическое удаление возможно точечно.
@@ -867,7 +867,7 @@ Row-Level Security в Postgres поверх EF-фильтров (при одно
 | EstimateItem | CRU | CRU | R (own object) | R |
 | Brigade | CRU | CRU | R (own) | R |
 | Worker | CRU | CRU (**без PayRate**) | R (own brigade) | R (**с PayRate**) |
-| Worker.Document* | R (полный) | R (**маскированный**) | — | R (полный) |
+| Worker.Document* | R (полный) | — (скрыто) | — | R (полный) |
 | WorkOrder | CRUA | CRUA | R(own) + submit | R |
 | WorkOrderProgress | R | R | C (own) | — |
 | WorkOrderPayoutShare | R | RA (**подтверждает**) | CU (own, при закрытии) | R |

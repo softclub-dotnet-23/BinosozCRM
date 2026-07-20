@@ -6,15 +6,577 @@
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
-**Phases 2 & 3: functionally ✅ COMPLETE for now (backend only).** All
-`[BE]` steps done except: Phase 2 Step 9's bot-idempotency slice, Phase 3
-Step 3's "финальный расчёт" clause (blocked on Phase 5's
-`CalculatedAmount`/`PayrollAdvance`, neither built yet). Every `[BOT]`
-step across both phases (Phase 2: 6–8, Phase 3: 4–6) stays unchecked,
-blocked on the 2026-07-18 bot deferral. No phase-summary files written for
-either — genuinely not finished, just unblocked for further backend work
-per the user's 2026-07-19 decision to keep going rather than wait on the
-bot.
+**Phases 2, 3, 4, 5 & 6: every `[BE]`/`[FULL]` step is now done, and the
+Phase 6 Step 9 punch list is fully closed.** The only unchecked items
+across all six phases are `[BOT]` steps, blocked on the 2026-07-18 bot
+deferral. No phase-summary files written for 2-6 — genuinely not finished
+(bot work outstanding), just unblocked for further backend work per the
+user's 2026-07-19 decision to keep going rather than wait on the bot.
+**Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
+(2026-07-20) — all 3 closed, 2026-07-20:**
+- ~~`GET,PUT /companies/current`~~ — **done**, see writeup below.
+- ~~`GET /work-orders/mine`~~ — **done**, see writeup below.
+- ~~`WorkOrder.Rework()`/`.Close()` wiring~~ — **done**, see writeup below.
+**Punch-list item 3/3 — `WorkOrder.Rework()`/`.Close()` wiring → MASTER
+§7.1.** The last punch-list gap. `Rework()` and `Close()` existed in
+Domain since Phase 2 but nothing ever called them — a `Rejected` order
+could never return to `InProgress`, and an `Accepted` order could never
+reach `Closed`, via the API. §7.1 documents Close both ways ("авто после
+`PayrollEntry.Paid`... либо вручную Prorab") — asked the user, both were
+wanted, plus a decision on how `Rework` should be triggered (new
+Brigadir-only endpoint, matching `/start`/`/submit`'s ownership, rather
+than folding it into `/submit`).
+
+- `ReworkWorkOrderCommand` — Brigadir, own brigade (`WorkOrderAccess.
+  GetForBrigadirAsync`), same TaskLogWriter/notifier shape as every other
+  transition handler. Wired as `POST /work-orders/{id}/rework`.
+- `CloseWorkOrderCommand` — Prorab+ manual half, own object
+  (`WorkOrderAccess.GetForProrabAsync`). Wired as `POST /work-orders/{id}/close`.
+- `WorkOrderAutoCloser` — the automatic half. A Piecework order's earnings
+  split across several workers via `WorkOrderPayoutShare` (§1.1), so
+  closing after just one contributor's `PayrollEntry` reaches `Paid` would
+  be wrong while others are still unpaid — this only closes an order once
+  **every** worker with a share in it has a `Paid` entry covering the
+  order's `CompletedDate`. Called from `PayPayrollEntryCommand` after each
+  successful `Pay()`. Deliberately runs in a **second** `SaveChangesAsync`,
+  not the same one as the payroll write — it queries every contributing
+  worker's `PayrollEntry.Status` fresh, which only reflects the just-paid
+  worker's own status once actually committed, not merely tracked in
+  memory (caught this the hard way: a first attempt bundled both into one
+  save and the auto-close silently never fired, since the query ran
+  before the paying worker's own `Paid` status had landed in the store).
+  Only ever finds candidates among orders that **have**
+  `WorkOrderPayoutShare` rows — an Hourly brigade's hours aren't
+  attributed to a specific `WorkOrder` in `PayrollEntry` at all (§8.0), so
+  those orders close only via the manual endpoint.
+
+Verified with a throwaway InMemory check (3 scenarios: rework, manual
+close with Prorab-isolation, and the two-worker auto-close sequence —
+order stays `Accepted` after the first worker's pay, closes only after
+the second) before adding permanent Postgres tests to
+`WorkOrderIsolationTests.cs` (rework + manual close scenarios; the
+auto-close scenario's InMemory-only verification stands alone since it
+spans WorkOrders + Payroll and didn't fit that file's existing seed shape
+cleanly — flagged here rather than silently skipped).
+
+Build clean, 0 warnings. Test suite: 69/119 pass locally (50 Docker-gated,
+up 2 — no regressions).
+
+**Punch-list item 2/3 — `GET /work-orders/mine` → MASTER §9.4.** The
+Brigadir half of "`GET,POST /work-orders` — Prorab+ / Brigadir(own, read)"
+that `ListWorkOrdersQuery`'s own comment had flagged as not yet built.
+Added `Application/WorkOrders/ListMyWorkOrdersQuery.cs` — same shape as
+`ListIndividualTasksQuery` (`BrigadeAccess.GetCallerBrigadeIdAsync`,
+`WORKER_NOT_FOUND` for a caller with no linked `Worker` row, filter by
+`BrigadeId`, paginated), a separate handler rather than a role branch
+inside `ListWorkOrdersQuery` — same split `ListIndividualTasksQuery` uses.
+Wired as `GET /work-orders/mine` (`[Authorize(Roles = "Brigadir")]`) in
+`WorkOrdersController`, ahead of the `{workOrderId:guid}/...` routes
+(no collision — this controller has no bare `GET /work-orders/{id}`).
+Updated `ListWorkOrdersQuery.cs`'s own comment, which had gone stale
+claiming "Brigadir has no authenticated path anywhere in this codebase
+yet" — no longer true as of Phase 3 Step 3 and this step both landing.
+
+Verified with a throwaway InMemory check (own-brigade order visible,
+other brigade's excluded, unlinked caller gets `WORKER_NOT_FOUND`) before
+adding 2 permanent Postgres tests to the existing
+`WorkOrderIsolationTests.cs` (same scenarios, reusing that file's existing
+`SeedAsync` helper).
+
+Build clean, 0 warnings. Test suite: 69/117 pass locally (48 Docker-gated,
+up 2 — no regressions).
+
+**Punch-list item 1/3 — `GET,PUT /companies/current` → MASTER §9.4, §5.1.**
+Not a PROGRESS.md checklist step (this was found during Phase 6 Step 9's
+reconciliation, not a numbered step of any phase) — closed at the user's
+explicit request to work through the punch list, starting here.
+
+`Company.UpdateSettings()` already existed in Domain (built alongside the
+entity, never wired to anything) — the actual gap was the entire
+Application/Api surface. Added:
+- `Application/Companies/CompanyDto.cs`, `GetCurrentCompanyQuery.cs`,
+  `UpdateCompanySettingsCommand.cs` — `Company` isn't `ICompanyOwned` (§5's
+  own exclusion list), so both handlers filter explicitly by the caller's
+  `CompanyId` claim rather than relying on a global query filter that
+  doesn't apply here; a caller from another company gets `COMPANY_NOT_FOUND`
+  (404), not another company's settings.
+- `Api/Controllers/CompaniesController.cs` — `GET /companies/current`
+  (`[Authorize]`, any authenticated role, per §9.4's plain "auth"),
+  `PUT /companies/current` (`[Authorize(Roles = "Owner")]`, overriding the
+  class default — only Owner changes thresholds/mode).
+- `COMPANY_NOT_FOUND` added to `ErrorCodeCatalog.cs` (404) — not in §9.2's
+  table, same "route reference to another company's row reads as 404"
+  reasoning as every other `*_NOT_FOUND` code documented there.
+- No `AdminAuditLog` entry — checked §5.16's `Action` enum and §11.7
+  first; company-settings changes aren't in either list (only role change,
+  deactivation, brigadir assignment, `PayRate` change, advance issued,
+  payroll paid), so adding one here would be inventing an audit
+  requirement MASTER doesn't state.
+
+Verified with a throwaway InMemory check (get → update → get again
+reflects new values; a caller from a different company gets
+`COMPANY_NOT_FOUND`) before writing the permanent Postgres test
+(`CompanySettingsTests.cs`, same 3 scenarios) — Docker unavailable
+locally, same caveat as every other permanent test this session.
+
+Build clean, 0 warnings. Test suite: 69/115 pass locally (46 Docker-gated,
+up 3 — no regressions).
+
+**Phase 3, Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения →
+MASTER §8.9.** Closes the gap flagged back when this step was first built
+(Phase 3) and re-flagged in Phase 6 Step 9's reconciliation: points 1, 2,
+and 5 of §8.9's five-point termination lifecycle were already done (open
+`IndividualTask` blocks termination outright, `WorkOrderPayoutShare` rows
+are left untouched, `IsActive = false`); points 3 and 4 — "текущий
+`PayrollEntry` формируется... досрочно" and "непогашенные авансы попадают
+в этот финальный расчёт" — needed Phase 5's `CalculatedAmount`/
+`PayrollAdvance` machinery, which didn't exist yet at the time.
+
+Added `PayrollEntry.ShortenPeriodEnd()` (Domain, Draft-only guard) and
+extended `TerminateWorkerCommandHandler`: on termination, finds the Draft
+`PayrollEntry` for the period containing `TerminationDate` (creating one
+if the background job hasn't yet, via `PayrollPeriodCalculator.
+GetPeriodContaining`), shortens its `PeriodEnd` to `TerminationDate`
+instead of the natural period end, and recomputes `CalculatedAmount`/
+`LatenessDeductionAmount`/`BonusAmount`/`AdvanceDeductedAmount` over that
+shortened range using the same calculators `GeneratePayrollDraftCommand`
+already uses. The shortened `PeriodEnd` is what makes
+`AdvanceDeductedAmountCalculator`'s existing `IssuedAt <= PeriodEnd` bound
+correctly exclude an advance issued after the worker left. An entry
+already `Approved`/`Paid` for that period is left untouched — termination
+can't rewrite a signed-off figure.
+
+Verified two ways: a throwaway InMemory-backed check (worker terminated
+mid-period, one advance before `TerminationDate` included, one after
+excluded — both correct, then deleted) and a permanent Postgres test
+(`WorkerTerminationLifecycleTests.cs`, 3 cases: open-task block, the
+shortened-draft money scenario, and reusing an existing full-period draft
+instead of creating a duplicate row for the same worker/month).
+
+Build clean, 0 warnings. Test suite: 69/112 pass locally (43 Docker-gated,
+up 3 from the new permanent tests — no regressions).
+
+**Phase 6, Step 9 [FULL] — docs: сверка MASTER.md с реальным кодом перед
+запуском → MASTER.md (весь документ).** Read the whole spec (947 lines,
+as the step calls for — not scoped sections), cross-checked every §5
+entity, §6 index, §7 state machine, §9.2 error code, §9.4 endpoint, and a
+sample of §12's role matrix against the actual code (Domain/Application/
+Infrastructure/Api — TelegramBot excluded, 0 source files, deferred since
+2026-07-18, not a discrepancy). Delegated the mechanical cross-referencing
+to a read-only research pass, then verified and acted on it directly.
+
+**Fixed — code bug from Step 8:** `AccountActiveMiddleware` (added last
+step) wrote `401` for `AUTH_ACCOUNT_DEACTIVATED`; MASTER §9.2 and
+`ErrorCodeCatalog.cs` both say `400` — same code `LoginCommand` already
+returns for the same case. Corrected to `400` for consistency, no new
+status code invented.
+
+**Fixed — MASTER.md corrections (code was right, docs were stale):**
+- §6: `WorkOrder(Code) UNIQUE` / `IndividualTask(Code) UNIQUE` contradicted
+  §5.11's own "`Code` (`BR-{N}`, unique **per company**)" — the index list
+  was globally-unique wording left over from an earlier draft. Corrected
+  both to `(CompanyId, Code) UNIQUE`, matching what's actually configured
+  in `Infrastructure/Persistence/Configurations/`.
+- §11.6/§12: documented Prorab as seeing a masked document number
+  (`****4567`); actual code (`WorkerDto.cs:32-46`, built and tested across
+  multiple earlier phases) hides it entirely (`null`) for Prorab instead —
+  stricter than spec, not a security gap. Per your call, updated MASTER to
+  document the real, stricter behavior rather than churn working code and
+  its tests for a cosmetic difference.
+
+**Found, not fixed — logged as a punch list in Current Status above, per
+your call to keep this step docs-only:** three real functional gaps
+(`WorkOrder.Rework()`/`.Close()` unreachable from any handler,
+`GET /work-orders/mine` missing, `GET,PUT /companies/current` missing
+entirely) that are genuine pre-launch feature work, not documentation
+drift — deliberately not implemented here to avoid quietly expanding a
+docs-reconciliation step into unplanned endpoint work.
+
+**Confirmed clean, no discrepancies:** all 27 §5 entities map to Domain
+classes with matching fields; all 4 §7 state machines (WorkOrder,
+IndividualTask, MaterialRequest, PayrollEntry) match their guard methods
+exactly; every §9.2 error code exists in `ErrorCodeCatalog.cs` with the
+documented HTTP status; sampled §12 role-matrix rows (AbsenceRecord,
+PayrollEntry) match their controllers' `[Authorize]` attributes.
+
+Build clean, 0 warnings. Test suite unchanged: 69/109 pass locally, 40
+Docker-gated.
+
+**Phase 6, Step 8 [FULL] — security: full pass over §11 + pentest.** Full
+audit against every §11 subsection; 7/9 already conformant, 2 real gaps
+fixed in code (deactivated-user middleware, a Prorab IDOR on bonus
+approval), 1 general rate-limit gap closed, telegram-webhook limiter
+explicitly deferred (bot unbuilt) — see full writeup below.
+
+**Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных
+логинов, упавшую фоновую задачу.** The 5xx and failed-background-job legs
+were already fully covered by existing code (`ExceptionHandlingMiddleware`,
+`PayrollDraftBackgroundService`/`OverdueCheckBackgroundService`); the only
+new work was bulk-failed-login alerting — see full writeup below.
+
+**Phase 6, Step 8 [FULL] — security: полный проход по §11 + пентест →
+MASTER §11.** No web-app pentest tooling applies here (no web frontend,
+§0) — treated as a full code-level audit of every §11 subsection against
+the actual implementation, the closest equivalent for an API-only backend.
+7 of 9 areas were already fully conformant from prior phases; 3 gaps found,
+2 fixed as real code, 1 explicitly deferred:
+
+- **§11.1 Tokens — GAP, fixed.** `User.IsActive = false` was checked at
+  login/refresh/reset but never per-request — spec requires "проверяется
+  middleware на каждом запросе", specifically to stop a deactivated user
+  working for up to 15 minutes (the access token's remaining TTL). Added
+  `backend/Api/Middleware/AccountActiveMiddleware.cs`: reads `IsActive` by
+  exact `UserId` from the JWT claim on every authenticated request
+  (`IgnoreQueryFilters()`, scoped by exact id so the CompanyId filter can't
+  hide anything), returns `401 AUTH_ACCOUNT_DEACTIVATED` the instant it's
+  false. Wired into `Program.cs` right after `UseAuthentication()` — before
+  `UseAuthorization()`, since this isn't a role decision. Deliberately a DB
+  read unlike the adjacent `ForcePasswordChangeMiddleware` (claim-only by
+  design there — a stale claim can only be too strict; here a stale claim
+  would be too lax, exactly the failure mode being closed).
+- **§11.5 Authorization/IDOR — GAP, fixed, the real one.** `ApproveBonusCommand`
+  (Prorab+, approves or overrides bonus amounts that feed straight into
+  `PayrollEntry`) had **no** `BrigadeId`/`ProrabObjectAssignment` scoping at
+  all — every sibling handler in `Application/IndividualTasks/` has one,
+  this didn't. A Prorab could approve/change bonus money for any brigade's
+  task company-wide, including objects they have zero assignment to. This
+  is the exact "🔴, not a suggestion" pattern AGENTS.md calls out. Fixed:
+  when the task carries a `WorkOrderId`, its order's `ObjectId` is now
+  checked against `ProrabObjectAccess.GetAllowedObjectIdsAsync` (mirrors
+  `WorkOrderAccess.GetForProrabAsync`), failing `PRORAB_NOT_ASSIGNED_TO_OBJECT`
+  (404-class, not 403, per rule 2). A personal task (§8.5, no `WorkOrderId`)
+  has no object to scope by — stays company-wide for Prorab, same precedent
+  already established for Worker/Brigade/AbsenceRecord elsewhere. Added a
+  permanent Postgres-backed test to `IndividualTaskIsolationTests.cs`
+  (`Prorab_not_assigned_to_the_objects_object_cannot_approve_the_bonus`)
+  proving an unassigned Prorab is rejected while a second, unrelated
+  assignment doesn't accidentally grant access (mirrors the existing
+  `WorkOrderIsolationTests` pattern).
+- **§11.4 Rate limiting — GAP, fixed.** Only `/auth/login` and
+  `/auth/forgot-password` had policies; spec's "остальное — общий лимит на
+  пользователя/IP" had no implementation at all, leaving every other
+  endpoint unthrottled. Added `options.GlobalLimiter` in `Program.cs`: 120
+  requests/minute, partitioned by user id when authenticated else by IP.
+  MASTER gives no number for this one (unlike login's literal 5/15min or
+  forgot-password's literal 3/hour) — 120/min is a documented judgment
+  call, not an invented business rule about money, chosen to be generous
+  enough not to bother a real integration while blunting a scripted hammer
+  against any single endpoint.
+- **Not fixed, explicitly deferred**: `/telegram/webhook`'s own rate limit
+  (§11.4) and its role in password-reset delivery (§11.2) — the
+  `TelegramBot` project has zero source files, unchanged since the
+  2026-07-18 bot deferral. Nothing to rate-limit yet.
+- **Confirmed already conformant, no change needed**: §11.2 (forgot/reset
+  password — always-200, hashed+TTL+single-use token, full refresh-chain
+  revoke on reset), §11.3 (HSTS/CSP/nosniff/X-Frame-Options/CORS allow-list),
+  §11.6 (PII masking in the DTO layer, Serilog PII exclusion), §11.7 (all 6
+  `AdminAuditLog` actions covered — role change, deactivation, brigadir
+  assignment, PayRate change, advance issued, payroll paid), §11.8 (health
+  checks, CI/CD with `dotnet list package --vulnerable` gated — ran clean,
+  no vulnerable packages across all 6 projects), §11.9 (Argon2id, signed
+  URLs with expiry, MIME allow-list not blacklist, path-traversal guard).
+  §11.10 items (Row-Level Security, WAF, 2FA) correctly remain out of MVP.
+
+Build clean, 0 warnings. Test suite: 69/109 pass locally (40 Docker-gated,
+up one from the new permanent isolation test — no regressions).
+
+**Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных
+логинов, упавшую фоновую задачу → MASTER §11.8.** Audited all three legs
+before writing anything; two were already fully covered by existing code:
+
+- **5xx** — every 5xx response funnels through `ExceptionHandlingMiddleware`
+  (Phase 0), which already logs at `Error` with structured Method/Path/
+  TraceId. Confirmed `INTERNAL_ERROR` is the only 5xx code in
+  `ErrorCodeCatalog.cs`, so there's no second path that bypasses it. No
+  change needed.
+- **Failed background job** — `PayrollDraftBackgroundService` (Phase 5
+  Step 8) and `OverdueCheckBackgroundService` (Phase 6 Step 2) already
+  wrap each company's run in try/catch and `LogError` on failure without
+  aborting the other companies' runs. No change needed.
+- **Bulk failed logins** — genuinely new: no `ILogger` had ever been
+  injected into `AuthController` or referenced from any `Application/
+  Auth/*.cs` handler. Two additions, keeping `ILogger` scoped to the Api
+  layer only (Application never takes a logging dependency anywhere in
+  this codebase — respected that boundary rather than adding it to
+  `LoginCommandHandler`):
+  1. `AuthController.Login` now logs a `Warning` on every failed attempt
+     (phone, IP, error code — never the password) — raw material for an
+     external log-based rule to detect a burst against one phone.
+  2. `Program.cs`'s rate limiter `OnRejected` callback now logs an `Error`
+     specifically when the request path is `/api/v1/auth/login` — i.e.
+     exactly when `RateLimitPolicies.AuthLogin`'s existing 5-per-15-minutes
+     threshold is exceeded. This *is* the "пачка неудачных логинов" alert:
+     it reuses the threshold the system already encodes rather than
+     inventing a second one.
+
+Verified with two throwaway tests (`ThrowawayLoginAlertingCheck.cs`, hand-
+written `FakeSender : ISender` + `CapturingLogger : ILogger<AuthController>`,
+no ASP.NET test host needed — this codebase has no `WebApplicationFactory`
+precedent anywhere): failed login logs exactly one `Warning` with the right
+phone/error code; successful login logs nothing. Both passed, then the
+file was deleted (`git status --short backend/Tests/` confirmed clean —
+no InMemory package was needed this time, so no `Directory.Packages.props`
+revert either). The rate-limiter branch itself wasn't unit-tested (a
+three-line conditional inside `OnRejected`, no test host to host it in) —
+verified by code review instead.
+
+Build clean, 0 warnings. Test suite unchanged from baseline (69/108 pass
+locally, 39 Docker-gated — same Testcontainers unavailability this session
+has documented throughout).
+
+**Phase 6, Step 6 [BE] — backups (`pg_dump` + WAL, 30-day retention,
+off-server) + restore verification.** Infrastructure/ops scripting, not
+C# — the .NET build/test suite is unaffected (zero `.cs` files touched).
+
+- `backend/ops/backup/pg_dump_backup.sh` — daily logical backup (`pg_dump
+  -Fc`), synced off-server, retention-pruned locally and remotely.
+- `backend/ops/backup/wal_archive.sh` — invoked per-segment by Postgres'
+  own `archive_command`, syncing each WAL file off-server for
+  point-in-time recovery.
+- `backend/ops/backup/restore_verify.sh` — the §11.8-mandated quarterly
+  check ("непроверенный бэкап не бэкап"): spins up a disposable Postgres
+  container, restores the latest backup into it, checks both table count
+  and `__EFMigrationsHistory` row count (catches a DDL-only dump that
+  never actually captured data), tears the container down regardless of
+  outcome, exits nonzero on failure — alertable the same way
+  `PayrollDraftBackgroundService`/`OverdueCheckBackgroundService` already
+  are.
+- `backend/ops/backup/README.md` — required env vars, cron/systemd wiring
+  for all three scripts, and a real incident-recovery runbook (not just
+  the verification path).
+
+**Deliberately provider-agnostic** — a judgment call: MASTER doesn't name
+a cloud vendor for off-server storage, and hardcoding one would be
+inventing an infra decision nobody made. Uses `rclone` (one tool, 40+
+supported backends) so the destination is a config value, not a script
+rewrite.
+
+**Verification limits, honestly stated**: `docker` and `rclone` aren't
+available in this environment, so all three scripts were only verified
+with `bash -n` (syntax-valid) — no functional smoke test of the actual
+restore path was possible here, same "Docker unavailable" caveat this
+session has documented throughout for Postgres-backed .NET tests. Whoever
+wires these into real cron/systemd should run `restore_verify.sh` once by
+hand against a real backup before trusting the quarterly schedule.
+
+**Phase 6, Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password`.**
+`POST /auth/forgot-password` always returns success regardless of whether
+the phone exists ("не раскрывать, кто есть в системе") — generates a
+crypto-random `PasswordResetToken` (1h TTL, hashed, same
+`RefreshTokenGenerator` shape as refresh tokens) only when a matching
+active user exists, rate-limited 3/hour per phone (extended
+`LoginRateLimitKeyMiddleware` to also partition this route, alongside
+`/auth/login`). `POST /auth/reset-password` verifies hash/TTL/one-time-use,
+changes the password, and revokes every active refresh token for that
+user — reusing the exact chain-revoke pattern `RefreshTokenCommand` uses
+for stolen-token detection — matching §11.2's "смена пароля + отзыв ВСЕХ
+refresh-токенов."
+
+**A real gap, not silently worked around**: §11.2's actual delivery
+channel is the Telegram bot (deferred). New `IPasswordResetDeliveryService`
+/`LoggingPasswordResetDeliveryService` — never puts the plaintext token in
+an HTTP response (that would defeat hashing it at all); logs it only in
+Development (never Production, where a log aggregator isn't the safe
+place for secrets); elsewhere it logs a warning that a token exists but
+has no channel to reach the user until the bot lands.
+
+**Two real bugs caught and fixed while writing throwaway tests**:
+
+1. `RefreshTokenGenerator.Hash` threw an unhandled `FormatException` on
+   any non-base64 input — a garbage token on `/auth/refresh`,
+   `/auth/logout`, or this new `/auth/reset-password` would 500 instead
+   of failing cleanly as "not found." Fixed by falling back to hashing
+   the raw UTF-8 bytes on decode failure (can never collide with a real
+   token's hash, since every token this codebase issues is valid
+   base64). Fixes the two pre-existing endpoints too, not just the new
+   ones.
+2. My own test read a `PasswordResetToken` back without
+   `IgnoreQueryFilters()`, so the automatic `CompanyId` filter (using a
+   null current-user) silently matched nothing — a test bug, not a
+   production one; fixed the test.
+
+Verified with 6 throwaway xUnit tests against a temporary InMemory-backed
+real `ApplicationDbContext` (written, run — 6/6 passed after the two
+fixes above — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): unknown phone still returns success without calling
+delivery; known phone creates a correctly-TTL'd token and calls delivery;
+`TelegramLink` presence is correctly detected and reported; a valid token
+changes the password and revokes all refresh tokens; token reuse is
+rejected; garbage token input is rejected cleanly. Docker still
+unavailable — suite count unchanged (108 total, 69 pass, 39 need Docker).
+
+**Phase 6, Step 2 [BE] — background task: overdue detection +
+notifications.** New `IOverdueNotifier` (Application) /
+`SignalROverdueNotifier` (Api) — fires `WorkOrderOverdue`/
+`IndividualTaskOverdue` events, reusing the existing `WorkOrdersHub`
+company group, same real-time pattern as `IMaterialShortageNotifier`/
+`IWorkOrderRealtimeNotifier`. §10.3's Telegram routing (by `TelegramLink`)
+is explicitly **not** built here — that's Step 3, `[BOT]`, deferred; this
+step only raises the event.
+
+`OverdueCheckBackgroundService` (Api/BackgroundServices) — same shape as
+`PayrollDraftBackgroundService` (Phase 5 Step 8): plain `BackgroundService`,
+checks once every 24h, per-company `ApplicationDbContext` via
+`SystemCompanyCurrentUserService`, exceptions caught and logged
+per-company. **Fires only for items due exactly yesterday**, not "any day
+in the past" — since there's no persisted "already notified" field on
+`WorkOrder`/`IndividualTask`, this is what keeps the job from re-firing
+the same notification every single day an item stays overdue. Overdue
+itself is defined identically to Step 1's dashboard: `Accepted`/`Closed`
+excluded for `WorkOrder`, `Done` excluded for `IndividualTask`.
+
+Extracted the per-company check into a `public static CheckCompanyAsync`
+(rather than `private`) specifically to make it directly testable against
+a real `ApplicationDbContext` — same precedent as `LocalFileStorageService`
+(Phase 2 Step 4).
+
+Verified with 1 focused throwaway xUnit test against a temporary
+InMemory-backed real `ApplicationDbContext` (written, run — passed —
+then deleted, same add-then-revert `Microsoft.EntityFrameworkCore.InMemory`
+pattern as every other throwaway check this session), covering all four
+boundary cases in one scenario: fires for an overdue `New` order;
+correctly excludes a `Closed` order (final status), an order due today
+(not yet overdue), and an order overdue two days ago (already fired on
+its own day) — plus the equivalent `IndividualTask` pair (overdue vs.
+`Done`). Docker still unavailable — suite count unchanged (108 total, 69
+pass, 39 need Docker).
+
+**Phase 6, Step 1 [BE] — `GET /dashboard/work-status`.** First step of the
+"polish + launch-readiness" phase. Single handler aggregating
+`WorkOrder.Status` and `IndividualTask.Status` together, per §8.6: status
+counts for each entity, plus separate overdue counts (`DueDate`/`DueAt` in
+the past, status not final — `Accepted`/`Closed` for `WorkOrder`, `Done`
+for `IndividualTask`). Read-only, no actions — matches §8.6's explicit
+"действия — в карточке конкретной сущности."
+
+Optional `objectId`/`brigadeId` query filters. `IndividualTask` has no
+direct `ObjectId`, so an object filter scopes it through its optional
+`WorkOrderId` link — a standalone personal task (no linked `WorkOrder`) is
+excluded when filtering by object, the natural reading rather than an
+invented rule.
+
+**Isolation, a documented judgment call**: `WorkOrder` counts respect
+`ProrabObjectAssignment` (the established Prorab isolation axis) — an
+explicit `objectId` filter is checked against it
+(`PRORAB_NOT_ASSIGNED_TO_OBJECT` if not allowed). `IndividualTask` counts
+are company-wide for Prorab+ — this codebase has no established
+per-object isolation rule for `IndividualTask` at all (it's Brigadir-own-
+brigade scoped everywhere else it appears, never Prorab-object scoped),
+and an aggregate count carries far less exposure risk than a data-access
+endpoint would, so nothing was invented to fill that gap.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): status counts and overdue detection aggregate
+correctly across both entities in a mixed scenario; the object filter
+correctly scopes `IndividualTask` through its linked `WorkOrder` and
+excludes both other-object and standalone tasks; Prorab isolation on an
+explicit object filter is enforced. Docker still unavailable — suite
+count unchanged (108 total, 69 pass, 39 need Docker).
+
+**Phase 5, Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8.**
+New permanent `PayrollNumericExampleTests.cs` (real Postgres via
+`PostgresFixture`, mirrors the session's established isolation-test
+style, 4 tests): permanentizes the exact worked examples first verified
+with throwaway checks while building Steps 3/4/7 —
+
+- §8.0 Hourly: **7040** сомони (`160×40 + 2×8×40`) via
+  `GeneratePayrollDraftCommandHandler` against real seeded `Timesheet`/
+  `AbsenceRecord` data.
+- §8.1 lateness deduction: **43.33** (grace=0) and **33.33** (grace=5),
+  one `[Theory]` covering both of MASTER's grace configurations against
+  the identical 15/0/40/10/0-minute sequence.
+- §8.8 combined `FinalAmount`: **4196.67** (`7040 − 43.33 + 200 − 3000`)
+  via `ApprovePayrollEntryCommandHandler`.
+
+Docker still unavailable here, so these 4 are compile-verified only on
+this machine, same limitation as every other Postgres-backed test in the
+suite — but the underlying formulas were already execution-verified via
+InMemory throwaway checks during Steps 3/4/7, so this closes the loop
+with permanent coverage rather than re-deriving trust from scratch.
+Suite: 108 total (was 104) — 69 pass locally (unchanged), 39 need Docker
+(35 pre-existing + 4 new); confirmed every failure is the expected
+`DockerUnavailableException` fail-fast, not a real assertion failure.
+
+**This closes out Phase 5 — all 10 steps done except Step 2 `[BOT]`,
+deferred.**
+
+**Phase 5, Step 9 [BE] — `GET /objects/{id}/cost-breakdown`.** Fixes the
+exact bug §8.10 flags — "факт" used to be materials + WorkOrder totals
+**without** payroll, understating true cost by the entire wage bill.
+
+- `MaterialCost` — Σ `MaterialDelivery.UnitCost × Qty` for the object,
+  always included (materials aren't payroll-period-gated).
+- `PieceworkPayrollCost` — driven from `WorkOrderPayoutShare` on
+  `Accepted`/`Closed` orders with a `CompletedDate`, but recomputed
+  directly as `SharePercent × OrderTotal` rather than trusting
+  `WorkOrderPayoutShare.Amount` — **a real gap flagged, not silently
+  worked around**: no handler anywhere in this codebase ever calls
+  `WorkOrderPayoutShare.Approve()`, so that field is never actually
+  populated.
+- `HourlyPayrollCost` — directly attributed per `Timesheet.ObjectId ×
+  HoursWorked × PayRate` (each timesheet already carries its own object).
+- `PaidAbsencePayrollCost` — genuinely proportional, since `AbsenceRecord`
+  has no `ObjectId` at all: reuses `CalculatedAmountCalculator`'s exact
+  absence-amount formula (bumped from `private` to `internal` so the two
+  can't drift apart), split by this object's share of the worker's total
+  hours that period.
+
+Every payroll component is gated on `PayrollEntry.Status == Paid` — an
+open period contributes nothing, matching §8.10's explicit "не в факте,
+иначе цифра прыгает каждый день" — and the response carries a `Note`
+field saying so explicitly rather than silently showing a number that
+looks final but isn't.
+
+Verified with 3 throwaway xUnit tests against a temporary EF InMemory
+context (written, run — 3/3 passed — then deleted, same add-then-revert
+`Microsoft.EntityFrameworkCore.InMemory` pattern as every other throwaway
+check this session): a full combined scenario (materials + piecework +
+hourly + proportionally-split absence) checks out to the exact expected
+numbers across all four components and the total; a `Draft`-status
+payroll entry contributes nothing; Prorab isolation is enforced. Docker
+still unavailable — suite count unchanged (104 total, 69 pass, 35 need
+Docker).
+
+**Phase 5, Step 8 [BE] — background task: payroll drafts per period +
+alert if generation didn't happen.** Built as a plain `BackgroundService`,
+not Hangfire — a judgment call, documented in code: no job-persistence/
+dashboard package exists anywhere in this codebase, and pulling one in is
+a bigger infrastructure decision than one step; §2's stack table
+explicitly lists `BackgroundService` as the alternative.
+
+New `PayrollPeriodCalculator` (Application/Payroll, pure/static):
+`IsPeriodEnd`/`GetPeriodContaining`, driven by `Company.PayrollPeriodType`
+(Monthly or SemiMonthly). `PayrollDraftBackgroundService` (Api/
+BackgroundServices) checks once every 24h. For every company whose period
+closed **yesterday**: checks whether any `PayrollEntry` exists for that
+period at all — if not, logs at `Error` (the "алерт" — Serilog is the
+alerting surface here; wiring that log to PagerDuty/Slack is ops
+configuration, not backend code) — then generates the draft anyway via
+the existing `GeneratePayrollDraftCommandHandler`, self-healing rather
+than just complaining. A thrown exception is caught and logged
+per-company, never crashing the host or blocking the remaining companies
+in that run.
+
+**Real design snag worked through**: the automatic `CompanyId` global
+query filter falls back to `Guid.Empty` (not "see everything") when
+`ICurrentUserService.CompanyId` is null — which it always is outside an
+HTTP request. Solved with a minimal `SystemCompanyCurrentUserService`, one
+instance constructed per company per run, and a fresh `ApplicationDbContext`
+built directly from `DbContextOptions<ApplicationDbContext>` rather than
+going through the DI-registered `CurrentUserService` (which reads HTTP
+claims that don't exist in a background loop).
+
+Verified with 12 throwaway xUnit tests (no DB needed — the calculator is
+pure, so no InMemory package was even required this time, written, run,
+deleted): monthly period-end detection including leap-year February;
+semi-monthly boundaries at day 15/end-of-month; period-containing
+calculations for both halves of a semi-monthly cycle, including the
+day-15 boundary case itself. Docker still unavailable — suite count
+unchanged (104 total, 69 pass, 35 need Docker).
+
 **Phase 5, Step 7 [BE] — `PayrollEntry.Approve()`: the `FinalAmount`
 formula.** Where all six preceding Phase 5 steps come together.
 `POST /payroll/{id}/approve` (Accountant/Owner) — Domain's
@@ -230,13 +792,18 @@ need Docker); no new permanent tests this step.
 Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
-**Phase:** 5 — Зарплата
-**Last completed:** Phase 5, Step 7
-**Next step:** Phase 5, Step 8 [BE] — фоновая задача: черновики за период +
-алерт, если не сформировалась → MASTER §11.8
+**Phase:** 6 — Полировка и запуск
+**Last completed:** punch-list item 3/3 (`WorkOrder.Rework()`/`.Close()`
+wiring) — **every `[BE]`/`[FULL]` step in the entire project (Phases 1-6)
+is checked off, and the Phase 6 Step 9 punch list is fully closed.** What
+remains project-wide is entirely `[BOT]` work, blocked on the 2026-07-18
+bot deferral.
+**Next step:** none auto-selected — resuming the bot is the only backend-
+adjacent work left; ask the user before starting it (it's a phase-wide
+deferred decision, not a single checklist step).
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 104 tests, confirmed via `dotnet test` (69 pass locally, 35 need Docker — see below)
-**Updated:** 2026-07-19
+**Tests:** `Tests/Api.IntegrationTests` — 119 tests, confirmed via `dotnet test` (69 pass locally, 50 need Docker — see below)
+**Updated:** 2026-07-20
 
 **Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
 пере-поставке.** New permanent `MaterialDeliveryAutoTransitionTests.cs`
@@ -1457,7 +2024,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
 - [x] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
-- [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
+- [x] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §15)* → MASTER §8.7, §10.4
@@ -1483,22 +2050,22 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 5 [BE] — подтверждение премии (`BonusApprovedByUserId`) → `BonusAmount` в расчёт по `CompletedAt` → MASTER §8.7
 - [x] Step 6 [BE] — `PayrollAdvance` + `AdvanceDeductedAmount` + `SettledInPayrollEntryId` → MASTER §5.23, §8.8
 - [x] Step 7 [BE] — `PayrollEntry.Approve()`: `FinalAmount` = Calculated − Lateness + Bonus − Advance ± Adjustment. **Отрицательный результат допустим**, не обнулять → MASTER §8.8
-- [ ] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
-- [ ] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
-- [ ] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
+- [x] Step 8 [BE] — фоновая задача: черновики за период + алерт, если не сформировалась → MASTER §11.8
+- [x] Step 9 [BE] — `GET /objects/{id}/cost-breakdown`: материалы + **ФОТ** (Piecework прямо, Hourly пропорционально часам) → MASTER §8.10
+- [x] Step 10 [BE] — тесты на числовых примерах §8.0/§8.1/§8.8: Hourly 7040, вычет 43.33, аванс → итог 4196.67 → MASTER §8.0, §8.8
 
 ## Phase 6 — Полировка и запуск
 **Goal:** обзорный слой + всё, без чего нельзя пускать на реальные деньги.
 
-- [ ] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
-- [ ] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
+- [x] Step 1 [BE] — `GET /dashboard/work-status` (агрегат `WorkOrder` + `IndividualTask`) → MASTER §8.6
+- [x] Step 2 [BE] — фоновая задача просрочки + уведомления → MASTER §9.4
 - [ ] Step 3 [BOT] — уведомления всем ролям (маршрутизация по `TelegramLink`) *(отложено — см. §15)* → MASTER §10.3
 - [ ] Step 4 [BOT] — язык `tg` + `/language`, `.resx` ресурсы *(отложено — см. §15)* → MASTER §10.6
-- [ ] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
-- [ ] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
-- [ ] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
-- [ ] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
-- [ ] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §16
+- [x] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
+- [x] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
+- [x] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
+- [x] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
+- [x] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §16
 
 ---
 

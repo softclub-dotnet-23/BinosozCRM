@@ -10,14 +10,25 @@ namespace Api.RateLimiting;
 // and stashed in HttpContext.Items here, from a buffered body read, before
 // UseRateLimiter() sees the request — then reset the stream position so
 // model binding downstream still works normally.
+//
+// §11.2's "3 запроса/час на телефон" for /auth/forgot-password needs the
+// exact same phone-extraction trick, so this middleware handles both
+// routes rather than duplicating the buffered-body-read dance in a
+// second middleware.
 public sealed class LoginRateLimitKeyMiddleware(RequestDelegate next)
 {
     public const string PhoneItemKey = "RateLimitPhone";
 
+    private static readonly string[] PhonePartitionedPaths =
+    [
+        "/api/v1/auth/login",
+        "/api/v1/auth/forgot-password"
+    ];
+
     public async Task InvokeAsync(HttpContext context)
     {
         if (HttpMethods.IsPost(context.Request.Method) &&
-            context.Request.Path.Equals("/api/v1/auth/login", StringComparison.OrdinalIgnoreCase))
+            PhonePartitionedPaths.Any(path => context.Request.Path.Equals(path, StringComparison.OrdinalIgnoreCase)))
         {
             context.Request.EnableBuffering();
 

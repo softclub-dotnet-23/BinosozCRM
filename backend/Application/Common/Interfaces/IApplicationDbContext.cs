@@ -27,6 +27,8 @@ public interface IApplicationDbContext
     DbSet<PayrollEntry> PayrollEntries { get; }
     DbSet<PayrollAdvance> PayrollAdvances { get; }
     DbSet<AdminAuditLog> AdminAuditLogs { get; }
+    DbSet<PasswordResetToken> PasswordResetTokens { get; }
+    DbSet<TelegramLink> TelegramLinks { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

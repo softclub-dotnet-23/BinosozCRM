@@ -1,4 +1,6 @@
 using System.Text;
+using Api.Auth;
+using Api.BackgroundServices;
 using Api.Common;
 using Api.Hubs;
 using Api.Middleware;
@@ -84,15 +86,64 @@ builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IWorkOrderRealtimeNotifier, SignalRWorkOrderNotifier>();
 builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNotifier>();
+builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
+builder.Services.AddScoped<IPasswordResetDeliveryService, LoggingPasswordResetDeliveryService>();
+
+builder.Services.AddHostedService<PayrollDraftBackgroundService>();
+builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
 builder.Services.AddRateLimiter(options =>
 {
-    options.OnRejected = async (context, cancellationToken) => await ErrorEnvelope.WriteAsync(
-        context.HttpContext,
-        StatusCodes.Status429TooManyRequests,
-        "RATE_LIMITED",
-        "Too many login attempts. Try again later.",
-        cancellationToken);
+    // MASTER §11.4: "Остальное — общий лимит на пользователя/IP." No
+    // number is specified for this one (unlike login's 5/15min or
+    // forgot-password's 3/hour, both literal spec values) — 120
+    // requests/minute is a judgment call, generous enough not to bother a
+    // real user/bot integration but enough to blunt a scripted hammering
+    // of any single non-auth endpoint. Partitioned by user id when
+    // authenticated (a shared office IP shouldn't throttle one user
+    // because of another), falling back to IP for anonymous requests.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? $"user:{httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress}";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        // MASTER §11.8: "алерт на... неудачные логины пачкой" — this IS
+        // that alert. Hitting AuthLogin's own 5-per-15-minutes limit is a
+        // burst by definition (this system's own threshold, not a second
+        // one invented here); logged at Error, not Warning, since a
+        // sustained burst against one phone is exactly the "someone is
+        // trying to break in" signal §11.8 wants surfaced.
+        if (context.HttpContext.Request.Path.Equals("/api/v1/auth/login", StringComparison.OrdinalIgnoreCase))
+        {
+            var rejectLogger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var phone = context.HttpContext.Items.TryGetValue(LoginRateLimitKeyMiddleware.PhoneItemKey, out var value)
+                ? value as string
+                : null;
+
+            rejectLogger.LogError(
+                "Login rate limit exceeded for {Phone} from {IpAddress} — bulk failed-login pattern detected.",
+                phone ?? "unknown", ip);
+        }
+
+        await ErrorEnvelope.WriteAsync(
+            context.HttpContext,
+            StatusCodes.Status429TooManyRequests,
+            "RATE_LIMITED",
+            "Too many login attempts. Try again later.",
+            cancellationToken);
+    };
 
     options.AddPolicy(RateLimitPolicies.AuthLogin, httpContext =>
     {
@@ -106,6 +157,22 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = 5,
             Window = TimeSpan.FromMinutes(15),
+            QueueLimit = 0
+        });
+    });
+
+    // MASTER §11.2: "3 запроса/час на телефон" — partitioned by phone
+    // alone (not IP+phone like login), matching the literal wording.
+    options.AddPolicy(RateLimitPolicies.AuthForgotPassword, httpContext =>
+    {
+        var phone = httpContext.Items.TryGetValue(LoginRateLimitKeyMiddleware.PhoneItemKey, out var value)
+            ? value as string
+            : null;
+
+        return RateLimitPartition.GetFixedWindowLimiter(phone ?? "unknown", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 3,
+            Window = TimeSpan.FromHours(1),
             QueueLimit = 0
         });
     });
@@ -166,6 +233,7 @@ app.UseMiddleware<LoginRateLimitKeyMiddleware>();
 app.UseRateLimiter();
 
 app.UseAuthentication();
+app.UseMiddleware<AccountActiveMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 

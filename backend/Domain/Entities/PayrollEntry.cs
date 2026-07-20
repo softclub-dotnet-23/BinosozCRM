@@ -51,6 +51,22 @@ public sealed class PayrollEntry : AuditableEntity, ICompanyOwned, ISoftDelete
         return Result.Success();
     }
 
+    // MASTER §8.9 point 3: an early termination shortens the worker's
+    // current period to end at TerminationDate rather than waiting for the
+    // natural period end — reusing the existing Draft row (same PeriodStart)
+    // instead of creating a second one for the same worker/month.
+    public Result ShortenPeriodEnd(DateOnly newPeriodEnd)
+    {
+        if (Status != PayrollEntryStatus.Draft)
+            return Result.Failure(new Error("PAYROLL_ENTRY_NOT_DRAFT", "Only a Draft payroll entry can have its period shortened."));
+
+        if (newPeriodEnd < PeriodStart || newPeriodEnd > PeriodEnd)
+            return Result.Failure(new Error("VALIDATION_FAILED", "New period end must fall within the existing period."));
+
+        PeriodEnd = newPeriodEnd;
+        return Result.Success();
+    }
+
     public Result Adjust(decimal adjustmentAmount, string adjustmentReason)
     {
         if (Status != PayrollEntryStatus.Draft)
