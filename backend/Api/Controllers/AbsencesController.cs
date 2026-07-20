@@ -1,6 +1,7 @@
 using Api.Common;
 using Api.Contracts.Absences;
 using Application.Absences;
+using Application.WorkOrders;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,9 @@ namespace Api.Controllers;
 
 // MASTER §9.4/§8.9: GET,POST /absences — Prorab+, Accountant. No Brigadir
 // path at all ("нужен документ/решение") — the only controller in this
-// codebase with zero Brigadir-reachable actions.
+// codebase with zero Brigadir-reachable actions. GET /{id} isn't literally
+// listed in §9.4 but added for the same REST-completeness reason as
+// elsewhere this project.
 [ApiController]
 [Route("api/v1/absences")]
 [Authorize(Roles = "Owner,Prorab,Accountant")]
@@ -25,9 +28,21 @@ public sealed class AbsencesController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    [HttpGet("{absenceRecordId:guid}")]
+    public async Task<IActionResult> Get(Guid absenceRecordId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetAbsenceRecordQuery(absenceRecordId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpPost]
+    [Consumes("multipart/form-data")]
     public async Task<IActionResult> Create(CreateAbsenceRecordRequest request, CancellationToken cancellationToken)
     {
+        var document = request.Document is null
+            ? null
+            : new WorkOrderProgressPhoto(request.Document.OpenReadStream(), request.Document.ContentType, request.Document.Length);
+
         var command = new CreateAbsenceRecordCommand(
             request.WorkerId,
             request.DateFrom,
@@ -35,7 +50,7 @@ public sealed class AbsencesController(ISender sender) : ControllerBase
             request.Type,
             request.IsPaid,
             request.Reason,
-            request.DocumentUrl);
+            document);
 
         var result = await sender.Send(command, cancellationToken);
         return result.ToActionResult(HttpContext);
