@@ -15,7 +15,7 @@ public sealed record WorkerDto(
     string Phone,
     DateOnly BirthDate,
     string? Specialty,
-    PayRateType PayRateType,
+    PayRateType? PayRateType,
     decimal? PayRate,
     TimeOnly? ShiftStartTime,
     string? DocumentType,
@@ -28,7 +28,7 @@ public sealed record WorkerDto(
     {
         // Owner/Accountant see everything. Every other role (Prorab today;
         // Brigadir has no access to this endpoint at all, per §9.4) gets
-        // PayRate hidden entirely and Document* masked.
+        // PayRateType/PayRate hidden entirely and Document* masked.
         var seesFullDetails = callerRole is Role.Owner or Role.Accountant;
 
         return new WorkerDto(
@@ -39,7 +39,7 @@ public sealed record WorkerDto(
             worker.Phone,
             worker.BirthDate,
             worker.Specialty,
-            worker.PayRateType,
+            seesFullDetails ? worker.PayRateType : null,
             seesFullDetails ? worker.PayRate : null,
             worker.ShiftStartTime,
             seesFullDetails ? worker.DocumentType : null,
