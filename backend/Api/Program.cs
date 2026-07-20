@@ -1,5 +1,6 @@
 using System.Text;
 using Api.Auth;
+using Api.BackgroundJobs;
 using Api.BackgroundServices;
 using Api.Common;
 using Api.Hubs;
@@ -9,6 +10,7 @@ using Api.Realtime;
 using Application;
 using Application.Common.Interfaces;
 using Application.Common.Options;
+using Application.Payroll;
 using Application.Seed;
 using Application.Workers;
 using Domain.Entities;
@@ -89,6 +91,7 @@ builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNot
 builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
 builder.Services.AddScoped<IPasswordResetDeliveryService, LoggingPasswordResetDeliveryService>();
 
+builder.Services.AddScoped<PayrollDraftGenerator>();
 builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
