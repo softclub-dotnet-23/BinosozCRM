@@ -13,17 +13,39 @@ phase-summary files written for 2-6 — genuinely not finished (bot work
 outstanding), just unblocked for further backend work per the user's
 2026-07-19 decision to keep going rather than wait on the bot.
 **Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
-(2026-07-20) — 1 of 3 closed, 2026-07-20:**
+(2026-07-20) — 2 of 3 closed, 2026-07-20:**
 - ~~`GET,PUT /companies/current`~~ — **done**, see writeup below.
+- ~~`GET /work-orders/mine`~~ — **done**, see writeup below.
 - `WorkOrder.Rework()` and `.Close()` exist in Domain (`backend/Domain/Entities/WorkOrder.cs`)
   but are never called from any handler or controller — a `Rejected`
   order can never return to `InProgress` via the API, and an `Accepted`
   order can never reach `Closed`. §7.1 says Close is "авто после
   `PayrollEntry.Paid`, либо вручную Prorab" — which of the two (or both)
   needs a decision before implementing, not assumed here.
-- `GET /work-orders/mine` (Brigadir) — documented in §9.4, no matching
-  controller action. `WorkOrdersController`'s `GET /work-orders` is
-  `Owner,Prorab` only.
+**Punch-list item 2/3 — `GET /work-orders/mine` → MASTER §9.4.** The
+Brigadir half of "`GET,POST /work-orders` — Prorab+ / Brigadir(own, read)"
+that `ListWorkOrdersQuery`'s own comment had flagged as not yet built.
+Added `Application/WorkOrders/ListMyWorkOrdersQuery.cs` — same shape as
+`ListIndividualTasksQuery` (`BrigadeAccess.GetCallerBrigadeIdAsync`,
+`WORKER_NOT_FOUND` for a caller with no linked `Worker` row, filter by
+`BrigadeId`, paginated), a separate handler rather than a role branch
+inside `ListWorkOrdersQuery` — same split `ListIndividualTasksQuery` uses.
+Wired as `GET /work-orders/mine` (`[Authorize(Roles = "Brigadir")]`) in
+`WorkOrdersController`, ahead of the `{workOrderId:guid}/...` routes
+(no collision — this controller has no bare `GET /work-orders/{id}`).
+Updated `ListWorkOrdersQuery.cs`'s own comment, which had gone stale
+claiming "Brigadir has no authenticated path anywhere in this codebase
+yet" — no longer true as of Phase 3 Step 3 and this step both landing.
+
+Verified with a throwaway InMemory check (own-brigade order visible,
+other brigade's excluded, unlinked caller gets `WORKER_NOT_FOUND`) before
+adding 2 permanent Postgres tests to the existing
+`WorkOrderIsolationTests.cs` (same scenarios, reusing that file's existing
+`SeedAsync` helper).
+
+Build clean, 0 warnings. Test suite: 69/117 pass locally (48 Docker-gated,
+up 2 — no regressions).
+
 **Punch-list item 1/3 — `GET,PUT /companies/current` → MASTER §9.4, §5.1.**
 Not a PROGRESS.md checklist step (this was found during Phase 6 Step 9's
 reconciliation, not a numbered step of any phase) — closed at the user's

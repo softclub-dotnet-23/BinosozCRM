@@ -49,6 +49,17 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    [HttpGet("mine")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> ListMine([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
+        var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
+
+        var result = await sender.Send(new ListMyWorkOrdersQuery(clampedPage, clampedPageSize), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpPost("{workOrderId:guid}/assign")]
     [Authorize(Roles = "Owner,Prorab")]
     public async Task<IActionResult> Assign(Guid workOrderId, AssignWorkOrderRequest request, CancellationToken cancellationToken)

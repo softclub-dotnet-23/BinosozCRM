@@ -222,4 +222,46 @@ public sealed class WorkOrderIsolationTests(PostgresFixture fixture)
         log.ToStatus.Should().Be("Rejected");
         log.Comment.Should().Be("Not up to spec");
     }
+
+    // MASTER §9.4/§11.5 rule 2: GET /work-orders/mine — Brigadir, own
+    // brigade only. Punch-list closeout: ListWorkOrdersQuery's own comment
+    // flagged this half as unbuilt back in Phase 6 Step 9's reconciliation.
+    [Fact]
+    public async Task ListMine_returns_only_the_callers_own_brigade_orders()
+    {
+        var (owner, _, brigadirUserId, objectId, brigadeId, otherBrigadeId, workOrderId) = await SeedAsync();
+
+        Guid otherOrderId;
+        await using (var context = fixture.CreateDbContext(owner))
+        {
+            var otherOrder = await new CreateWorkOrderCommandHandler(context, owner).Handle(
+                new CreateWorkOrderCommand(objectId, otherBrigadeId, "Other brigade's order", "m2", 5, 100, null, null),
+                CancellationToken.None);
+            otherOrderId = otherOrder.Value.Id;
+        }
+
+        var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
+        await using var context2 = fixture.CreateDbContext(brigadir);
+        var result = await new ListMyWorkOrdersQueryHandler(context2, brigadir)
+            .Handle(new ListMyWorkOrdersQuery(1, 20), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle(w => w.Id == workOrderId);
+        result.Value.Items.Should().NotContain(w => w.Id == otherOrderId);
+        otherBrigadeId.Should().NotBe(brigadeId);
+    }
+
+    [Fact]
+    public async Task ListMine_for_a_user_with_no_linked_worker_row_gets_worker_not_found()
+    {
+        var (owner, _, _, _, _, _, _) = await SeedAsync();
+        var unlinkedUser = new FixedCurrentUserService(owner.CompanyId!.Value, Guid.NewGuid(), Role.Brigadir);
+
+        await using var context = fixture.CreateDbContext(unlinkedUser);
+        var result = await new ListMyWorkOrdersQueryHandler(context, unlinkedUser)
+            .Handle(new ListMyWorkOrdersQuery(1, 20), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("WORKER_NOT_FOUND");
+    }
 }

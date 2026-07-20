@@ -8,9 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.WorkOrders;
 
 // MASTER §9.4: GET,POST /work-orders — Prorab+ / Brigadir(own, read). Only
-// the Prorab+ half is built here — Brigadir has no authenticated path
-// anywhere in this codebase yet (the bot is Brigadir's interface, and bot
-// work is deferred per the user's 2026-07-18 decision).
+// the Prorab+ half is built here — Brigadir's own-brigade read is
+// GET /work-orders/mine (ListMyWorkOrdersQuery), a separate handler rather
+// than a role branch in this one, same pattern as ListIndividualTasksQuery.
 public sealed record ListWorkOrdersQuery(int Page, int PageSize) : IRequest<Result<PagedResult<WorkOrderDto>>>;
 
 public sealed class ListWorkOrdersQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
