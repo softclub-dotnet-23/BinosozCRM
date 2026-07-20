@@ -6,17 +6,12 @@
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
-**Phases 2, 3, 4 & 5: functionally ✅ COMPLETE for now (backend only).**
-All `[BE]` steps done except: Phase 2 Step 9's bot-idempotency slice.
-Every `[BOT]` step across all four phases stays unchecked, blocked on the
-2026-07-18 bot deferral. No phase-summary files written for any of them —
-genuinely not finished, just unblocked for further backend work per the
-user's 2026-07-19 decision to keep going rather than wait on the bot.
-**Phase 3 Step 3's "финальный расчёт" clause is now newly unblocked** —
-it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
-which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
-part of this step; flagged here so it isn't forgotten, worth a dedicated
-pass if the user wants it closed out.
+**Phases 2, 3, 4, 5 & 6: every `[BE]`/`[FULL]` step is now done.**
+The only unchecked items across all six phases are `[BOT]` steps, blocked
+on the 2026-07-18 bot deferral, plus the punch list below. No
+phase-summary files written for 2-6 — genuinely not finished (bot work
+outstanding), just unblocked for further backend work per the user's
+2026-07-19 decision to keep going rather than wait on the bot.
 **Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
 (2026-07-20), not implemented — real gaps, deliberately out of scope for
 a docs step, need their own pass before launch:**
@@ -32,6 +27,40 @@ a docs step, need their own pass before launch:**
 - `GET,PUT /companies/current` (§9.4) — no `CompaniesController` exists at
   all. Owner currently has no API way to change `Company` thresholds
   (`LatenessGraceMinutes`, `PieceworkDistributionMode`, etc.) post-seed.
+**Phase 3, Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения →
+MASTER §8.9.** Closes the gap flagged back when this step was first built
+(Phase 3) and re-flagged in Phase 6 Step 9's reconciliation: points 1, 2,
+and 5 of §8.9's five-point termination lifecycle were already done (open
+`IndividualTask` blocks termination outright, `WorkOrderPayoutShare` rows
+are left untouched, `IsActive = false`); points 3 and 4 — "текущий
+`PayrollEntry` формируется... досрочно" and "непогашенные авансы попадают
+в этот финальный расчёт" — needed Phase 5's `CalculatedAmount`/
+`PayrollAdvance` machinery, which didn't exist yet at the time.
+
+Added `PayrollEntry.ShortenPeriodEnd()` (Domain, Draft-only guard) and
+extended `TerminateWorkerCommandHandler`: on termination, finds the Draft
+`PayrollEntry` for the period containing `TerminationDate` (creating one
+if the background job hasn't yet, via `PayrollPeriodCalculator.
+GetPeriodContaining`), shortens its `PeriodEnd` to `TerminationDate`
+instead of the natural period end, and recomputes `CalculatedAmount`/
+`LatenessDeductionAmount`/`BonusAmount`/`AdvanceDeductedAmount` over that
+shortened range using the same calculators `GeneratePayrollDraftCommand`
+already uses. The shortened `PeriodEnd` is what makes
+`AdvanceDeductedAmountCalculator`'s existing `IssuedAt <= PeriodEnd` bound
+correctly exclude an advance issued after the worker left. An entry
+already `Approved`/`Paid` for that period is left untouched — termination
+can't rewrite a signed-off figure.
+
+Verified two ways: a throwaway InMemory-backed check (worker terminated
+mid-period, one advance before `TerminationDate` included, one after
+excluded — both correct, then deleted) and a permanent Postgres test
+(`WorkerTerminationLifecycleTests.cs`, 3 cases: open-task block, the
+shortened-draft money scenario, and reusing an existing full-period draft
+instead of creating a duplicate row for the same worker/month).
+
+Build clean, 0 warnings. Test suite: 69/112 pass locally (43 Docker-gated,
+up 3 from the new permanent tests — no regressions).
+
 **Phase 6, Step 9 [FULL] — docs: сверка MASTER.md с реальным кодом перед
 запуском → MASTER.md (весь документ).** Read the whole spec (947 lines,
 as the step calls for — not scoped sections), cross-checked every §5
@@ -669,17 +698,17 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 9 — **last `[BE]`/`[FULL]` step of Phase 6.**
-All backend-only work through Phase 6 is now checked off. What remains
-unchecked project-wide: every `[BOT]` step (blocked on the 2026-07-18 bot
-deferral) and the 3-item punch list above from Step 9's reconciliation
+**Last completed:** Phase 3, Step 3 — **every `[BE]`/`[FULL]` step in the
+entire project (Phases 1-6) is now checked off.** What remains unchecked
+project-wide: every `[BOT]` step (blocked on the 2026-07-18 bot deferral)
+and the 3-item punch list above from Phase 6 Step 9's reconciliation
 (Rework/Close wiring, `work-orders/mine`, `companies/current`) — neither
 is a "next step" in the usual sequential sense; both need a user decision
 on scope/priority before becoming one.
 **Next step:** none auto-selected — see punch list above and the bot
 deferral; ask the user which to pick up.
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 109 tests, confirmed via `dotnet test` (69 pass locally, 40 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 112 tests, confirmed via `dotnet test` (69 pass locally, 43 need Docker — see below)
 **Updated:** 2026-07-20
 
 **Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
@@ -1901,7 +1930,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 
 - [x] Step 1 [BE] — `Timesheet` + `LateMinutes` (computed при check-in, `PlannedStartTime` — снимок, `null` при незаданном `ShiftStartTime`) → MASTER §5.20, §8.1
 - [x] Step 2 [BE] — `AbsenceRecord`: день с отсутствием не даёт `LateMinutes` и не прогул, конфликт с `Timesheet` → 400 → MASTER §5.21, §8.9
-- [ ] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
+- [x] Step 3 [BE] — `Worker.TerminationDate` + lifecycle увольнения (открытые задачи, доли, финальный расчёт) → MASTER §8.9
 - [ ] Step 4 [BOT] — «Моя бригада»: check-in/check-out за бригаду и себя *(отложено — см. §15)* → MASTER §10.4
 - [ ] Step 5 [BOT] — фоновое напоминание о незакрытой смене (20:00 по настройке) *(отложено — см. §15)* → MASTER §8.4
 - [ ] Step 6 [BOT] — «Личные задачи»: создание себе/рабочим, закрытие, `CompletedEarly` → предложение премии (черновик) *(отложено — см. §15)* → MASTER §8.7, §10.4
