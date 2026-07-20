@@ -264,4 +264,105 @@ public sealed class WorkOrderIsolationTests(PostgresFixture fixture)
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("WORKER_NOT_FOUND");
     }
+
+    // MASTER §7.1: Rejected --доработка--> InProgress. Punch-list closeout
+    // for WorkOrder.Rework(), which existed in Domain since Phase 2 but had
+    // no handler wired to it.
+    [Fact]
+    public async Task Rework_moves_a_rejected_order_back_to_InProgress_and_TaskLog_records_it()
+    {
+        var (owner, _, brigadirUserId, _, _, _, workOrderId) = await SeedAsync();
+        var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
+
+        await using (var setupContext = fixture.CreateDbContext(owner))
+        {
+            await new AssignWorkOrderCommandHandler(setupContext, owner, Notifier)
+                .Handle(new AssignWorkOrderCommand(workOrderId, DateOnly.FromDateTime(DateTime.UtcNow)), CancellationToken.None);
+        }
+
+        await using (var startContext = fixture.CreateDbContext(brigadir))
+        {
+            await new StartWorkOrderCommandHandler(startContext, brigadir, Notifier)
+                .Handle(new StartWorkOrderCommand(workOrderId), CancellationToken.None);
+        }
+
+        await using (var progressContext = fixture.CreateDbContext(brigadir))
+        {
+            progressContext.WorkOrderProgresses.Add(WorkOrderProgress.Create(
+                owner.CompanyId!.Value, workOrderId, brigadirUserId, 5, DateTimeOffset.UtcNow));
+            await progressContext.SaveChangesAsync(CancellationToken.None);
+
+            await new SubmitWorkOrderForReviewCommandHandler(progressContext, brigadir, Notifier)
+                .Handle(new SubmitWorkOrderForReviewCommand(workOrderId), CancellationToken.None);
+        }
+
+        await using (var rejectContext = fixture.CreateDbContext(owner))
+        {
+            await new RejectWorkOrderCommandHandler(rejectContext, owner, Notifier)
+                .Handle(new RejectWorkOrderCommand(workOrderId, "Redo the corner"), CancellationToken.None);
+        }
+
+        await using (var reworkContext = fixture.CreateDbContext(brigadir))
+        {
+            var result = await new ReworkWorkOrderCommandHandler(reworkContext, brigadir, Notifier)
+                .Handle(new ReworkWorkOrderCommand(workOrderId), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Status.Should().Be(WorkOrderStatus.InProgress);
+        }
+
+        await using var readContext = fixture.CreateDbContext(owner);
+        var log = readContext.TaskLogs.Where(l => l.EntityId == workOrderId).OrderBy(l => l.ChangedAt).Last();
+        log.FromStatus.Should().Be("Rejected");
+        log.ToStatus.Should().Be("InProgress");
+    }
+
+    // MASTER §7.1: Accepted --close--> Closed, "вручную Prorab" — the
+    // manual half. Punch-list closeout for WorkOrder.Close().
+    [Fact]
+    public async Task Close_by_an_assigned_Prorab_succeeds_an_unassigned_one_is_rejected()
+    {
+        var (owner, prorabUserId, _, objectId, _, _, workOrderId) = await SeedAsync();
+
+        await using (var acceptContext = fixture.CreateDbContext(owner))
+        {
+            await new AssignWorkOrderCommandHandler(acceptContext, owner, Notifier)
+                .Handle(new AssignWorkOrderCommand(workOrderId, DateOnly.FromDateTime(DateTime.UtcNow)), CancellationToken.None);
+        }
+
+        await using (var context = fixture.CreateDbContext(owner))
+        {
+            var order = context.WorkOrders.Single(w => w.Id == workOrderId);
+            order.Start();
+            context.WorkOrderProgresses.Add(WorkOrderProgress.Create(owner.CompanyId!.Value, workOrderId, prorabUserId, 10, DateTimeOffset.UtcNow));
+            order.SubmitForReview(hasProgress: true, payoutShareComplete: true);
+            order.Accept(DateOnly.FromDateTime(DateTime.UtcNow));
+            await context.SaveChangesAsync(CancellationToken.None);
+        }
+
+        var unassignedProrab = new FixedCurrentUserService(owner.CompanyId!.Value, Guid.NewGuid(), Role.Prorab);
+        await using (var deniedContext = fixture.CreateDbContext(unassignedProrab))
+        {
+            var otherCustomer = Customer.Create(owner.CompanyId!.Value, "Elsewhere Customer");
+            var otherObject = ConstructionObject.Create(owner.CompanyId!.Value, "Object Elsewhere", otherCustomer.Id);
+            deniedContext.Customers.Add(otherCustomer);
+            deniedContext.ConstructionObjects.Add(otherObject);
+            await deniedContext.SaveChangesAsync(CancellationToken.None);
+
+            await new AssignProrabCommandHandler(deniedContext, owner)
+                .Handle(new AssignProrabCommand(otherObject.Id, unassignedProrab.UserId!.Value), CancellationToken.None);
+
+            var deniedResult = await new CloseWorkOrderCommandHandler(deniedContext, unassignedProrab, Notifier)
+                .Handle(new CloseWorkOrderCommand(workOrderId), CancellationToken.None);
+            deniedResult.IsFailure.Should().BeTrue();
+            deniedResult.Error.Code.Should().Be("PRORAB_NOT_ASSIGNED_TO_OBJECT");
+        }
+
+        await using var closeContext = fixture.CreateDbContext(owner);
+        var closeResult = await new CloseWorkOrderCommandHandler(closeContext, owner, Notifier)
+            .Handle(new CloseWorkOrderCommand(workOrderId), CancellationToken.None);
+
+        closeResult.IsSuccess.Should().BeTrue();
+        closeResult.Value.Status.Should().Be(WorkOrderStatus.Closed);
+    }
 }

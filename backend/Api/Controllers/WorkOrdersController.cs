@@ -13,8 +13,10 @@ namespace Api.Controllers;
 // aren't in §9.4's literal endpoint table (only /submit, /accept|/reject,
 // /log are) — added anyway, decided with the user, since without them a
 // WorkOrder can never leave New via the API and /submit could never
-// succeed. Flagged for MASTER.md reconciliation. /rework and /close are
-// still not exposed — same class of gap, out of this step's scope.
+// succeed. Flagged for MASTER.md reconciliation. /rework (Brigadir) and
+// /close (Prorab+ manual half — the automatic half lives in
+// WorkOrderAutoCloser, off PayrollEntry.Paid) closed the last punch-list
+// gap from Phase 6 Step 9's reconciliation.
 [ApiController]
 [Route("api/v1/work-orders")]
 [Authorize]
@@ -99,6 +101,22 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
     public async Task<IActionResult> Reject(Guid workOrderId, RejectWorkOrderRequest request, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new RejectWorkOrderCommand(workOrderId, request.Reason), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{workOrderId:guid}/rework")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> Rework(Guid workOrderId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ReworkWorkOrderCommand(workOrderId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{workOrderId:guid}/close")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> Close(Guid workOrderId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new CloseWorkOrderCommand(workOrderId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 

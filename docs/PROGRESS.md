@@ -6,22 +6,62 @@
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.
-**Phases 2, 3, 4, 5 & 6: every `[BE]`/`[FULL]` step is now done.**
-The only unchecked items across all six phases are `[BOT]` steps, blocked
-on the 2026-07-18 bot deferral, plus the punch list below. No
-phase-summary files written for 2-6 — genuinely not finished (bot work
-outstanding), just unblocked for further backend work per the user's
-2026-07-19 decision to keep going rather than wait on the bot.
+**Phases 2, 3, 4, 5 & 6: every `[BE]`/`[FULL]` step is now done, and the
+Phase 6 Step 9 punch list is fully closed.** The only unchecked items
+across all six phases are `[BOT]` steps, blocked on the 2026-07-18 bot
+deferral. No phase-summary files written for 2-6 — genuinely not finished
+(bot work outstanding), just unblocked for further backend work per the
+user's 2026-07-19 decision to keep going rather than wait on the bot.
 **Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
-(2026-07-20) — 2 of 3 closed, 2026-07-20:**
+(2026-07-20) — all 3 closed, 2026-07-20:**
 - ~~`GET,PUT /companies/current`~~ — **done**, see writeup below.
 - ~~`GET /work-orders/mine`~~ — **done**, see writeup below.
-- `WorkOrder.Rework()` and `.Close()` exist in Domain (`backend/Domain/Entities/WorkOrder.cs`)
-  but are never called from any handler or controller — a `Rejected`
-  order can never return to `InProgress` via the API, and an `Accepted`
-  order can never reach `Closed`. §7.1 says Close is "авто после
-  `PayrollEntry.Paid`, либо вручную Prorab" — which of the two (or both)
-  needs a decision before implementing, not assumed here.
+- ~~`WorkOrder.Rework()`/`.Close()` wiring~~ — **done**, see writeup below.
+**Punch-list item 3/3 — `WorkOrder.Rework()`/`.Close()` wiring → MASTER
+§7.1.** The last punch-list gap. `Rework()` and `Close()` existed in
+Domain since Phase 2 but nothing ever called them — a `Rejected` order
+could never return to `InProgress`, and an `Accepted` order could never
+reach `Closed`, via the API. §7.1 documents Close both ways ("авто после
+`PayrollEntry.Paid`... либо вручную Prorab") — asked the user, both were
+wanted, plus a decision on how `Rework` should be triggered (new
+Brigadir-only endpoint, matching `/start`/`/submit`'s ownership, rather
+than folding it into `/submit`).
+
+- `ReworkWorkOrderCommand` — Brigadir, own brigade (`WorkOrderAccess.
+  GetForBrigadirAsync`), same TaskLogWriter/notifier shape as every other
+  transition handler. Wired as `POST /work-orders/{id}/rework`.
+- `CloseWorkOrderCommand` — Prorab+ manual half, own object
+  (`WorkOrderAccess.GetForProrabAsync`). Wired as `POST /work-orders/{id}/close`.
+- `WorkOrderAutoCloser` — the automatic half. A Piecework order's earnings
+  split across several workers via `WorkOrderPayoutShare` (§1.1), so
+  closing after just one contributor's `PayrollEntry` reaches `Paid` would
+  be wrong while others are still unpaid — this only closes an order once
+  **every** worker with a share in it has a `Paid` entry covering the
+  order's `CompletedDate`. Called from `PayPayrollEntryCommand` after each
+  successful `Pay()`. Deliberately runs in a **second** `SaveChangesAsync`,
+  not the same one as the payroll write — it queries every contributing
+  worker's `PayrollEntry.Status` fresh, which only reflects the just-paid
+  worker's own status once actually committed, not merely tracked in
+  memory (caught this the hard way: a first attempt bundled both into one
+  save and the auto-close silently never fired, since the query ran
+  before the paying worker's own `Paid` status had landed in the store).
+  Only ever finds candidates among orders that **have**
+  `WorkOrderPayoutShare` rows — an Hourly brigade's hours aren't
+  attributed to a specific `WorkOrder` in `PayrollEntry` at all (§8.0), so
+  those orders close only via the manual endpoint.
+
+Verified with a throwaway InMemory check (3 scenarios: rework, manual
+close with Prorab-isolation, and the two-worker auto-close sequence —
+order stays `Accepted` after the first worker's pay, closes only after
+the second) before adding permanent Postgres tests to
+`WorkOrderIsolationTests.cs` (rework + manual close scenarios; the
+auto-close scenario's InMemory-only verification stands alone since it
+spans WorkOrders + Payroll and didn't fit that file's existing seed shape
+cleanly — flagged here rather than silently skipped).
+
+Build clean, 0 warnings. Test suite: 69/119 pass locally (50 Docker-gated,
+up 2 — no regressions).
+
 **Punch-list item 2/3 — `GET /work-orders/mine` → MASTER §9.4.** The
 Brigadir half of "`GET,POST /work-orders` — Prorab+ / Brigadir(own, read)"
 that `ListWorkOrdersQuery`'s own comment had flagged as not yet built.
@@ -753,17 +793,16 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 3, Step 3 — **every `[BE]`/`[FULL]` step in the
-entire project (Phases 1-6) is now checked off.** What remains unchecked
-project-wide: every `[BOT]` step (blocked on the 2026-07-18 bot deferral)
-and the 3-item punch list above from Phase 6 Step 9's reconciliation
-(Rework/Close wiring, `work-orders/mine`, `companies/current`) — neither
-is a "next step" in the usual sequential sense; both need a user decision
-on scope/priority before becoming one.
-**Next step:** none auto-selected — see punch list above and the bot
-deferral; ask the user which to pick up.
+**Last completed:** punch-list item 3/3 (`WorkOrder.Rework()`/`.Close()`
+wiring) — **every `[BE]`/`[FULL]` step in the entire project (Phases 1-6)
+is checked off, and the Phase 6 Step 9 punch list is fully closed.** What
+remains project-wide is entirely `[BOT]` work, blocked on the 2026-07-18
+bot deferral.
+**Next step:** none auto-selected — resuming the bot is the only backend-
+adjacent work left; ask the user before starting it (it's a phase-wide
+deferred decision, not a single checklist step).
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 112 tests, confirmed via `dotnet test` (69 pass locally, 43 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 119 tests, confirmed via `dotnet test` (69 pass locally, 50 need Docker — see below)
 **Updated:** 2026-07-20
 
 **Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
