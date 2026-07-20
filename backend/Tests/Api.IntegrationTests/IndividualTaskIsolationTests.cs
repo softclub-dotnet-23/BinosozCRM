@@ -1,4 +1,6 @@
 using Application.IndividualTasks;
+using Application.Objects;
+using Application.WorkOrders;
 using Domain.Entities;
 using Domain.Enums;
 using FluentAssertions;
@@ -135,5 +137,76 @@ public sealed class IndividualTaskIsolationTests(PostgresFixture fixture)
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("WORKER_NOT_FOUND");
+    }
+
+    // MASTER §11.5 rule 3/§8.7 point 4: ApproveBonusCommand touches money
+    // (bonus feeds the worker's PayrollEntry) via a task tied to a
+    // WorkOrder — a Prorab not assigned to that order's object must not be
+    // able to approve or override the amount, same isolation every other
+    // WorkOrder-scoped handler already enforces.
+    [Fact]
+    public async Task Prorab_not_assigned_to_the_objects_object_cannot_approve_the_bonus()
+    {
+        var companyId = Guid.NewGuid();
+        var owner = new FixedCurrentUserService(companyId, Guid.NewGuid(), Role.Owner);
+        Guid taskId;
+        Guid prorabUserId;
+
+        await using (var context = fixture.CreateDbContext(owner))
+        {
+            var company = Company.Create(companyId, $"Bonus Isolation Test Co {companyId}");
+            var customer = Customer.Create(companyId, "Acme");
+            var constructionObject = ConstructionObject.Create(companyId, "Object A", customer.Id);
+            var brigade = Brigade.Create(companyId, "Brigade A");
+            var brigadirUser = User.Create("Brigadir A", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+            var prorabUser = User.Create("Prorab Elsewhere", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+            var adult = new DateOnly(1990, 1, 1);
+            var hireDate = new DateOnly(2020, 1, 1);
+            var brigadirWorker = Worker.Create(companyId, brigade.Id, "Brigadir A Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", adult, PayRateType.Hourly, 50m, hireDate, userId: brigadirUser.Id);
+
+            context.Companies.Add(company);
+            context.Customers.Add(customer);
+            context.ConstructionObjects.Add(constructionObject);
+            context.Brigades.Add(brigade);
+            context.Users.AddRange(brigadirUser, prorabUser);
+            context.Workers.Add(brigadirWorker);
+            await context.SaveChangesAsync(CancellationToken.None);
+            prorabUserId = prorabUser.Id;
+
+            // Prorab is assigned to some OTHER object — proves this is a
+            // strict allow-list, not "the Prorab has no assignments at all".
+            var otherCustomer = Customer.Create(companyId, "Other Customer");
+            var otherObject = ConstructionObject.Create(companyId, "Object Elsewhere", otherCustomer.Id);
+            context.Customers.Add(otherCustomer);
+            context.ConstructionObjects.Add(otherObject);
+            await context.SaveChangesAsync(CancellationToken.None);
+            await new AssignProrabCommandHandler(context, owner)
+                .Handle(new AssignProrabCommand(otherObject.Id, prorabUserId), CancellationToken.None);
+
+            var orderResult = await new CreateWorkOrderCommandHandler(context, owner).Handle(
+                new CreateWorkOrderCommand(constructionObject.Id, brigade.Id, "Do the thing", "m2", 10, 100, null, null),
+                CancellationToken.None);
+            orderResult.IsSuccess.Should().BeTrue();
+
+            var brigadir = new FixedCurrentUserService(companyId, brigadirUser.Id, Role.Brigadir);
+            await using var createContext = fixture.CreateDbContext(brigadir);
+            var created = await new CreateIndividualTaskCommandHandler(createContext, brigadir).Handle(
+                new CreateIndividualTaskCommand(brigadirWorker.Id, "Order task", null, orderResult.Value.Id, DateTimeOffset.UtcNow.AddDays(1)),
+                CancellationToken.None);
+            created.IsSuccess.Should().BeTrue();
+            taskId = created.Value.Id;
+
+            var completed = await new CompleteIndividualTaskCommandHandler(createContext, brigadir).Handle(
+                new CompleteIndividualTaskCommand(taskId, BonusAmount: 50m), CancellationToken.None);
+            completed.IsSuccess.Should().BeTrue();
+        }
+
+        var prorab = new FixedCurrentUserService(companyId, prorabUserId, Role.Prorab);
+        await using var context2 = fixture.CreateDbContext(prorab);
+        var result = await new ApproveBonusCommandHandler(context2, prorab)
+            .Handle(new ApproveBonusCommand(taskId, OverrideAmount: null), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("PRORAB_NOT_ASSIGNED_TO_OBJECT");
     }
 }

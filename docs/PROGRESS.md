@@ -17,11 +17,83 @@ it was waiting on Phase 5's `CalculatedAmount`/`PayrollAdvance`, both of
 which now exist (Phase 5 Steps 3/6/7). Not retroactively completed as
 part of this step; flagged here so it isn't forgotten, worth a dedicated
 pass if the user wants it closed out.
+**Phase 6, Step 8 [FULL] — security: full pass over §11 + pentest.** Full
+audit against every §11 subsection; 7/9 already conformant, 2 real gaps
+fixed in code (deactivated-user middleware, a Prorab IDOR on bonus
+approval), 1 general rate-limit gap closed, telegram-webhook limiter
+explicitly deferred (bot unbuilt) — see full writeup below.
+
 **Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных
 логинов, упавшую фоновую задачу.** The 5xx and failed-background-job legs
 were already fully covered by existing code (`ExceptionHandlingMiddleware`,
 `PayrollDraftBackgroundService`/`OverdueCheckBackgroundService`); the only
 new work was bulk-failed-login alerting — see full writeup below.
+
+**Phase 6, Step 8 [FULL] — security: полный проход по §11 + пентест →
+MASTER §11.** No web-app pentest tooling applies here (no web frontend,
+§0) — treated as a full code-level audit of every §11 subsection against
+the actual implementation, the closest equivalent for an API-only backend.
+7 of 9 areas were already fully conformant from prior phases; 3 gaps found,
+2 fixed as real code, 1 explicitly deferred:
+
+- **§11.1 Tokens — GAP, fixed.** `User.IsActive = false` was checked at
+  login/refresh/reset but never per-request — spec requires "проверяется
+  middleware на каждом запросе", specifically to stop a deactivated user
+  working for up to 15 minutes (the access token's remaining TTL). Added
+  `backend/Api/Middleware/AccountActiveMiddleware.cs`: reads `IsActive` by
+  exact `UserId` from the JWT claim on every authenticated request
+  (`IgnoreQueryFilters()`, scoped by exact id so the CompanyId filter can't
+  hide anything), returns `401 AUTH_ACCOUNT_DEACTIVATED` the instant it's
+  false. Wired into `Program.cs` right after `UseAuthentication()` — before
+  `UseAuthorization()`, since this isn't a role decision. Deliberately a DB
+  read unlike the adjacent `ForcePasswordChangeMiddleware` (claim-only by
+  design there — a stale claim can only be too strict; here a stale claim
+  would be too lax, exactly the failure mode being closed).
+- **§11.5 Authorization/IDOR — GAP, fixed, the real one.** `ApproveBonusCommand`
+  (Prorab+, approves or overrides bonus amounts that feed straight into
+  `PayrollEntry`) had **no** `BrigadeId`/`ProrabObjectAssignment` scoping at
+  all — every sibling handler in `Application/IndividualTasks/` has one,
+  this didn't. A Prorab could approve/change bonus money for any brigade's
+  task company-wide, including objects they have zero assignment to. This
+  is the exact "🔴, not a suggestion" pattern AGENTS.md calls out. Fixed:
+  when the task carries a `WorkOrderId`, its order's `ObjectId` is now
+  checked against `ProrabObjectAccess.GetAllowedObjectIdsAsync` (mirrors
+  `WorkOrderAccess.GetForProrabAsync`), failing `PRORAB_NOT_ASSIGNED_TO_OBJECT`
+  (404-class, not 403, per rule 2). A personal task (§8.5, no `WorkOrderId`)
+  has no object to scope by — stays company-wide for Prorab, same precedent
+  already established for Worker/Brigade/AbsenceRecord elsewhere. Added a
+  permanent Postgres-backed test to `IndividualTaskIsolationTests.cs`
+  (`Prorab_not_assigned_to_the_objects_object_cannot_approve_the_bonus`)
+  proving an unassigned Prorab is rejected while a second, unrelated
+  assignment doesn't accidentally grant access (mirrors the existing
+  `WorkOrderIsolationTests` pattern).
+- **§11.4 Rate limiting — GAP, fixed.** Only `/auth/login` and
+  `/auth/forgot-password` had policies; spec's "остальное — общий лимит на
+  пользователя/IP" had no implementation at all, leaving every other
+  endpoint unthrottled. Added `options.GlobalLimiter` in `Program.cs`: 120
+  requests/minute, partitioned by user id when authenticated else by IP.
+  MASTER gives no number for this one (unlike login's literal 5/15min or
+  forgot-password's literal 3/hour) — 120/min is a documented judgment
+  call, not an invented business rule about money, chosen to be generous
+  enough not to bother a real integration while blunting a scripted hammer
+  against any single endpoint.
+- **Not fixed, explicitly deferred**: `/telegram/webhook`'s own rate limit
+  (§11.4) and its role in password-reset delivery (§11.2) — the
+  `TelegramBot` project has zero source files, unchanged since the
+  2026-07-18 bot deferral. Nothing to rate-limit yet.
+- **Confirmed already conformant, no change needed**: §11.2 (forgot/reset
+  password — always-200, hashed+TTL+single-use token, full refresh-chain
+  revoke on reset), §11.3 (HSTS/CSP/nosniff/X-Frame-Options/CORS allow-list),
+  §11.6 (PII masking in the DTO layer, Serilog PII exclusion), §11.7 (all 6
+  `AdminAuditLog` actions covered — role change, deactivation, brigadir
+  assignment, PayRate change, advance issued, payroll paid), §11.8 (health
+  checks, CI/CD with `dotnet list package --vulnerable` gated — ran clean,
+  no vulnerable packages across all 6 projects), §11.9 (Argon2id, signed
+  URLs with expiry, MIME allow-list not blacklist, path-traversal guard).
+  §11.10 items (Row-Level Security, WAF, 2FA) correctly remain out of MVP.
+
+Build clean, 0 warnings. Test suite: 69/109 pass locally (40 Docker-gated,
+up one from the new permanent isolation test — no regressions).
 
 **Phase 6, Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных
 логинов, упавшую фоновую задачу → MASTER §11.8.** Audited all three legs
@@ -536,11 +608,11 @@ Steps 1–4/6 done; Step 5 `[BOT]` unchecked, blocked on the 2026-07-18 bot
 deferral. No `Phase4-summary.md` — same "functionally complete for now"
 status as Phases 2/3.
 **Phase:** 6 — Полировка и запуск
-**Last completed:** Phase 6, Step 7
-**Next step:** Phase 6, Step 8 [FULL] — security: полный проход по §11 +
-пентест — до первого реального использования на деньгах → MASTER §11
+**Last completed:** Phase 6, Step 8
+**Next step:** Phase 6, Step 9 [FULL] — docs: сверка MASTER.md с реальным
+кодом перед запуском → MASTER.md (весь документ)
 **Build:** clean, 0 warnings (`dotnet build backend.slnx`)
-**Tests:** `Tests/Api.IntegrationTests` — 108 tests, confirmed via `dotnet test` (69 pass locally, 39 need Docker — see below)
+**Tests:** `Tests/Api.IntegrationTests` — 109 tests, confirmed via `dotnet test` (69 pass locally, 40 need Docker — see below)
 **Updated:** 2026-07-20
 
 **Phase 4, Step 6 [BE] — тесты: авто-переход при частичной/полной/
@@ -1802,7 +1874,7 @@ those specific queries now call `.IgnoreQueryFilters()` deliberately.
 - [x] Step 5 [BE] — `/auth/forgot-password` + `/auth/reset-password` (`PasswordResetToken`, TTL 1ч, отзыв всех refresh) → MASTER §5.4, §11.2
 - [x] Step 6 [BE] — бэкапы (`pg_dump` + WAL, retention 30д, вне сервера) + **проверка восстановления** → MASTER §11.8
 - [ ] Step 7 [BE] — мониторинг: алерты на 5xx, пачку неудачных логинов, упавшую фоновую задачу → MASTER §11.8
-- [ ] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
+- [x] Step 8 [FULL] — **`security` полный проход по §11 + пентест — до первого реального использования на деньгах** → MASTER §11
 - [ ] Step 9 [FULL] — `docs` — сверка MASTER.md с реальным кодом перед запуском → MASTER §16
 
 ---

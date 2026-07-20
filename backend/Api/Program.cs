@@ -94,6 +94,28 @@ builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
 builder.Services.AddRateLimiter(options =>
 {
+    // MASTER §11.4: "Остальное — общий лимит на пользователя/IP." No
+    // number is specified for this one (unlike login's 5/15min or
+    // forgot-password's 3/hour, both literal spec values) — 120
+    // requests/minute is a judgment call, generous enough not to bother a
+    // real user/bot integration but enough to blunt a scripted hammering
+    // of any single non-auth endpoint. Partitioned by user id when
+    // authenticated (a shared office IP shouldn't throttle one user
+    // because of another), falling back to IP for anonymous requests.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? $"user:{httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress}";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
     options.OnRejected = async (context, cancellationToken) =>
     {
         // MASTER §11.8: "алерт на... неудачные логины пачкой" — this IS
@@ -211,6 +233,7 @@ app.UseMiddleware<LoginRateLimitKeyMiddleware>();
 app.UseRateLimiter();
 
 app.UseAuthentication();
+app.UseMiddleware<AccountActiveMiddleware>();
 app.UseAuthorization();
 app.UseMiddleware<ForcePasswordChangeMiddleware>();
 

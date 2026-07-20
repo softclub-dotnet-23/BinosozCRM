@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Objects;
 using Domain.Common;
 using FluentValidation;
 using MediatR;
@@ -16,6 +17,13 @@ namespace Application.IndividualTasks;
 // takes no amount parameter — to support changing it, an OverrideAmount
 // here re-proposes via ProposeBonus() first (Domain doesn't gate that
 // call's caller identity), then approves. No Domain change needed.
+//
+// MASTER §11.5 rule 3: a task created off a WorkOrder carries that order's
+// ObjectId — a Prorab approving/changing bonus money for it must be
+// assigned to that object, same as every other WorkOrder-scoped handler
+// (mirrors WorkOrderAccess.GetForProrabAsync). A personal task (§8.5, no
+// WorkOrderId) has no object to scope by at all — company-wide for Prorab,
+// same precedent as Worker/Brigade/AbsenceRecord elsewhere in this codebase.
 public sealed record ApproveBonusCommand(Guid TaskId, decimal? OverrideAmount) : IRequest<Result<IndividualTaskDto>>;
 
 public sealed class ApproveBonusCommandValidator : AbstractValidator<ApproveBonusCommand>
@@ -35,6 +43,18 @@ public sealed class ApproveBonusCommandHandler(IApplicationDbContext context, IC
         var task = await context.IndividualTasks.FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken);
         if (task is null)
             return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+
+        if (task.WorkOrderId is not null)
+        {
+            var objectId = await context.WorkOrders
+                .Where(w => w.Id == task.WorkOrderId.Value)
+                .Select(w => (Guid?)w.ObjectId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+            if (allowedObjectIds is not null && (objectId is null || !allowedObjectIds.Contains(objectId.Value)))
+                return Result.Failure<IndividualTaskDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
+        }
 
         if (request.OverrideAmount is not null)
         {
