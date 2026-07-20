@@ -8,3 +8,4 @@ const box = await page.locator("text=Общая стоимость").first().loc
 await page.screenshot({ path: `${outDir}\\kpi5-crop.png`, clip: { x: box.x - 10, y: box.y - 10, width: box.width + 20, height: box.height + 20 } });
 await browser.close();
 console.log("DONE");
+  

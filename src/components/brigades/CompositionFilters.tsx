@@ -1,5 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockBrigades";
 import type { EmployeeStatus } from "../../types";
@@ -17,9 +18,6 @@ export const DEFAULT_COMPOSITION_FILTERS: CompositionFiltersState = {
   objectId: "all",
   status: "all",
 };
-
-const selectClass =
-  "h-9 rounded-lg border border-border-strong bg-card px-2.5 text-xs font-medium text-ink focus:border-primary focus:outline-none";
 
 const STATUS_OPTIONS: { value: EmployeeStatus; label: string }[] = [
   { value: "on_shift", label: "На смене" },
@@ -41,57 +39,40 @@ interface CompositionFiltersProps {
 export function CompositionFilters({ filters, onChange, onReset, specialties }: CompositionFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <select
+      <CustomSelect
+        size="sm"
+        searchable
+        aria-label="Бригада"
         value={filters.brigadeId}
-        onChange={(e) => onChange({ ...filters, brigadeId: e.target.value })}
-        className={selectClass}
-      >
-        <option value="all">Бригада: Все</option>
-        {mockBrigades.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-          </option>
-        ))}
-      </select>
+        onValueChange={(v) => onChange({ ...filters, brigadeId: v })}
+        options={[{ value: "all", label: "Бригада: Все" }, ...mockBrigades.map((b) => ({ value: b.id, label: b.name }))]}
+      />
 
-      <select
+      <CustomSelect
+        size="sm"
+        searchable
+        aria-label="Роль"
         value={filters.specialty}
-        onChange={(e) => onChange({ ...filters, specialty: e.target.value })}
-        className={selectClass}
-      >
-        <option value="all">Роль: Все</option>
-        {specialties.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
+        onValueChange={(v) => onChange({ ...filters, specialty: v })}
+        options={[{ value: "all", label: "Роль: Все" }, ...specialties.map((s) => ({ value: s, label: s }))]}
+      />
 
-      <select
+      <CustomSelect
+        size="sm"
+        searchable
+        aria-label="Объект"
         value={filters.objectId}
-        onChange={(e) => onChange({ ...filters, objectId: e.target.value })}
-        className={selectClass}
-      >
-        <option value="all">Объект: Все</option>
-        {mockObjects.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name}
-          </option>
-        ))}
-      </select>
+        onValueChange={(v) => onChange({ ...filters, objectId: v })}
+        options={[{ value: "all", label: "Объект: Все" }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
+      />
 
-      <select
+      <CustomSelect
+        size="sm"
+        aria-label="Статус"
         value={filters.status}
-        onChange={(e) => onChange({ ...filters, status: e.target.value as EmployeeStatus | "all" })}
-        className={selectClass}
-      >
-        <option value="all">Статус: Все</option>
-        {STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+        onValueChange={(v) => onChange({ ...filters, status: v as EmployeeStatus | "all" })}
+        options={[{ value: "all", label: "Статус: Все" }, ...STATUS_OPTIONS]}
+      />
 
       <Button variant="ghost" size="sm" onClick={onReset}>
         <RotateCcw size={13} /> Сбросить фильтры

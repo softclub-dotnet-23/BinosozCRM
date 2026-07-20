@@ -2,9 +2,13 @@ import { Building2, Calendar, FileText, Pencil, Trash2, User, Warehouse } from "
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { ReviewStatusBadge, writeOffReasonLabel } from "./InventoryStatusBadges";
+import { ResponsiblePersonSummary } from "./ResponsiblePersonField";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
 import { writeOffQuantity, writeOffTotal } from "../../data/mockMaterialWriteOffs";
+import { employeesRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { responsiblePersonName } from "../../utils/responsiblePerson";
 import type { MaterialWriteOff } from "../../types";
 
 interface WriteOffDetailDrawerProps {
@@ -15,6 +19,7 @@ interface WriteOffDetailDrawerProps {
 }
 
 export function WriteOffDetailDrawer({ writeOff, onClose, onEdit, onDelete }: WriteOffDetailDrawerProps) {
+  const employees = useRepositorySnapshot(employeesRepository);
   return (
     <Drawer open={Boolean(writeOff)} onClose={onClose} title="Списание">
       {writeOff && (
@@ -39,7 +44,7 @@ export function WriteOffDetailDrawer({ writeOff, onClose, onEdit, onDelete }: Wr
               {writeOff.warehouse}
             </Row>
             <Row icon={User} label="Ответственный">
-              {writeOff.responsible}
+              <ResponsiblePersonSummary value={writeOff.responsible} employees={employees} />
             </Row>
           </dl>
 
@@ -82,7 +87,7 @@ export function WriteOffDetailDrawer({ writeOff, onClose, onEdit, onDelete }: Wr
 
           <div className="border-t border-border pt-4 text-xs text-ink-muted">
             <div className="flex items-center gap-1.5">
-              <FileText size={12} /> Создано {formatDateShort(writeOff.createdDate)} · {writeOff.createdBy}
+              <FileText size={12} /> Создано {formatDateShort(writeOff.createdDate)} · {responsiblePersonName(writeOff.createdBy, employees)}
             </div>
           </div>
 

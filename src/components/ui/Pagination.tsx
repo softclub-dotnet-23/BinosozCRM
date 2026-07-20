@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { CustomSelect } from "./CustomSelect";
 
 interface PaginationProps {
   page: number;
@@ -53,17 +54,13 @@ export function Pagination({
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-xs text-ink-secondary">
           <span>Показывать по:</span>
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="rounded-lg border border-border-strong px-2 py-1 text-xs text-ink focus:border-primary focus:outline-none"
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            size="sm"
+            aria-label="Показывать по"
+            value={String(pageSize)}
+            onValueChange={(v) => onPageSizeChange(Number(v))}
+            options={pageSizeOptions.map((size) => ({ value: String(size), label: String(size) }))}
+          />
         </div>
 
         <div className="flex items-center gap-1">

@@ -3,6 +3,7 @@ import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
 import { IconSummaryRow } from "../ui/IconSummaryRow";
+import { CustomSelect } from "../ui/CustomSelect";
 import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
 import { EmployeeRoleBadge } from "./EmployeeRoleBadge";
 import { formatCurrency } from "../../utils/format";
@@ -102,33 +103,29 @@ export function EmployeeDetailsDrawer({
         <p className="text-xs text-ink-secondary">{employee.objectName ?? "—"}</p>
         <label className="mt-3 block text-xs text-ink-secondary">
           Смена
-          <select
+          <CustomSelect
+            className="mt-1"
             value={employee.shift}
-            onChange={(e) => onChangeShift(employee.id, e.target.value as WorkShift)}
-            className="mt-1 w-full rounded-[10px] border border-border-strong px-3 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          >
-            {(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((s) => (
-              <option key={s} value={s}>
-                {SHIFT_CONFIG[s].label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => onChangeShift(employee.id, v as WorkShift)}
+            options={(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((s) => ({ value: s, label: SHIFT_CONFIG[s].label }))}
+          />
         </label>
         <label className="mt-3 block text-xs text-ink-secondary">
           Статус
-          <select
+          <CustomSelect
+            className="mt-1"
             value={employee.status}
-            onChange={(e) => onChangeStatus(employee.id, e.target.value as EmployeeStatus)}
-            className="mt-1 w-full rounded-[10px] border border-border-strong px-3 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          >
-            <option value="on_shift">На смене</option>
-            <option value="on_site">На объекте</option>
-            <option value="available">Свободен</option>
-            <option value="on_trip">На выезде</option>
-            <option value="absent">Отсутствует</option>
-            <option value="on_leave">В отпуске</option>
-            <option value="sick_leave">На больничном</option>
-          </select>
+            onValueChange={(v) => onChangeStatus(employee.id, v as EmployeeStatus)}
+            options={[
+              { value: "on_shift", label: "На смене" },
+              { value: "on_site", label: "На объекте" },
+              { value: "available", label: "Свободен" },
+              { value: "on_trip", label: "На выезде" },
+              { value: "absent", label: "Отсутствует" },
+              { value: "on_leave", label: "В отпуске" },
+              { value: "sick_leave", label: "На больничном" },
+            ]}
+          />
         </label>
       </div>
 

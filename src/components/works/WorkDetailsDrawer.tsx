@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Calendar, CheckCircle2, Clock, Paperclip, Pencil, TrendingUp, Users, Wallet } from "lucide-react";
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { ObjectImage } from "../ui/ObjectImage";
 import { Avatar } from "../ui/Avatar";
 import { IconSummaryRow } from "../ui/IconSummaryRow";
@@ -90,17 +91,15 @@ export function WorkDetailsDrawer({
 
         <label className="mt-2 block text-xs text-ink-secondary">
           Изменить статус
-          <select
+          <CustomSelect
+            className="mt-1"
             value={work.status}
-            onChange={(e) => onChangeStatus(work.id, e.target.value as WorkStatus)}
-            className="mt-1 w-full rounded-[10px] border border-border-strong px-3 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          >
-            {(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {WORK_STATUS_CONFIG[s].label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => onChangeStatus(work.id, v as WorkStatus)}
+            options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => ({
+              value: s,
+              label: WORK_STATUS_CONFIG[s].label,
+            }))}
+          />
         </label>
 
         <div className="mt-4 flex items-center gap-2.5">

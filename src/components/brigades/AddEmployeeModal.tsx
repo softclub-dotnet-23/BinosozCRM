@@ -3,6 +3,7 @@ import { Camera, X } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
+import { CustomSelect } from "../ui/CustomSelect";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockBrigades";
 import { mockEmployees } from "../../data/mockEmployees";
@@ -226,53 +227,63 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
         </Field>
 
         <Field label="Бригада" error={errors.brigadeId}>
-          <select value={form.brigadeId} onChange={(e) => update("brigadeId", e.target.value)} className={inputClass}>
-            {mockBrigades.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            error={Boolean(errors.brigadeId)}
+            className="mt-1.5"
+            value={form.brigadeId}
+            onValueChange={(v) => update("brigadeId", v)}
+            options={mockBrigades.map((b) => ({ value: b.id, label: b.name }))}
+          />
         </Field>
 
         <Field label="Роль в бригаде">
-          <select value={form.memberRole} onChange={(e) => update("memberRole", e.target.value as BrigadeMemberRole)} className={inputClass}>
-            <option value="worker">Рабочий</option>
-            <option value="helper">Разнорабочий</option>
-            <option value="foreman">Прораб</option>
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.memberRole}
+            onValueChange={(v) => update("memberRole", v as BrigadeMemberRole)}
+            options={[
+              { value: "worker", label: "Рабочий" },
+              { value: "helper", label: "Разнорабочий" },
+              { value: "foreman", label: "Прораб" },
+            ]}
+          />
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectId} onChange={(e) => update("objectId", e.target.value)} className={inputClass}>
-            {mockObjects.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.objectId}
+            onValueChange={(v) => update("objectId", v)}
+            options={mockObjects.map((o) => ({ value: o.id, label: o.name }))}
+          />
         </Field>
 
         <Field label="Смена">
-          <select value={form.shift} onChange={(e) => update("shift", e.target.value as WorkShift)} className={inputClass}>
-            {(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((s) => (
-              <option key={s} value={s}>
-                {SHIFT_CONFIG[s].label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.shift}
+            onValueChange={(v) => update("shift", v as WorkShift)}
+            options={(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((s) => ({ value: s, label: SHIFT_CONFIG[s].label }))}
+          />
         </Field>
 
         <Field label="Статус">
-          <select value={form.status} onChange={(e) => update("status", e.target.value as EmployeeStatus)} className={inputClass}>
-            <option value="on_shift">На смене</option>
-            <option value="on_site">На объекте</option>
-            <option value="available">Свободен</option>
-            <option value="on_trip">На выезде</option>
-            <option value="absent">Отсутствует</option>
-            <option value="on_leave">В отпуске</option>
-            <option value="sick_leave">На больничном</option>
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.status}
+            onValueChange={(v) => update("status", v as EmployeeStatus)}
+            options={[
+              { value: "on_shift", label: "На смене" },
+              { value: "on_site", label: "На объекте" },
+              { value: "available", label: "Свободен" },
+              { value: "on_trip", label: "На выезде" },
+              { value: "absent", label: "Отсутствует" },
+              { value: "on_leave", label: "В отпуске" },
+              { value: "sick_leave", label: "На больничном" },
+            ]}
+          />
         </Field>
 
         <Field label="Дата назначения">

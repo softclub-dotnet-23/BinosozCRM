@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { mockMaterials, MATERIAL_WAREHOUSES } from "../../data/mockMaterials";
-import { WRITE_OFF_OBJECTS, WRITE_OFF_BRIGADES, WRITE_OFF_RESPONSIBLE } from "../../data/mockMaterialWriteOffs";
+import { WRITE_OFF_OBJECTS, WRITE_OFF_BRIGADES } from "../../data/mockMaterialWriteOffs";
+import { employeesRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { ResponsiblePersonSelect } from "./ResponsiblePersonField";
 import { WRITE_OFF_REASONS, writeOffReasonLabel } from "./InventoryStatusBadges";
 import { getAvailableStock } from "../../utils/materialStockEffects";
 import { formatCurrency, formatNumber } from "../../utils/format";
@@ -36,14 +40,14 @@ function emptyLine(): LineForm {
   return { materialName: first.name, quantity: "", unit: first.unit, price: String(first.price) };
 }
 
-function emptyForm(): FormState {
+function emptyForm(defaultResponsible: string): FormState {
   return {
     documentNumber: "",
     date: "",
     objectName: WRITE_OFF_OBJECTS[0],
     brigadeName: "",
     warehouse: MATERIAL_WAREHOUSES[0],
-    responsible: WRITE_OFF_RESPONSIBLE[0],
+    responsible: defaultResponsible,
     reason: "construction_works",
     basis: "",
     note: "",
@@ -81,13 +85,14 @@ interface WriteOffFormModalProps {
 }
 
 export function WriteOffFormModal({ open, writeOff, existingDocumentNumbers, onClose, onSave }: WriteOffFormModalProps) {
-  const [form, setForm] = useState<FormState>(() => (writeOff ? toForm(writeOff) : emptyForm()));
+  const employees = useRepositorySnapshot(employeesRepository);
+  const [form, setForm] = useState<FormState>(() => (writeOff ? toForm(writeOff) : emptyForm(employees[0]?.id ?? "")));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(writeOff ? toForm(writeOff) : emptyForm());
+      setForm(writeOff ? toForm(writeOff) : emptyForm(employees[0]?.id ?? ""));
       setErrors({});
       setSaving(false);
     }
@@ -239,61 +244,54 @@ export function WriteOffFormModal({ open, writeOff, existingDocumentNumbers, onC
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectName} onChange={(e) => update("objectName", e.target.value)} className={inputClass}>
-            {WRITE_OFF_OBJECTS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.objectName}
+            onValueChange={(v) => update("objectName", v)}
+            options={WRITE_OFF_OBJECTS.map((o) => ({ value: o, label: o }))}
+          />
         </Field>
 
         <Field label="Бригада">
-          <select value={form.brigadeName} onChange={(e) => update("brigadeName", e.target.value)} className={inputClass}>
-            <option value="">Без бригады</option>
-            {WRITE_OFF_BRIGADES.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            clearable
+            placeholder="Без бригады"
+            className="mt-1.5"
+            value={form.brigadeName}
+            onValueChange={(v) => update("brigadeName", v)}
+            options={WRITE_OFF_BRIGADES.map((b) => ({ value: b, label: b }))}
+          />
         </Field>
 
         <Field label="Склад" error={errors.warehouse}>
-          <select
+          <CustomSelect
+            error={Boolean(errors.warehouse)}
+            className="mt-1.5"
             value={form.warehouse}
-            onChange={(e) => {
-              update("warehouse", e.target.value);
+            onValueChange={(v) => {
+              update("warehouse", v);
               setErrors({});
             }}
-            className={cn(inputClass, errors.warehouse && errorInputClass)}
-          >
-            {MATERIAL_WAREHOUSES.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
+            options={MATERIAL_WAREHOUSES.map((w) => ({ value: w, label: w }))}
+          />
         </Field>
 
         <Field label="Ответственный" error={errors.responsible}>
-          <select value={form.responsible} onChange={(e) => update("responsible", e.target.value)} className={inputClass}>
-            {WRITE_OFF_RESPONSIBLE.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <ResponsiblePersonSelect
+            employees={employees}
+            value={form.responsible}
+            onChange={(value) => update("responsible", value)}
+            error={Boolean(errors.responsible)}
+          />
         </Field>
 
         <Field label="Причина">
-          <select value={form.reason} onChange={(e) => update("reason", e.target.value as WriteOffReason)} className={inputClass}>
-            {WRITE_OFF_REASONS.map((r) => (
-              <option key={r} value={r}>
-                {writeOffReasonLabel(r)}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.reason}
+            onValueChange={(v) => update("reason", v as WriteOffReason)}
+            options={WRITE_OFF_REASONS.map((r) => ({ value: r, label: writeOffReasonLabel(r) }))}
+          />
         </Field>
 
         <Field label="Основание">
@@ -343,17 +341,13 @@ export function WriteOffFormModal({ open, writeOff, existingDocumentNumbers, onC
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.6fr_0.7fr_0.6fr_0.8fr_auto] sm:items-end">
                   <label className="block text-xs font-medium text-ink">
                     Материал
-                    <select
+                    <CustomSelect
+                      searchable
+                      className="mt-1.5"
                       value={line.materialName}
-                      onChange={(e) => updateLine(i, { materialName: e.target.value })}
-                      className={inputClass}
-                    >
-                      {mockMaterials.slice(0, 128).map((m) => (
-                        <option key={m.id} value={m.name}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={(v) => updateLine(i, { materialName: v })}
+                      options={mockMaterials.slice(0, 128).map((m) => ({ value: m.name, label: m.name }))}
+                    />
                   </label>
                   <label className="block text-xs font-medium text-ink">
                     Кол-во

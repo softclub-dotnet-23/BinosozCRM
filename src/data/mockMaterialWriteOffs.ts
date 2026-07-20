@@ -244,10 +244,6 @@ export const WRITE_OFF_OBJECTS: string[] = Array.from(new Set(mockMaterialWriteO
 export const WRITE_OFF_BRIGADES: string[] = Array.from(
   new Set(mockMaterialWriteOffs.map((w) => w.brigadeName).filter((v): v is string => Boolean(v))),
 ).sort((a, b) => a.localeCompare(b, "ru"));
-export const WRITE_OFF_RESPONSIBLE: string[] = Array.from(new Set(mockMaterialWriteOffs.map((w) => w.responsible))).sort((a, b) =>
-  a.localeCompare(b, "ru"),
-);
-
 export function writeOffQuantity(writeOff: MaterialWriteOff): number {
   return writeOff.lines.reduce((sum, line) => sum + line.quantity, 0);
 }

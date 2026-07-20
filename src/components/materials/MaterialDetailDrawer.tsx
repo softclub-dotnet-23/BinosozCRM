@@ -4,24 +4,27 @@ import { MaterialStatusBadge } from "./MaterialStatusBadge";
 import { getMaterialStatus, getMaterialTotalValue } from "../../utils/materialAnalytics";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
-import { mockMaterialReceipts } from "../../data/mockMaterialReceipts";
-import { mockMaterialWriteOffs } from "../../data/mockMaterialWriteOffs";
-import { mockMaterialTransfers } from "../../data/mockMaterialTransfers";
+import { materialReceiptsRepository, materialWriteOffsRepository, materialTransfersRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
 import type { Material } from "../../types";
 
 export function MaterialDetailDrawer({ material, onClose }: { material: Material | null; onClose: () => void }) {
+  const receipts = useRepositorySnapshot(materialReceiptsRepository);
+  const writeOffs = useRepositorySnapshot(materialWriteOffsRepository);
+  const transfers = useRepositorySnapshot(materialTransfersRepository);
+
   const receiptLines = material
-    ? mockMaterialReceipts
+    ? receipts
         .flatMap((r) => r.lines.filter((l) => l.materialName === material.name).map((l) => ({ id: r.id, date: r.date, line: l })))
         .slice(0, 3)
     : [];
   const writeOffLines = material
-    ? mockMaterialWriteOffs
+    ? writeOffs
         .flatMap((w) => w.lines.filter((l) => l.materialName === material.name).map((l) => ({ id: w.id, date: w.date, line: l })))
         .slice(0, 3)
     : [];
   const transferLines = material
-    ? mockMaterialTransfers
+    ? transfers
         .filter((t) => t.lines.some((l) => l.materialName === material.name))
         .slice(0, 3)
     : [];

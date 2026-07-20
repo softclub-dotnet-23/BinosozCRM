@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Boxes, Download, Layers, RefreshCw, Wallet } from "lucide-react";
+import { AlertTriangle, Boxes, Download, Eye, LayoutGrid, Pencil, RefreshCw, TrendingDown } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -7,79 +7,87 @@ import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { MaterialThumbnail } from "../components/materials/MaterialThumbnail";
 import { MaterialStatusBadge } from "../components/materials/MaterialStatusBadge";
-import { MaterialDetailDrawer } from "../components/materials/MaterialDetailDrawer";
+import { StockDetailDrawer } from "../components/materials/StockDetailDrawer";
+import { StockAdjustmentModal } from "../components/materials/StockAdjustmentModal";
+import { StockReservationModal } from "../components/materials/StockReservationModal";
+import { DonutChart } from "../components/charts/DonutChart";
 import { MATERIAL_WAREHOUSES, MATERIAL_CATEGORIES } from "../data/mockMaterials";
-import { materialsRepository } from "../data/repositories";
-import { useRepositorySnapshot } from "../hooks/useRepositoryState";
+import {
+  materialsRepository,
+  materialReceiptsRepository,
+  stockReservationsRepository,
+  stockAdjustmentsRepository,
+} from "../data/repositories";
+import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { getMaterialStatus, getMaterialTotalValue } from "../utils/materialAnalytics";
+import { adjustMaterialStock } from "../utils/materialStockEffects";
+import {
+  buildStockRows,
+  computeStockKpis,
+  computeStockStatusBuckets,
+  getCriticalStockRows,
+} from "../utils/stockAnalytics";
 import { useToast } from "../hooks/useToast";
-import { formatCurrency, formatNumber } from "../utils/format";
-import type { Material, MaterialStatus } from "../types";
+import { formatNumber } from "../utils/format";
+import { formatDateTimeShort } from "../utils/date";
+import type { MaterialStockRow, StockAdjustment, StockFilters, StockReservation } from "../types";
 
-interface StockRow {
-  material: Material;
-  reserved: number;
-  available: number;
-  status: MaterialStatus;
-}
-
-interface StockFilters {
-  warehouse: string;
-  category: string;
-  status: MaterialStatus | "all";
-}
-
-const DEFAULT_FILTERS: StockFilters = { warehouse: "all", category: "all", status: "all" };
+const DEFAULT_FILTERS: StockFilters = {
+  warehouse: "all",
+  category: "all",
+  status: "all",
+  dateFrom: "2026-07-01",
+  dateTo: "2026-07-30",
+};
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const toolbarSelectClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-
-function formatCompactAmount(value: number): string {
-  if (value < 100000) return formatNumber(Math.round(value * 10) / 10);
-  return `${formatNumber(Math.round(value / 1000))} тыс.`;
-}
-
-function buildStockRows(materials: Material[]): StockRow[] {
-  return materials.map((m) => {
-    const reserved = Math.round(m.stock * (0.08 + ((m.number * 7) % 10) / 100) * 100) / 100;
-    return { material: m, reserved, available: Math.round((m.stock - reserved) * 100) / 100, status: getMaterialStatus(m) };
-  });
-}
+const iconButtonClass =
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
 
 export default function StockPage() {
   const { showToast } = useToast();
-  const materials = useRepositorySnapshot(materialsRepository);
+  const [materials] = useRepositoryState(materialsRepository);
+  const reservations = useRepositorySnapshot(stockReservationsRepository);
+  const receipts = useRepositorySnapshot(materialReceiptsRepository);
+
   const [search, setSearch] = usePersistentState("filters.stock.search", "");
   const [filters, setFilters] = usePersistentState<StockFilters>("filters.stock.filters", DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [viewMaterial, setViewMaterial] = useState<Material | null>(null);
 
-  const allRows = useMemo(() => buildStockRows(materials), [materials]);
+  const [detailRow, setDetailRow] = useState<MaterialStockRow | null>(null);
+  const [adjustRow, setAdjustRow] = useState<MaterialStockRow | null>(null);
+  const [reserveRow, setReserveRow] = useState<MaterialStockRow | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<StockReservation | null>(null);
+
+  const allRows = useMemo(() => buildStockRows(materials, reservations), [materials, reservations]);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return allRows.filter((r) => {
-      if (query && !r.material.name.toLowerCase().includes(query)) return false;
-      if (filters.warehouse !== "all" && r.material.warehouse !== filters.warehouse) return false;
-      if (filters.category !== "all" && r.material.category !== filters.category) return false;
+      if (query) {
+        const haystack = `${r.materialName} ${r.category} ${r.warehouse} ${r.unit}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      if (filters.warehouse !== "all" && r.warehouse !== filters.warehouse) return false;
+      if (filters.category !== "all" && r.category !== filters.category) return false;
       if (filters.status !== "all" && r.status !== filters.status) return false;
+      const updatedDate = (r.updatedAt ?? "").slice(0, 10);
+      if (filters.dateFrom && updatedDate < filters.dateFrom) return false;
+      if (filters.dateTo && updatedDate > filters.dateTo) return false;
       return true;
     });
   }, [allRows, search, filters]);
 
-  const kpis = useMemo(() => {
-    const totalPositions = filteredRows.length;
-    const totalStock = filteredRows.reduce((s, r) => s + r.material.stock, 0);
-    const totalValue = filteredRows.reduce((s, r) => s + getMaterialTotalValue(r.material), 0);
-    const criticalCount = filteredRows.filter((r) => r.status !== "normal").length;
-    return { totalPositions, totalStock, totalValue, criticalCount };
-  }, [filteredRows]);
+  const kpis = useMemo(() => computeStockKpis(filteredRows), [filteredRows]);
+  const statusBuckets = useMemo(() => computeStockStatusBuckets(filteredRows, receipts), [filteredRows, receipts]);
+  const criticalRows = useMemo(() => getCriticalStockRows(filteredRows, 4), [filteredRows]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -92,19 +100,39 @@ export default function StockPage() {
   }
 
   function handleExport() {
-    const header = ["Материал", "Категория", "Склад", "Остаток", "Зарезервировано", "Доступно", "Мин. остаток", "Ед.", "Статус", "Стоимость"];
-    const rows = filteredRows.map((r) => [
-      r.material.name,
-      r.material.category,
-      r.material.warehouse,
-      r.material.stock,
-      r.reserved,
-      r.available,
-      r.material.minStock,
-      r.material.unit,
-      r.status,
-      getMaterialTotalValue(r.material).toFixed(2),
-    ]);
+    const header = [
+      "Материал",
+      "Поставщик",
+      "Категория",
+      "Склад",
+      "Ед.",
+      "Текущий остаток",
+      "Резерв",
+      "Доступно",
+      "Мин. остаток",
+      "Статус",
+      "Цена",
+      "Стоимость",
+      "Последнее обновление",
+    ];
+    const rows = filteredRows.map((r) => {
+      const material = materials.find((m) => m.id === r.id);
+      return [
+        r.materialName,
+        material?.supplier ?? "",
+        r.category,
+        r.warehouse,
+        r.unit,
+        r.quantity,
+        r.reserved,
+        r.available,
+        r.minStock,
+        r.status,
+        r.price.toFixed(2),
+        (r.price * r.quantity).toFixed(2),
+        formatDateTimeShort(r.updatedAt),
+      ];
+    });
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -116,32 +144,131 @@ export default function StockPage() {
     showToast("Остатки экспортированы");
   }
 
-  const columns: DataTableColumn<StockRow>[] = [
+  function handleSaveAdjustment(adjustment: Omit<StockAdjustment, "id" | "createdDate">, delta: number) {
+    adjustMaterialStock(adjustment.materialName, adjustment.warehouse, delta);
+    void stockAdjustmentsRepository.create({
+      ...adjustment,
+      id: `adj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      createdDate: new Date().toISOString().slice(0, 10),
+    });
+    setAdjustRow(null);
+    showToast("Остаток скорректирован");
+  }
+
+  function handleSaveReservation(reservation: Omit<StockReservation, "id" | "createdDate" | "status">) {
+    void stockReservationsRepository.create({
+      ...reservation,
+      id: `resv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      status: "active",
+      createdDate: new Date().toISOString().slice(0, 10),
+    });
+    setReserveRow(null);
+    showToast("Материал зарезервирован");
+  }
+
+  function handleReleaseReservation(reservationId: string) {
+    const reservation = reservations.find((r) => r.id === reservationId);
+    if (reservation) setReleaseTarget(reservation);
+  }
+
+  function confirmReleaseReservation() {
+    if (!releaseTarget) return;
+    void stockReservationsRepository.update(releaseTarget.id, { status: "released" });
+    showToast("Резерв снят");
+  }
+
+  const columns: DataTableColumn<MaterialStockRow>[] = [
+    { key: "number", header: "№", render: (row) => <span className="text-ink-muted">{materials.find((m) => m.id === row.id)?.number ?? ""}</span> },
     {
       key: "material",
       header: "Материал",
-      render: (row) => (
-        <div className="flex items-center gap-3">
-          <MaterialThumbnail src={row.material.imageUrl} alt={row.material.name} className="h-9 w-9 shrink-0" />
-          <div className="min-w-0">
-            <p className="whitespace-nowrap font-semibold text-ink">{row.material.name}</p>
-            <p className="whitespace-nowrap text-xs text-ink-muted">{row.material.category}</p>
+      render: (row) => {
+        const material = materials.find((m) => m.id === row.id);
+        return (
+          <div className="flex items-center gap-3">
+            <MaterialThumbnail src={material?.imageUrl ?? ""} alt={row.materialName} className="h-9 w-9 shrink-0" />
+            <div className="min-w-0">
+              <p className="whitespace-nowrap font-semibold text-ink">{row.materialName}</p>
+              <p className="whitespace-nowrap text-xs text-ink-muted">{material?.supplier}</p>
+            </div>
           </div>
+        );
+      },
+    },
+    { key: "category", header: "Категория", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.category}</span> },
+    { key: "warehouse", header: "Склад", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.warehouse}</span> },
+    {
+      key: "quantity",
+      header: "Текущий остаток",
+      render: (row) => (
+        <span className="tabular whitespace-nowrap font-semibold text-ink">
+          {formatNumber(row.quantity)} {row.unit}
+        </span>
+      ),
+    },
+    {
+      key: "minStock",
+      header: "Мин. остаток",
+      render: (row) => (
+        <span className="tabular whitespace-nowrap text-ink-secondary">
+          {formatNumber(row.minStock)} {row.unit}
+        </span>
+      ),
+    },
+    {
+      key: "reserved",
+      header: "Резерв",
+      render: (row) => (
+        <span className="tabular whitespace-nowrap text-warning">
+          {formatNumber(row.reserved)} {row.unit}
+        </span>
+      ),
+    },
+    {
+      key: "available",
+      header: "Доступно",
+      render: (row) => (
+        <span className="tabular whitespace-nowrap text-green">
+          {formatNumber(row.available)} {row.unit}
+        </span>
+      ),
+    },
+    { key: "status", header: "Статус", render: (row) => <MaterialStatusBadge status={row.status} /> },
+    {
+      key: "updatedAt",
+      header: "Последнее обновление",
+      render: (row) => <span className="whitespace-nowrap text-xs text-ink-muted">{formatDateTimeShort(row.updatedAt)}</span>,
+    },
+    {
+      key: "actions",
+      header: "Действия",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button type="button" aria-label="Просмотреть остаток" onClick={() => setDetailRow(row)} className={iconButtonClass}>
+            <Eye size={14} />
+          </button>
+          <button type="button" aria-label="Корректировать остаток" onClick={() => setAdjustRow(row)} className={iconButtonClass}>
+            <Pencil size={14} />
+          </button>
+          <DropdownMenu
+            trigger={<span className={iconButtonClass}>⋯</span>}
+            items={[
+              { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setDetailRow(row) },
+              { label: "Корректировать остаток", icon: <Pencil size={14} />, onClick: () => setAdjustRow(row) },
+              { label: "Зарезервировать", onClick: () => setReserveRow(row) },
+            ]}
+          />
         </div>
       ),
     },
-    { key: "warehouse", header: "Склад", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.material.warehouse}</span> },
-    { key: "quantity", header: "Остаток", render: (row) => <span className="tabular whitespace-nowrap font-semibold text-ink">{formatNumber(row.material.stock)} {row.material.unit}</span> },
-    { key: "reserved", header: "Зарезервировано", render: (row) => <span className="tabular whitespace-nowrap text-warning">{formatNumber(row.reserved)} {row.material.unit}</span> },
-    { key: "available", header: "Доступно", render: (row) => <span className="tabular whitespace-nowrap text-green">{formatNumber(row.available)} {row.material.unit}</span> },
-    { key: "minStock", header: "Мин. остаток", render: (row) => <span className="tabular whitespace-nowrap text-ink-secondary">{formatNumber(row.material.minStock)} {row.material.unit}</span> },
-    { key: "status", header: "Статус", render: (row) => <MaterialStatusBadge status={row.status} /> },
   ];
 
   return (
     <AppLayout
       title="Остатки"
-      subtitle="Остатки материалов по складам"
+      subtitle="Учет текущих остатков материалов по складам и объектам"
       search={{
         value: search,
         onChange: (value) => {
@@ -154,56 +281,70 @@ export default function StockPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего позиций" value={String(kpis.totalPositions)} icon={Layers} tone="green" footer="Наименований" />
-            <MetricCard label="Общий остаток" value={formatCompactAmount(kpis.totalStock)} icon={Boxes} tone="blue" footer="Ед. измерения" />
-            <MetricCard label="Общая стоимость" value={formatCompactAmount(kpis.totalValue)} icon={Wallet} tone="orange" footer="сомони" />
-            <MetricCard label="Критических" value={String(kpis.criticalCount)} icon={AlertTriangle} tone="red" footer="Требуют внимания" />
+            <MetricCard label="Всего позиций" value={String(kpis.totalPositions)} icon={LayoutGrid} tone="blue" footer="наименований" />
+            <MetricCard label="В наличии" value={String(kpis.inStock)} icon={Boxes} tone="green" footer="позиций" />
+            <MetricCard label="Низкий остаток" value={String(kpis.lowStock)} icon={TrendingDown} tone="orange" footer="позиций" />
+            <MetricCard label="Критический остаток" value={String(kpis.critical)} icon={AlertTriangle} tone="red" footer="позиций" />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-3 text-xs text-ink-secondary">
+              <input
+                type="date"
+                value={filters.dateFrom}
+                onChange={(e) => {
+                  setFilters((f) => ({ ...f, dateFrom: e.target.value }));
+                  setPage(1);
+                }}
+                className="w-27.5 bg-transparent text-ink focus:outline-none"
+              />
+              <span>–</span>
+              <input
+                type="date"
+                value={filters.dateTo}
+                onChange={(e) => {
+                  setFilters((f) => ({ ...f, dateTo: e.target.value }));
+                  setPage(1);
+                }}
+                className="w-27.5 bg-transparent text-ink focus:outline-none"
+              />
+            </div>
+            <CustomSelect
+              size="sm"
+              aria-label="Склад"
               value={filters.warehouse}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, warehouse: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, warehouse: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Склад: Все</option>
-              {MATERIAL_WAREHOUSES.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Склад: Все" }, ...MATERIAL_WAREHOUSES.map((w) => ({ value: w, label: w }))]}
+            />
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Категория"
               value={filters.category}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, category: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, category: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Категория: Все</option>
-              {MATERIAL_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Категория: Все" }, ...MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Статус"
               value={filters.status}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, status: e.target.value as StockFilters["status"] }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, status: v as StockFilters["status"] }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Статус: Все</option>
-              <option value="normal">В норме</option>
-              <option value="low">Низкий остаток</option>
-              <option value="critical">Критический</option>
-            </select>
+              options={[
+                { value: "all", label: "Статус: Все" },
+                { value: "normal", label: "В наличии" },
+                { value: "low", label: "Низкий остаток" },
+                { value: "critical", label: "Критический" },
+              ]}
+            />
             <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
               <RefreshCw size={14} /> Сбросить фильтры
             </Button>
@@ -211,12 +352,7 @@ export default function StockPage() {
 
           <Card>
             {pageRows.length > 0 ? (
-              <DataTable
-                columns={columns}
-                rows={pageRows}
-                rowKey={(row) => row.material.id}
-                onRowClick={(row) => setViewMaterial(row.material)}
-              />
+              <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} onRowClick={(row) => setDetailRow(row)} />
             ) : (
               <EmptyState
                 icon={Boxes}
@@ -239,7 +375,7 @@ export default function StockPage() {
                 setPageSize(size);
                 setPage(1);
               }}
-              itemLabel="позиций"
+              itemLabel="записей"
             />
           </Card>
         </div>
@@ -252,39 +388,44 @@ export default function StockPage() {
           <Card className="p-5">
             <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
-              <FilterField label="Склад">
-                <select value={filters.warehouse} onChange={(e) => setFilters((f) => ({ ...f, warehouse: e.target.value }))} className={selectClass}>
-                  <option value="all">Все склады</option>
-                  {MATERIAL_WAREHOUSES.map((w) => (
-                    <option key={w} value={w}>
-                      {w}
-                    </option>
-                  ))}
-                </select>
+              <FilterField label="Поиск">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Название материала..."
+                  className={selectClass}
+                />
               </FilterField>
 
               <FilterField label="Категория">
-                <select value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))} className={selectClass}>
-                  <option value="all">Все категории</option>
-                  {MATERIAL_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  searchable
+                  value={filters.category}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}
+                  options={[{ value: "all", label: "Все категории" }, ...MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+                />
+              </FilterField>
+
+              <FilterField label="Склад">
+                <CustomSelect
+                  value={filters.warehouse}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, warehouse: v }))}
+                  options={[{ value: "all", label: "Все склады" }, ...MATERIAL_WAREHOUSES.map((w) => ({ value: w, label: w }))]}
+                />
               </FilterField>
 
               <FilterField label="Статус">
-                <select
+                <CustomSelect
                   value={filters.status}
-                  onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as StockFilters["status"] }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все статусы</option>
-                  <option value="normal">В норме</option>
-                  <option value="low">Низкий остаток</option>
-                  <option value="critical">Критический</option>
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v as StockFilters["status"] }))}
+                  options={[
+                    { value: "all", label: "Все статусы" },
+                    { value: "normal", label: "В наличии" },
+                    { value: "low", label: "Низкий остаток" },
+                    { value: "critical", label: "Критический" },
+                  ]}
+                />
               </FilterField>
             </div>
             <div className="mt-4 flex gap-2">
@@ -298,26 +439,122 @@ export default function StockPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Итоги</h2>
-            <dl className="mt-3.5 space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Позиций</dt>
-                <dd className="font-bold text-ink tabular">{kpis.totalPositions}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Общий остаток</dt>
-                <dd className="font-bold text-ink tabular">{formatNumber(Math.round(kpis.totalStock * 10) / 10)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Стоимость (сомони)</dt>
-                <dd className="font-bold text-ink tabular">{formatCurrency(Math.round(kpis.totalValue))}</dd>
-              </div>
-            </dl>
+            <h2 className="text-[15px] font-bold text-ink">Статистика остатков</h2>
+            {statusBuckets.length > 0 ? (
+              <>
+                <DonutChart
+                  data={statusBuckets}
+                  centerLabel="Всего позиций"
+                  centerValue={String(kpis.totalPositions)}
+                  size={176}
+                  valueFormatter={(value) => formatNumber(value)}
+                />
+                <ul className="mt-4 w-full space-y-2.5">
+                  {statusBuckets.map((bucket) => (
+                    <li key={bucket.category} className="flex items-center gap-2.5 text-sm">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: bucket.color }} />
+                      <span className="text-ink-secondary">{bucket.category}</span>
+                      <span className="ml-auto shrink-0 font-semibold text-ink tabular">
+                        {bucket.amount}{" "}
+                        <span className="text-ink-muted">
+                          ({kpis.totalPositions > 0 ? Math.round((bucket.amount / kpis.totalPositions) * 1000) / 10 : 0}%)
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="mt-4 text-sm text-ink-muted">Нет данных для отображения</p>
+            )}
+          </Card>
+
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[15px] font-bold text-ink">Критические остатки</h2>
+              {criticalRows.length > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red px-1.5 text-[11px] font-bold text-white">
+                  {criticalRows.length}
+                </span>
+              )}
+            </div>
+            <ul className="mt-3.5 space-y-3">
+              {criticalRows.length > 0 ? (
+                criticalRows.map((row) => {
+                  const material = materials.find((m) => m.id === row.id);
+                  return (
+                    <li key={row.id}>
+                      <button type="button" onClick={() => setDetailRow(row)} className="flex w-full items-center gap-2.5 text-left">
+                        <MaterialThumbnail src={material?.imageUrl ?? ""} alt={row.materialName} className="h-9 w-9 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-ink">{row.materialName}</p>
+                          <p className="text-xs text-ink-secondary">
+                            Остаток:{" "}
+                            <span className={row.status === "critical" ? "font-semibold text-red" : "font-semibold text-warning"}>
+                              {formatNumber(row.quantity)} {row.unit}
+                            </span>{" "}
+                            (Мин. {formatNumber(row.minStock)})
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-ink-muted">Критических остатков нет</p>
+              )}
+            </ul>
+            <button
+              type="button"
+              onClick={() => {
+                setFilters((f) => ({ ...f, status: "critical" }));
+                setPage(1);
+              }}
+              className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
+            >
+              Все критические остатки →
+            </button>
           </Card>
         </div>
       </div>
 
-      <MaterialDetailDrawer material={viewMaterial} onClose={() => setViewMaterial(null)} />
+      <StockDetailDrawer
+        row={detailRow}
+        onClose={() => setDetailRow(null)}
+        onAdjust={(row) => {
+          setDetailRow(null);
+          setAdjustRow(row);
+        }}
+        onReserve={(row) => {
+          setDetailRow(null);
+          setReserveRow(row);
+        }}
+        onReleaseReservation={handleReleaseReservation}
+      />
+
+      <StockAdjustmentModal
+        open={Boolean(adjustRow)}
+        row={adjustRow}
+        onClose={() => setAdjustRow(null)}
+        onSave={handleSaveAdjustment}
+      />
+
+      <StockReservationModal
+        open={Boolean(reserveRow)}
+        row={reserveRow}
+        onClose={() => setReserveRow(null)}
+        onSave={handleSaveReservation}
+      />
+
+      <ConfirmDialog
+        open={Boolean(releaseTarget)}
+        title="Снять резерв?"
+        description={releaseTarget ? `${releaseTarget.materialName} · ${formatNumber(releaseTarget.quantity)} ед.` : undefined}
+        confirmLabel="Снять резерв"
+        onConfirm={confirmReleaseReservation}
+        onClose={() => setReleaseTarget(null)}
+      />
+
     </AppLayout>
   );
 }

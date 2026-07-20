@@ -2,9 +2,13 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { mockMaterials } from "../../data/mockMaterials";
-import { TRANSFER_LOCATIONS, TRANSFER_OBJECTS, TRANSFER_RESPONSIBLE } from "../../data/mockMaterialTransfers";
+import { TRANSFER_LOCATIONS, TRANSFER_OBJECTS } from "../../data/mockMaterialTransfers";
+import { employeesRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { ResponsiblePersonSelect } from "./ResponsiblePersonField";
 import { getAvailableStock } from "../../utils/materialStockEffects";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import type { MaterialTransfer, MaterialTransferLine } from "../../types";
@@ -33,14 +37,14 @@ function emptyLine(): LineForm {
   return { materialName: first.name, quantity: "", unit: first.unit, price: String(first.price) };
 }
 
-function emptyForm(): FormState {
+function emptyForm(defaultResponsible: string): FormState {
   return {
     documentNumber: "",
     date: "",
     fromWarehouse: TRANSFER_LOCATIONS[0],
     toWarehouse: TRANSFER_LOCATIONS[1] ?? TRANSFER_LOCATIONS[0],
     objectName: TRANSFER_OBJECTS[0] ?? "",
-    responsible: TRANSFER_RESPONSIBLE[0],
+    responsible: defaultResponsible,
     basis: "",
     note: "",
     lines: [emptyLine()],
@@ -74,13 +78,14 @@ interface TransferFormModalProps {
 }
 
 export function TransferFormModal({ open, transfer, existingDocumentNumbers, onClose, onSave }: TransferFormModalProps) {
-  const [form, setForm] = useState<FormState>(() => (transfer ? toForm(transfer) : emptyForm()));
+  const employees = useRepositorySnapshot(employeesRepository);
+  const [form, setForm] = useState<FormState>(() => (transfer ? toForm(transfer) : emptyForm(employees[0]?.id ?? "")));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(transfer ? toForm(transfer) : emptyForm());
+      setForm(transfer ? toForm(transfer) : emptyForm(employees[0]?.id ?? ""));
       setErrors({});
       setSaving(false);
     }
@@ -235,58 +240,49 @@ export function TransferFormModal({ open, transfer, existingDocumentNumbers, onC
         </Field>
 
         <Field label="Откуда" error={errors.fromWarehouse}>
-          <select
+          <CustomSelect
+            error={Boolean(errors.fromWarehouse)}
+            className="mt-1.5"
             value={form.fromWarehouse}
-            onChange={(e) => {
-              update("fromWarehouse", e.target.value);
+            onValueChange={(v) => {
+              update("fromWarehouse", v);
               setErrors({});
             }}
-            className={cn(inputClass, errors.fromWarehouse && errorInputClass)}
-          >
-            {TRANSFER_LOCATIONS.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
+            options={TRANSFER_LOCATIONS.map((loc) => ({ value: loc, label: loc }))}
+          />
         </Field>
 
         <Field label="Куда" error={errors.toWarehouse}>
-          <select
+          <CustomSelect
+            error={Boolean(errors.toWarehouse)}
+            className="mt-1.5"
             value={form.toWarehouse}
-            onChange={(e) => {
-              update("toWarehouse", e.target.value);
+            onValueChange={(v) => {
+              update("toWarehouse", v);
               setErrors({});
             }}
-            className={cn(inputClass, errors.toWarehouse && errorInputClass)}
-          >
-            {TRANSFER_LOCATIONS.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
+            options={TRANSFER_LOCATIONS.map((loc) => ({ value: loc, label: loc }))}
+          />
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectName} onChange={(e) => update("objectName", e.target.value)} className={inputClass}>
-            <option value="">Без объекта</option>
-            {TRANSFER_OBJECTS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            clearable
+            placeholder="Без объекта"
+            className="mt-1.5"
+            value={form.objectName}
+            onValueChange={(v) => update("objectName", v)}
+            options={TRANSFER_OBJECTS.map((o) => ({ value: o, label: o }))}
+          />
         </Field>
 
         <Field label="Ответственный" error={errors.responsible}>
-          <select value={form.responsible} onChange={(e) => update("responsible", e.target.value)} className={inputClass}>
-            {TRANSFER_RESPONSIBLE.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <ResponsiblePersonSelect
+            employees={employees}
+            value={form.responsible}
+            onChange={(value) => update("responsible", value)}
+            error={Boolean(errors.responsible)}
+          />
         </Field>
 
         <Field label="Основание">
@@ -326,17 +322,13 @@ export function TransferFormModal({ open, transfer, existingDocumentNumbers, onC
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.6fr_0.7fr_0.6fr_0.8fr_auto] sm:items-end">
                   <label className="block text-xs font-medium text-ink">
                     Материал
-                    <select
+                    <CustomSelect
+                      searchable
+                      className="mt-1.5"
                       value={line.materialName}
-                      onChange={(e) => updateLine(i, { materialName: e.target.value })}
-                      className={inputClass}
-                    >
-                      {mockMaterials.slice(0, 128).map((m) => (
-                        <option key={m.id} value={m.name}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
+                      onValueChange={(v) => updateLine(i, { materialName: v })}
+                      options={mockMaterials.slice(0, 128).map((m) => ({ value: m.name, label: m.name }))}
+                    />
                   </label>
                   <label className="block text-xs font-medium text-ink">
                     Кол-во

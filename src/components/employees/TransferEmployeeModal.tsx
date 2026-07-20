@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { BRIGADE_OPTIONS, DEPARTMENT_OPTIONS } from "../../data/mockStaff";
 import type { StaffMember } from "../../types";
 
@@ -12,9 +13,6 @@ interface TransferEmployeeModalProps {
   onClose: () => void;
   onTransfer: (result: { brigadeName: string | null; brigadeSpecialization: string | null; department: string | null }) => void;
 }
-
-const inputClass =
-  "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 
 export function TransferEmployeeModal({ open, employee, onClose, onTransfer }: TransferEmployeeModalProps) {
   const [unitType, setUnitType] = useState<UnitType>("brigade");
@@ -61,33 +59,38 @@ export function TransferEmployeeModal({ open, employee, onClose, onTransfer }: T
       <div className="space-y-4">
         <label className="block text-sm font-medium text-ink">
           Тип подразделения
-          <select value={unitType} onChange={(e) => setUnitType(e.target.value as UnitType)} className={inputClass}>
-            <option value="brigade">Бригада</option>
-            <option value="department">Отдел</option>
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={unitType}
+            onValueChange={(v) => setUnitType(v as UnitType)}
+            options={[
+              { value: "brigade", label: "Бригада" },
+              { value: "department", label: "Отдел" },
+            ]}
+          />
         </label>
 
         {unitType === "brigade" ? (
           <label className="block text-sm font-medium text-ink">
             Новая бригада
-            <select value={brigadeName} onChange={(e) => setBrigadeName(e.target.value)} className={inputClass}>
-              {BRIGADE_OPTIONS.map((b) => (
-                <option key={b.name} value={b.name}>
-                  {b.name} — {b.specialization}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              searchable
+              className="mt-1.5"
+              value={brigadeName}
+              onValueChange={setBrigadeName}
+              options={BRIGADE_OPTIONS.map((b) => ({ value: b.name, label: `${b.name} — ${b.specialization}` }))}
+            />
           </label>
         ) : (
           <label className="block text-sm font-medium text-ink">
             Новый отдел
-            <select value={department} onChange={(e) => setDepartment(e.target.value)} className={inputClass}>
-              {DEPARTMENT_OPTIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              searchable
+              className="mt-1.5"
+              value={department}
+              onValueChange={setDepartment}
+              options={DEPARTMENT_OPTIONS.map((d) => ({ value: d, label: d }))}
+            />
           </label>
         )}
       </div>

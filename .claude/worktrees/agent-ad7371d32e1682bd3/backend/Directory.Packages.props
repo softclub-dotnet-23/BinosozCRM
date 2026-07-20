@@ -1,0 +1,32 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+    <PackageVersion Include="MediatR" Version="14.2.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.IdentityModel.Tokens" Version="8.19.2" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
+
+    <!-- Test-only (Api.IntegrationTests, MASTER §11.1/§5.27, Phase 0 Step 10) -->
+    <!-- FluentAssertions pinned to 7.2.2, the last Apache-2.0 release before the
+         v8 Xceed commercial license — avoids taking on a licensing question that
+         isn't a code decision. -->
+    <PackageVersion Include="FluentAssertions" Version="7.2.2" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+  </ItemGroup>
+</Project>

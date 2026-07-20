@@ -13,6 +13,7 @@ import { SpecializationDonut, SpecializationLegend } from "../components/brigade
 import { AttendanceStatusBadge } from "../components/attendance/AttendanceStatusBadge";
 import { AttendanceFormModal } from "../components/attendance/AttendanceFormModal";
 import { AttendanceDetailDrawer } from "../components/attendance/AttendanceDetailDrawer";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { ATTENDANCE_BRIGADES, ATTENDANCE_EMPLOYEES, ATTENDANCE_OBJECTS } from "../data/mockAttendance";
 import { attendanceRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
@@ -38,8 +39,6 @@ const STATUS_FILTER_OPTIONS: { value: AttendanceStatus | "all"; label: string }[
   { value: "absent", label: "Отсутствовал" },
 ];
 
-const selectClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const dateInputClass =
   "h-9 rounded-[10px] border border-border-strong bg-card px-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
@@ -333,65 +332,55 @@ export default function AttendancePage() {
                 className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
               />
             </div>
-            <select
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Объект"
               value={filters.objectName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, objectName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, objectName: v }));
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              <option value="all">Объект: Все</option>
-              {ATTENDANCE_OBJECTS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Объект: Все" }, ...ATTENDANCE_OBJECTS.map((o) => ({ value: o, label: o }))]}
+            />
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Сотрудник"
               value={filters.employeeName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, employeeName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, employeeName: v }));
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              <option value="all">Сотрудник: Все</option>
-              {ATTENDANCE_EMPLOYEES.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: "all", label: "Сотрудник: Все" },
+                ...ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name })),
+              ]}
+            />
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Бригада"
               value={filters.brigadeName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, brigadeName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, brigadeName: v }));
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              <option value="all">Бригада: Все</option>
-              {ATTENDANCE_BRIGADES.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: "all", label: "Бригада: Все" },
+                ...ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name })),
+              ]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Статус"
               value={filters.status}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, status: e.target.value as AttendanceStatus | "all" }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, status: v as AttendanceStatus | "all" }));
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              {STATUS_FILTER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              options={STATUS_FILTER_OPTIONS}
+            />
             <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
               <RefreshCw size={14} /> Сбросить фильтры
             </Button>
@@ -464,61 +453,61 @@ export default function AttendancePage() {
               </div>
 
               <FilterField label="Объект">
-                <select
+                <CustomSelect
+                  size="sm"
+                  fullWidth
+                  searchable
+                  aria-label="Объект"
                   value={filters.objectName}
-                  onChange={(e) => setFilters((f) => ({ ...f, objectName: e.target.value }))}
-                  className={cnFull(selectClass)}
-                >
-                  <option value="all">Все объекты</option>
-                  {ATTENDANCE_OBJECTS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
+                  options={[{ value: "all", label: "Все объекты" }, ...ATTENDANCE_OBJECTS.map((o) => ({ value: o, label: o }))]}
+                />
               </FilterField>
 
               <FilterField label="Бригада">
-                <select
+                <CustomSelect
+                  size="sm"
+                  fullWidth
+                  searchable
+                  aria-label="Бригада"
                   value={filters.brigadeName}
-                  onChange={(e) => setFilters((f) => ({ ...f, brigadeName: e.target.value }))}
-                  className={cnFull(selectClass)}
-                >
-                  <option value="all">Все бригады</option>
-                  {ATTENDANCE_BRIGADES.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
+                  options={[
+                    { value: "all", label: "Все бригады" },
+                    ...ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name })),
+                  ]}
+                />
               </FilterField>
 
               <FilterField label="Сотрудник">
-                <select
+                <CustomSelect
+                  size="sm"
+                  fullWidth
+                  searchable
+                  aria-label="Сотрудник"
                   value={filters.employeeName}
-                  onChange={(e) => setFilters((f) => ({ ...f, employeeName: e.target.value }))}
-                  className={cnFull(selectClass)}
-                >
-                  <option value="all">Все сотрудники</option>
-                  {ATTENDANCE_EMPLOYEES.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, employeeName: v }))}
+                  options={[
+                    { value: "all", label: "Все сотрудники" },
+                    ...ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name })),
+                  ]}
+                />
               </FilterField>
 
               <FilterField label="Статус">
-                <select
+                <CustomSelect
+                  size="sm"
+                  fullWidth
+                  aria-label="Статус"
                   value={filters.status}
-                  onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as AttendanceStatus | "all" }))}
-                  className={cnFull(selectClass)}
-                >
-                  <option value="all">Все статусы</option>
-                  <option value="present">Присутствовал</option>
-                  <option value="late">Опоздание</option>
-                  <option value="absent">Отсутствовал</option>
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v as AttendanceStatus | "all" }))}
+                  options={[
+                    { value: "all", label: "Все статусы" },
+                    { value: "present", label: "Присутствовал" },
+                    { value: "late", label: "Опоздание" },
+                    { value: "absent", label: "Отсутствовал" },
+                  ]}
+                />
               </FilterField>
             </div>
 

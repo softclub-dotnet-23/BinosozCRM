@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "dgSpecHash": "3UVG2xaOtJg=",
+  "success": true,
+  "projectFilePath": "c:\\Users\\user\\Desktop\\BinosozCRM\\frontend\\.claude\\worktrees\\agent-ad7371d32e1682bd3\\backend\\Application\\Application.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\user\\.nuget\\packages\\fluentvalidation\\12.1.1\\fluentvalidation.12.1.1.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\fluentvalidation.dependencyinjectionextensions\\12.1.1\\fluentvalidation.dependencyinjectionextensions.12.1.1.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\mediatr\\14.2.0\\mediatr.14.2.0.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\mediatr.contracts\\2.0.1\\mediatr.contracts.2.0.1.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.entityframeworkcore\\10.0.10\\microsoft.entityframeworkcore.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.entityframeworkcore.abstractions\\10.0.10\\microsoft.entityframeworkcore.abstractions.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.entityframeworkcore.analyzers\\10.0.10\\microsoft.entityframeworkcore.analyzers.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.caching.abstractions\\10.0.10\\microsoft.extensions.caching.abstractions.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.caching.memory\\10.0.10\\microsoft.extensions.caching.memory.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\10.0.10\\microsoft.extensions.dependencyinjection.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.10\\microsoft.extensions.dependencyinjection.abstractions.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.logging\\10.0.10\\microsoft.extensions.logging.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.10\\microsoft.extensions.logging.abstractions.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.options\\10.0.10\\microsoft.extensions.options.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.extensions.primitives\\10.0.10\\microsoft.extensions.primitives.10.0.10.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.identitymodel.abstractions\\8.14.0\\microsoft.identitymodel.abstractions.8.14.0.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.identitymodel.jsonwebtokens\\8.14.0\\microsoft.identitymodel.jsonwebtokens.8.14.0.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.identitymodel.logging\\8.14.0\\microsoft.identitymodel.logging.8.14.0.nupkg.sha512",
+    "C:\\Users\\user\\.nuget\\packages\\microsoft.identitymodel.tokens\\8.14.0\\microsoft.identitymodel.tokens.8.14.0.nupkg.sha512"
+  ],
+  "logs": []
+}

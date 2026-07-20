@@ -219,10 +219,6 @@ export const TRANSFER_OBJECTS: string[] = Array.from(
   new Set(mockMaterialTransfers.map((t) => t.objectName).filter((v): v is string => Boolean(v))),
 ).sort((a, b) => a.localeCompare(b, "ru"));
 
-export const TRANSFER_RESPONSIBLE: string[] = Array.from(new Set(mockMaterialTransfers.map((t) => t.responsible))).sort((a, b) =>
-  a.localeCompare(b, "ru"),
-);
-
 export function transferQuantity(transfer: MaterialTransfer): number {
   return transfer.lines.reduce((sum, line) => sum + line.quantity, 0);
 }

@@ -7,11 +7,12 @@ interface DonutChartProps {
   centerLabel: string;
   centerValue: string;
   size?: number;
+  valueFormatter?: (value: number) => string;
 }
 
 const INNER_RADIUS_PERCENT = 64;
 
-export function DonutChart({ data, centerLabel, centerValue, size = 208 }: DonutChartProps) {
+export function DonutChart({ data, centerLabel, centerValue, size = 208, valueFormatter = formatCurrency }: DonutChartProps) {
   const innerDiameter = size * (INNER_RADIUS_PERCENT / 100);
   const textMaxWidth = Math.round(innerDiameter - 28);
 
@@ -43,7 +44,7 @@ export function DonutChart({ data, centerLabel, centerValue, size = 208 }: Donut
                   <div className="flex items-center gap-2 text-xs">
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
                     <span className="text-ink-secondary">{entry.category}:</span>
-                    <span className="font-semibold text-ink tabular">{formatCurrency(entry.amount)}</span>
+                    <span className="font-semibold text-ink tabular">{valueFormatter(entry.amount)}</span>
                   </div>
                 </div>
               );

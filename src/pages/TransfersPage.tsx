@@ -25,6 +25,7 @@ import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { TransferFormModal } from "../components/materials/TransferFormModal";
 import { TransferDetailDrawer } from "../components/materials/TransferDetailDrawer";
 import {
@@ -33,10 +34,11 @@ import {
   transferQuantity,
   transferTotal,
 } from "../data/mockMaterialTransfers";
-import { materialTransfersRepository } from "../data/repositories";
-import { useRepositoryState } from "../hooks/useRepositoryState";
+import { materialTransfersRepository, employeesRepository } from "../data/repositories";
+import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { cn } from "../utils/cn";
 import { usePersistentState } from "../hooks/usePersistentState";
+import { responsiblePersonName } from "../utils/responsiblePerson";
 import { computeTransferKpis, computeFrequentRoutes } from "../utils/transferAnalytics";
 import { adjustMaterialStock } from "../utils/materialStockEffects";
 import { useToast } from "../hooks/useToast";
@@ -54,8 +56,6 @@ const DEFAULT_FILTERS: TransferFilters = {
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const toolbarSelectClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
 
@@ -82,6 +82,7 @@ export default function TransfersPage() {
   const { showToast } = useToast();
 
   const [transfers, setTransfers] = useRepositoryState(materialTransfersRepository);
+  const employees = useRepositorySnapshot(employeesRepository);
   const [search, setSearch] = usePersistentState("filters.transfers.search", "");
   const [filters, setFilters] = usePersistentState<TransferFilters>("filters.transfers.filters", DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
@@ -96,9 +97,10 @@ export default function TransfersPage() {
     const query = search.trim().toLowerCase();
     return transfers.filter((t) => {
       if (query) {
-        const haystack = `${t.documentNumber} ${t.fromWarehouse} ${t.toWarehouse} ${t.objectName ?? ""} ${t.responsible} ${t.note} ${t.lines
-          .map((l) => l.materialName)
-          .join(" ")}`.toLowerCase();
+        const haystack = `${t.documentNumber} ${t.fromWarehouse} ${t.toWarehouse} ${t.objectName ?? ""} ${responsiblePersonName(
+          t.responsible,
+          employees,
+        )} ${t.note} ${t.lines.map((l) => l.materialName).join(" ")}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       if (filters.fromWarehouse !== "all" && t.fromWarehouse !== filters.fromWarehouse) return false;
@@ -108,7 +110,7 @@ export default function TransfersPage() {
       if (filters.dateTo && t.date > filters.dateTo) return false;
       return true;
     });
-  }, [transfers, search, filters]);
+  }, [transfers, search, filters, employees]);
 
   const kpis = useMemo(() => computeTransferKpis(filteredTransfers), [filteredTransfers]);
   const frequentRoutes = useMemo(() => computeFrequentRoutes(filteredTransfers), [filteredTransfers]);
@@ -176,7 +178,7 @@ export default function TransfersPage() {
       t.lines.length,
       transferQuantity(t).toFixed(2),
       transferTotal(t).toFixed(2),
-      t.responsible,
+      responsiblePersonName(t.responsible, employees),
     ]);
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
@@ -218,12 +220,15 @@ export default function TransfersPage() {
     {
       key: "responsible",
       header: "Кто перенес",
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <Avatar name={row.responsible} size="sm" />
-          <span className="whitespace-nowrap text-ink">{row.responsible}</span>
-        </div>
-      ),
+      render: (row) => {
+        const name = responsiblePersonName(row.responsible, employees);
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar name={name} size="sm" />
+            <span className="whitespace-nowrap text-ink">{name}</span>
+          </div>
+        );
+      },
     },
     {
       key: "actions",
@@ -306,51 +311,36 @@ export default function TransfersPage() {
                 className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
               />
             </div>
-            <select
+            <CustomSelect
+              size="sm"
+              aria-label="Откуда"
               value={filters.fromWarehouse}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, fromWarehouse: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, fromWarehouse: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Откуда: Все</option>
-              {TRANSFER_LOCATIONS.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Откуда: Все" }, ...TRANSFER_LOCATIONS.map((loc) => ({ value: loc, label: loc }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Куда"
               value={filters.toWarehouse}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, toWarehouse: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, toWarehouse: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Куда: Все</option>
-              {TRANSFER_LOCATIONS.map((loc) => (
-                <option key={loc} value={loc}>
-                  {loc}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Куда: Все" }, ...TRANSFER_LOCATIONS.map((loc) => ({ value: loc, label: loc }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Объект"
               value={filters.objectName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, objectName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, objectName: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Объект: Все</option>
-              {TRANSFER_OBJECTS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
+              options={[{ value: "all", label: "Объект: Все" }, ...TRANSFER_OBJECTS.map((o) => ({ value: o, label: o }))]}
+            />
             <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
               <RefreshCw size={14} /> Сбросить фильтры
             </Button>
@@ -418,48 +408,27 @@ export default function TransfersPage() {
               </div>
 
               <FilterField label="Откуда">
-                <select
+                <CustomSelect
                   value={filters.fromWarehouse}
-                  onChange={(e) => setFilters((f) => ({ ...f, fromWarehouse: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все склады и объекты</option>
-                  {TRANSFER_LOCATIONS.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, fromWarehouse: v }))}
+                  options={[{ value: "all", label: "Все склады и объекты" }, ...TRANSFER_LOCATIONS.map((loc) => ({ value: loc, label: loc }))]}
+                />
               </FilterField>
 
               <FilterField label="Куда">
-                <select
+                <CustomSelect
                   value={filters.toWarehouse}
-                  onChange={(e) => setFilters((f) => ({ ...f, toWarehouse: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все склады и объекты</option>
-                  {TRANSFER_LOCATIONS.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, toWarehouse: v }))}
+                  options={[{ value: "all", label: "Все склады и объекты" }, ...TRANSFER_LOCATIONS.map((loc) => ({ value: loc, label: loc }))]}
+                />
               </FilterField>
 
               <FilterField label="Объект">
-                <select
+                <CustomSelect
                   value={filters.objectName}
-                  onChange={(e) => setFilters((f) => ({ ...f, objectName: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все объекты</option>
-                  {TRANSFER_OBJECTS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
+                  options={[{ value: "all", label: "Все объекты" }, ...TRANSFER_OBJECTS.map((o) => ({ value: o, label: o }))]}
+                />
               </FilterField>
             </div>
             <div className="mt-4 flex gap-2">

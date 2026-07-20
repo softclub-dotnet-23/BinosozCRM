@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { ATTENDANCE_BRIGADES, ATTENDANCE_EMPLOYEES, ATTENDANCE_OBJECTS, mockAttendance } from "../../data/mockAttendance";
 import type { AttendanceRecord, AttendanceStatus } from "../../types";
@@ -141,13 +142,13 @@ export function AttendanceFormModal({ open, record, onClose, onSave }: Attendanc
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Сотрудник">
-          <select value={form.employeeName} onChange={(e) => handleEmployeeChange(e.target.value)} className={inputClass}>
-            {ATTENDANCE_EMPLOYEES.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.employeeName}
+            onValueChange={handleEmployeeChange}
+            options={ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name }))}
+          />
         </Field>
 
         <Field label="Дата" error={errors.date}>
@@ -160,24 +161,25 @@ export function AttendanceFormModal({ open, record, onClose, onSave }: Attendanc
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectName} onChange={(e) => update("objectName", e.target.value)} className={inputClass}>
-            {ATTENDANCE_OBJECTS.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.objectName}
+            onValueChange={(v) => update("objectName", v)}
+            options={ATTENDANCE_OBJECTS.map((name) => ({ value: name, label: name }))}
+          />
         </Field>
 
         <Field label="Бригада">
-          <select value={form.brigadeName} onChange={(e) => update("brigadeName", e.target.value)} className={inputClass}>
-            <option value="">Без бригады</option>
-            {ATTENDANCE_BRIGADES.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            clearable
+            className="mt-1.5"
+            placeholder="Без бригады"
+            value={form.brigadeName}
+            onValueChange={(v) => update("brigadeName", v)}
+            options={ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name }))}
+          />
         </Field>
 
         <Field label="Время прихода" error={errors.arrivalTime}>
@@ -201,13 +203,12 @@ export function AttendanceFormModal({ open, record, onClose, onSave }: Attendanc
         </Field>
 
         <Field label="Статус">
-          <select value={form.status} onChange={(e) => update("status", e.target.value as AttendanceStatus)} className={inputClass}>
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.status}
+            onValueChange={(v) => update("status", v as AttendanceStatus)}
+            options={STATUS_OPTIONS}
+          />
         </Field>
 
         <Field label="Примечание">

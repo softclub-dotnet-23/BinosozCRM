@@ -9,6 +9,7 @@ import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { ReceiptFormModal } from "../components/materials/ReceiptFormModal";
 import { ReceiptDetailDrawer } from "../components/materials/ReceiptDetailDrawer";
 import {
@@ -19,9 +20,10 @@ import {
   receiptTotal,
   receiptUnit,
 } from "../data/mockMaterialReceipts";
-import { materialReceiptsRepository } from "../data/repositories";
-import { useRepositoryState } from "../hooks/useRepositoryState";
+import { materialReceiptsRepository, employeesRepository } from "../data/repositories";
+import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
+import { responsiblePersonName } from "../utils/responsiblePerson";
 import { computeReceiptKpis } from "../utils/receiptAnalytics";
 import { adjustMaterialStock } from "../utils/materialStockEffects";
 import { useToast } from "../hooks/useToast";
@@ -39,8 +41,6 @@ const DEFAULT_FILTERS: ReceiptFilters = {
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const toolbarSelectClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
 
@@ -60,6 +60,7 @@ export default function ReceiptsPage() {
   const { showToast } = useToast();
 
   const [receipts, setReceipts] = useRepositoryState(materialReceiptsRepository);
+  const employees = useRepositorySnapshot(employeesRepository);
   const [search, setSearch] = usePersistentState("filters.receipts.search", "");
   const [filters, setFilters] = usePersistentState<ReceiptFilters>("filters.receipts.filters", DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
@@ -73,9 +74,10 @@ export default function ReceiptsPage() {
     const query = search.trim().toLowerCase();
     return receipts.filter((r) => {
       if (query) {
-        const haystack = `${r.documentNumber} ${r.supplier} ${r.objectName} ${r.invoiceNumber} ${r.responsible} ${r.lines
-          .map((l) => l.materialName)
-          .join(" ")}`.toLowerCase();
+        const haystack = `${r.documentNumber} ${r.supplier} ${r.objectName} ${r.invoiceNumber} ${responsiblePersonName(
+          r.responsible,
+          employees,
+        )} ${r.lines.map((l) => l.materialName).join(" ")}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       if (filters.supplier !== "all" && r.supplier !== filters.supplier) return false;
@@ -85,7 +87,7 @@ export default function ReceiptsPage() {
       if (filters.dateTo && r.date > filters.dateTo) return false;
       return true;
     });
-  }, [receipts, search, filters]);
+  }, [receipts, search, filters, employees]);
 
   const kpis = useMemo(() => computeReceiptKpis(filteredReceipts), [filteredReceipts]);
 
@@ -251,51 +253,37 @@ export default function ReceiptsPage() {
                 className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
               />
             </div>
-            <select
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Поставщик"
               value={filters.supplier}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, supplier: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, supplier: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Поставщик: Все</option>
-              {RECEIPT_SUPPLIERS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Поставщик: Все" }, ...RECEIPT_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Объект"
               value={filters.objectName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, objectName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, objectName: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Объект: Все</option>
-              {RECEIPT_OBJECTS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Объект: Все" }, ...RECEIPT_OBJECTS.map((o) => ({ value: o, label: o }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Бригада"
               value={filters.brigadeName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, brigadeName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, brigadeName: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Бригада: Все</option>
-              {RECEIPT_BRIGADES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+              options={[{ value: "all", label: "Бригада: Все" }, ...RECEIPT_BRIGADES.map((b) => ({ value: b, label: b }))]}
+            />
             <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
               <RefreshCw size={14} /> Сбросить фильтры
             </Button>
@@ -363,44 +351,28 @@ export default function ReceiptsPage() {
               </div>
 
               <FilterField label="Поставщик">
-                <select value={filters.supplier} onChange={(e) => setFilters((f) => ({ ...f, supplier: e.target.value }))} className={selectClass}>
-                  <option value="all">Все поставщики</option>
-                  {RECEIPT_SUPPLIERS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  searchable
+                  value={filters.supplier}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, supplier: v }))}
+                  options={[{ value: "all", label: "Все поставщики" }, ...RECEIPT_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
+                />
               </FilterField>
 
               <FilterField label="Объект">
-                <select
+                <CustomSelect
                   value={filters.objectName}
-                  onChange={(e) => setFilters((f) => ({ ...f, objectName: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все объекты</option>
-                  {RECEIPT_OBJECTS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
+                  options={[{ value: "all", label: "Все объекты" }, ...RECEIPT_OBJECTS.map((o) => ({ value: o, label: o }))]}
+                />
               </FilterField>
 
               <FilterField label="Бригада">
-                <select
+                <CustomSelect
                   value={filters.brigadeName}
-                  onChange={(e) => setFilters((f) => ({ ...f, brigadeName: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все бригады</option>
-                  {RECEIPT_BRIGADES.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
+                  options={[{ value: "all", label: "Все бригады" }, ...RECEIPT_BRIGADES.map((b) => ({ value: b, label: b }))]}
+                />
               </FilterField>
             </div>
             <div className="mt-4 flex gap-2">

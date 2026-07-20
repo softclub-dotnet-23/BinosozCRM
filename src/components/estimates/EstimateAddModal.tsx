@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { ESTIMATE_OBJECT_META } from "../../data/mockEstimates";
 import type { Estimate, EstimateStatus } from "../../types";
@@ -99,17 +100,13 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Объект">
-          <select
+          <CustomSelect
+            searchable
+            className="mt-1.5"
             value={form.objectName}
-            onChange={(e) => update("objectName", e.target.value)}
-            className={inputClass}
-          >
-            {Object.keys(ESTIMATE_OBJECT_META).map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => update("objectName", v)}
+            options={Object.keys(ESTIMATE_OBJECT_META).map((name) => ({ value: name, label: name }))}
+          />
         </Field>
 
         <Field label="Версия">
@@ -143,17 +140,12 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
         </Field>
 
         <Field label="Статус">
-          <select
+          <CustomSelect
+            className="mt-1.5"
             value={form.status}
-            onChange={(e) => update("status", e.target.value as EstimateStatus)}
-            className={inputClass}
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => update("status", v as EstimateStatus)}
+            options={STATUS_OPTIONS}
+          />
         </Field>
 
         <Field label="Ответственный" error={errors.responsible}>

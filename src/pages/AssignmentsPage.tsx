@@ -10,6 +10,7 @@ import { ObjectImage } from "../components/ui/ObjectImage";
 import { Avatar } from "../components/ui/Avatar";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -32,9 +33,6 @@ import { ASSIGNMENT_STATUS_CONFIG } from "../utils/financeStatus";
 import type { Assignment, AssignmentStatus } from "../types";
 
 const TODAY_ISO = "2026-07-17";
-
-const selectClass =
-  "h-9 rounded-lg border border-border-strong bg-card px-2.5 text-xs font-medium text-ink focus:border-primary focus:outline-none";
 
 function progressTone(status: AssignmentStatus): "green" | "orange" | "red" {
   if (status === "completed") return "green";
@@ -311,57 +309,54 @@ export default function AssignmentsPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 px-5 sm:px-6">
-            <select
+            <CustomSelect
+              size="sm"
+              aria-label="Статус"
               value={filters.status}
-              onChange={(e) => updateFilters({ ...filters, status: e.target.value as AssignmentStatus | "all" })}
-              className={selectClass}
-            >
-              <option value="all">Статус: Все</option>
-              {(Object.keys(ASSIGNMENT_STATUS_CONFIG) as AssignmentStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {ASSIGNMENT_STATUS_CONFIG[s].label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => updateFilters({ ...filters, status: v as AssignmentStatus | "all" })}
+              options={[
+                { value: "all", label: "Статус: Все" },
+                ...(Object.keys(ASSIGNMENT_STATUS_CONFIG) as AssignmentStatus[]).map((s) => ({
+                  value: s,
+                  label: ASSIGNMENT_STATUS_CONFIG[s].label,
+                })),
+              ]}
+            />
 
-            <select
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Объект"
               value={filters.objectId}
-              onChange={(e) => updateFilters({ ...filters, objectId: e.target.value })}
-              className={selectClass}
-            >
-              <option value="all">Объект: Все</option>
-              {mockObjects.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => updateFilters({ ...filters, objectId: v })}
+              options={[
+                { value: "all", label: "Объект: Все" },
+                ...mockObjects.map((o) => ({ value: o.id, label: o.name })),
+              ]}
+            />
 
-            <select
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Бригада"
               value={filters.brigadeId}
-              onChange={(e) => updateFilters({ ...filters, brigadeId: e.target.value })}
-              className={selectClass}
-            >
-              <option value="all">Бригада: Все</option>
-              {mockBrigades.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => updateFilters({ ...filters, brigadeId: v })}
+              options={[
+                { value: "all", label: "Бригада: Все" },
+                ...mockBrigades.map((b) => ({ value: b.id, label: b.name })),
+              ]}
+            />
 
-            <select
+            <CustomSelect
+              size="sm"
+              aria-label="Прораб"
               value={filters.foremanName}
-              onChange={(e) => updateFilters({ ...filters, foremanName: e.target.value })}
-              className={selectClass}
-            >
-              <option value="all">Прораб: Все</option>
-              {mockBrigades.map((b) => (
-                <option key={b.id} value={b.foremanName}>
-                  {b.foremanName}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => updateFilters({ ...filters, foremanName: v })}
+              options={[
+                { value: "all", label: "Прораб: Все" },
+                ...mockBrigades.map((b) => ({ value: b.foremanName, label: b.foremanName })),
+              ]}
+            />
 
             <span className="flex h-9 items-center whitespace-nowrap rounded-lg border border-border-strong px-2.5 text-xs font-medium text-ink-secondary">
               {formatDateShort(filters.dateFrom)} – {formatDateShort(filters.dateTo)}

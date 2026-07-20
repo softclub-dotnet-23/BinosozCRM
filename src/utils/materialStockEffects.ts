@@ -24,7 +24,7 @@ export function adjustMaterialStock(materialName: string, warehouse: string, del
 
   if (existing) {
     const nextStock = Math.max(0, Math.round((existing.stock + delta) * 100) / 100);
-    void materialsRepository.update(existing.id, { stock: nextStock });
+    void materialsRepository.update(existing.id, { stock: nextStock, updatedAt: new Date().toISOString() });
     return;
   }
 
@@ -40,5 +40,6 @@ export function adjustMaterialStock(materialName: string, warehouse: string, del
     number: nextNumber,
     warehouse,
     stock: Math.round(delta * 100) / 100,
+    updatedAt: new Date().toISOString(),
   });
 }

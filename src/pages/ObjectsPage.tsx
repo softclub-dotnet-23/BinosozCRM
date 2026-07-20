@@ -11,6 +11,7 @@ import { Avatar } from "../components/ui/Avatar";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { FilterDrawer } from "../components/objects/FilterDrawer";
@@ -69,6 +70,7 @@ export default function ObjectsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [chartMode, setChartMode] = useState<"progress" | "budget">("progress");
+  const [chartPeriod, setChartPeriod] = useState("month");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -339,11 +341,17 @@ export default function ObjectsPage() {
                     </button>
                   ))}
                 </div>
-                <select className="h-8 rounded-lg border border-border-strong px-2.5 text-xs text-ink focus:border-primary focus:outline-none">
-                  <option>Месяц</option>
-                  <option>Квартал</option>
-                  <option>Год</option>
-                </select>
+                <CustomSelect
+                  size="sm"
+                  aria-label="Период"
+                  value={chartPeriod}
+                  onValueChange={setChartPeriod}
+                  options={[
+                    { value: "month", label: "Месяц" },
+                    { value: "quarter", label: "Квартал" },
+                    { value: "year", label: "Год" },
+                  ]}
+                />
               </div>
             </div>
 

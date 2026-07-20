@@ -398,6 +398,7 @@ export interface Material {
   price: number;
   warehouse: string;
   note: string;
+  updatedAt: string;
 }
 
 export interface MaterialFilters {
@@ -524,6 +525,49 @@ export interface MaterialStockRow {
   reserved: number;
   available: number;
   minStock: number;
+  status: MaterialStatus;
+  price: number;
+  updatedAt: string;
+}
+
+export interface StockFilters {
+  warehouse: string;
+  category: string;
+  status: MaterialStatus | "all";
+  dateFrom: string;
+  dateTo: string;
+}
+
+export type StockReservationStatus = "active" | "released" | "consumed";
+
+export interface StockReservation {
+  id: string;
+  materialName: string;
+  warehouse: string;
+  quantity: number;
+  objectName: string | null;
+  responsible: string;
+  date: string;
+  note: string;
+  status: StockReservationStatus;
+  createdDate: string;
+}
+
+export type StockAdjustmentType = "increase" | "decrease" | "set";
+
+export interface StockAdjustment {
+  id: string;
+  materialName: string;
+  warehouse: string;
+  type: StockAdjustmentType;
+  previousQuantity: number;
+  adjustmentQuantity: number;
+  resultingQuantity: number;
+  reason: string;
+  responsible: string;
+  note: string;
+  date: string;
+  createdDate: string;
 }
 
 export interface Assignment {
@@ -544,3 +588,68 @@ export interface Assignment {
   status: AssignmentStatus;
   progress: number;
 }
+
+export type PayrollStatus = "prepared" | "needs_review" | "pending_approval" | "approved" | "returned" | "paid" | "cancelled";
+
+export interface PayrollStatusHistoryEntry {
+  id: string;
+  status: PayrollStatus;
+  date: string;
+  actor: string;
+  comment: string;
+}
+
+export interface PayrollRecord {
+  id: string;
+  number: number;
+  staffId: string;
+  employeeName: string;
+  position: string;
+  category: StaffCategory;
+  brigadeName: string | null;
+  department: string | null;
+  periodStart: string;
+  periodEnd: string;
+  periodLabel: string;
+  baseSalary: number;
+  totalDays: number;
+  workedDays: number;
+  overtimeHours: number;
+  overtimeAmount: number;
+  bonuses: number;
+  allowances: number;
+  absenceDeduction: number;
+  taxDeduction: number;
+  advanceDeduction: number;
+  otherDeductions: number;
+  totalAccrued: number;
+  totalDeductions: number;
+  netPayable: number;
+  status: PayrollStatus;
+  paymentDate: string | null;
+  paymentMethod: string | null;
+  paymentReference: string | null;
+  preparedBy: string;
+  preparedAt: string;
+  submittedAt: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  returnedBy: string | null;
+  returnedAt: string | null;
+  returnReason: string | null;
+  paidAt: string | null;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+  statusHistory: PayrollStatusHistoryEntry[];
+}
+
+export interface PayrollFilters {
+  status: PayrollStatus | "all";
+  brigadeName: string;
+  position: string;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export type PayrollRole = "accountant" | "owner" | "prorab";

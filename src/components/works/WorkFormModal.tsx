@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Paperclip, X } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockAssignments";
 import { WORK_SECTIONS } from "../../data/mockWorks";
@@ -250,33 +251,34 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
         </Field>
 
         <Field label="Приоритет">
-          <select value={form.priority} onChange={(e) => update("priority", e.target.value as WorkPriority)} className={inputClass}>
-            {(Object.keys(WORK_PRIORITY_CONFIG) as WorkPriority[]).map((p) => (
-              <option key={p} value={p}>
-                {WORK_PRIORITY_CONFIG[p].label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.priority}
+            onValueChange={(v) => update("priority", v as WorkPriority)}
+            options={(Object.keys(WORK_PRIORITY_CONFIG) as WorkPriority[]).map((p) => ({
+              value: p,
+              label: WORK_PRIORITY_CONFIG[p].label,
+            }))}
+          />
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectId} onChange={(e) => update("objectId", e.target.value)} className={inputClass}>
-            {mockObjects.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.objectId}
+            onValueChange={(v) => update("objectId", v)}
+            options={mockObjects.map((o) => ({ value: o.id, label: o.name }))}
+          />
         </Field>
 
         <Field label="Раздел">
-          <select value={form.sectionId} onChange={(e) => update("sectionId", e.target.value as WorkSectionKey)} className={inputClass}>
-            {WORK_SECTIONS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.sectionId}
+            onValueChange={(v) => update("sectionId", v as WorkSectionKey)}
+            options={WORK_SECTIONS.map((s) => ({ value: s.id, label: s.name }))}
+          />
         </Field>
 
         <div className="sm:col-span-2">
@@ -292,31 +294,26 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
         </div>
 
         <Field label="Ответственный">
-          <select value={form.responsible} onChange={(e) => update("responsible", e.target.value)} className={inputClass}>
-            {mockBrigades.map((b) => (
-              <option key={b.id} value={b.foremanName}>
-                {b.foremanName}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.responsible}
+            onValueChange={(v) => update("responsible", v)}
+            options={mockBrigades.map((b) => ({ value: b.foremanName, label: b.foremanName }))}
+          />
         </Field>
 
         <Field label="Бригада">
-          <select
+          <CustomSelect
+            searchable
+            className="mt-1.5"
             value={form.brigadeId}
-            onChange={(e) => {
-              const brigade = mockBrigades.find((b) => b.id === e.target.value);
-              update("brigadeId", e.target.value);
+            onValueChange={(v) => {
+              const brigade = mockBrigades.find((b) => b.id === v);
+              update("brigadeId", v);
               if (brigade) update("responsible", brigade.foremanName);
             }}
-            className={inputClass}
-          >
-            {mockBrigades.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+            options={mockBrigades.map((b) => ({ value: b.id, label: b.name }))}
+          />
         </Field>
 
         <Field label="Плановая дата начала" error={errors.plannedStart}>
@@ -357,13 +354,15 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
         </Field>
 
         <Field label="Статус">
-          <select value={form.status} onChange={(e) => update("status", e.target.value as WorkStatus)} className={inputClass}>
-            {(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {WORK_STATUS_CONFIG[s].label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.status}
+            onValueChange={(v) => update("status", v as WorkStatus)}
+            options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => ({
+              value: s,
+              label: WORK_STATUS_CONFIG[s].label,
+            }))}
+          />
         </Field>
 
         <Field label="Бюджет работы, сомони" error={errors.budget}>
@@ -378,14 +377,15 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
         </Field>
 
         <Field label="Родительская работа">
-          <select value={form.parentWorkId} onChange={(e) => update("parentWorkId", e.target.value)} className={inputClass}>
-            <option value="">Нет</option>
-            {parentOptions.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.code} — {w.title}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            clearable
+            className="mt-1.5"
+            placeholder="Нет"
+            value={form.parentWorkId}
+            onValueChange={(v) => update("parentWorkId", v)}
+            options={parentOptions.map((w) => ({ value: w.id, label: `${w.code} — ${w.title}` }))}
+          />
         </Field>
 
         <div className="sm:col-span-2">

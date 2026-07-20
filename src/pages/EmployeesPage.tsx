@@ -22,6 +22,7 @@ import { SearchInput } from "../components/ui/SearchInput";
 import { Avatar } from "../components/ui/Avatar";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -50,9 +51,6 @@ const STATUS_FILTER_OPTIONS: { value: StaffStatus | "all"; label: string }[] = [
   { value: "vacation", label: "Отпуск" },
   { value: "dismissed", label: "Уволен" },
 ];
-
-const selectClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 
 const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
@@ -346,50 +344,47 @@ export default function EmployeesPage() {
               containerClassName="min-w-[220px] flex-1"
               className="h-9"
             />
-            <select
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Должность"
               value={positionFilter}
-              onChange={(e) => {
-                setPositionFilter(e.target.value);
+              onValueChange={(v) => {
+                setPositionFilter(v);
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              <option value="all">Должность: Все</option>
-              {STAFF_POSITIONS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: "all", label: "Должность: Все" },
+                ...STAFF_POSITIONS.map((p) => ({ value: p, label: p })),
+              ]}
+            />
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Бригада"
               value={brigadeFilter}
-              onChange={(e) => {
-                setBrigadeFilter(e.target.value);
+              onValueChange={(v) => {
+                setBrigadeFilter(v);
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              <option value="all">Бригада: Все</option>
-              {STAFF_BRIGADES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[
+                { value: "all", label: "Бригада: Все" },
+                ...STAFF_BRIGADES.map((b) => ({ value: b, label: b })),
+              ]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Статус"
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as StaffStatus | "all");
+              onValueChange={(v) => {
+                setStatusFilter(v as StaffStatus | "all");
                 setPage(1);
               }}
-              className={selectClass}
-            >
-              {STATUS_FILTER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.value === "all" ? "Статус: Все" : opt.label}
-                </option>
-              ))}
-            </select>
+              options={STATUS_FILTER_OPTIONS.map((opt) => ({
+                value: opt.value,
+                label: opt.value === "all" ? "Статус: Все" : opt.label,
+              }))}
+            />
             <Button variant="outline" size="sm" className="h-9" onClick={() => setDrawerOpen(true)}>
               <Filter size={14} /> Фильтры
             </Button>

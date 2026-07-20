@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { OBJECT_TYPE_IMAGE_FALLBACK } from "../../utils/objectImages";
 import type { ConstructionObject, ObjectStatus, ObjectType } from "../../types";
@@ -157,17 +158,12 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
         </Field>
 
         <Field label="Тип объекта">
-          <select
+          <CustomSelect
+            className="mt-1.5"
             value={form.objectType}
-            onChange={(e) => update("objectType", e.target.value as ObjectType)}
-            className={inputClass}
-          >
-            {OBJECT_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => update("objectType", v as ObjectType)}
+            options={OBJECT_TYPE_OPTIONS}
+          />
         </Field>
 
         <Field label="Город" error={errors.city}>
@@ -201,17 +197,12 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
         </Field>
 
         <Field label="Статус">
-          <select
+          <CustomSelect
+            className="mt-1.5"
             value={form.status}
-            onChange={(e) => update("status", e.target.value as ObjectStatus)}
-            className={inputClass}
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => update("status", v as ObjectStatus)}
+            options={STATUS_OPTIONS}
+          />
         </Field>
 
         <Field label="Дата начала" error={errors.startDate}>

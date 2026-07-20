@@ -19,6 +19,7 @@ import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Drawer } from "../components/ui/Drawer";
@@ -277,36 +278,31 @@ export default function EstimatesPage() {
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <div className="flex flex-wrap items-center gap-2 px-5 pt-5 sm:px-6">
-              <select
+              <CustomSelect
+                searchable
+                size="sm"
+                aria-label="Объект"
                 value={objectFilter}
-                onChange={(e) => {
-                  setObjectFilter(e.target.value);
+                onValueChange={(v) => {
+                  setObjectFilter(v);
                   setPage(1);
                 }}
-                className="h-9 rounded-[10px] border border-border-strong px-3 text-sm text-ink focus:border-primary focus:outline-none"
-              >
-                <option value="all">Все объекты</option>
-                {Object.keys(ESTIMATE_OBJECT_META).map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "all", label: "Все объекты" },
+                  ...Object.keys(ESTIMATE_OBJECT_META).map((name) => ({ value: name, label: name })),
+                ]}
+              />
 
-              <select
+              <CustomSelect
+                size="sm"
+                aria-label="Статус"
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as EstimateStatus | "all");
+                onValueChange={(v) => {
+                  setStatusFilter(v as EstimateStatus | "all");
                   setPage(1);
                 }}
-                className="h-9 rounded-[10px] border border-border-strong px-3 text-sm text-ink focus:border-primary focus:outline-none"
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                options={STATUS_OPTIONS}
+              />
 
               <button
                 type="button"

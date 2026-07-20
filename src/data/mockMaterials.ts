@@ -127,9 +127,18 @@ function round(value: number, decimals: number): number {
   return Math.round(value * factor) / factor;
 }
 
+// Deterministic "last updated" timestamp spread across late July 2026, matching the date
+// range the rest of the inventory mock data (receipts/write-offs/transfers) lives in.
+function syntheticUpdatedAt(index: number): string {
+  const day = 1 + (index % 29);
+  const hour = 6 + (index % 12);
+  const minute = (index * 7) % 60;
+  return `2026-07-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+}
+
 let num = 1;
 
-const featuredMaterials: Material[] = FEATURED.map((f) => ({
+const featuredMaterials: Material[] = FEATURED.map((f, i) => ({
   id: `mat-${String(num).padStart(4, "0")}`,
   number: num++,
   name: f.name,
@@ -143,14 +152,16 @@ const featuredMaterials: Material[] = FEATURED.map((f) => ({
   price: f.price,
   warehouse: WAREHOUSES[0],
   note: f.note,
+  updatedAt: syntheticUpdatedAt(i),
 }));
 
-// Padding distribution across the 9 categories: 118 more materials, all kept comfortably
-// above their minimum so the only low/critical items are the 2 featured ones above —
-// matching the reference screenshot's "Критический остаток" badge value of exactly 2.
+// Padding distribution across the 9 categories: 118 more materials. Most stay comfortably
+// above their minimum; a spread of ~2 low + ~1 critical item per category (plus the 2
+// featured low/critical rows above) gives the Stock page a realistic, non-degenerate
+// critical-stock list and donut breakdown instead of only 1-2 flagged items out of 128.
 const PADDING_PER_CATEGORY = [13, 13, 13, 13, 13, 13, 13, 13, 14];
-const LOW_INDICES = new Set<number>([]);
-const CRITICAL_INDICES = new Set<number>([]);
+const LOW_INDICES = new Set<number>([2, 7]);
+const CRITICAL_INDICES = new Set<number>([4]);
 
 const paddingMaterials: Material[] = [];
 CATEGORY_POOL.forEach((cat, catIndex) => {
@@ -189,6 +200,7 @@ CATEGORY_POOL.forEach((cat, catIndex) => {
       price,
       warehouse: WAREHOUSES[(catIndex + i) % WAREHOUSES.length],
       note: "",
+      updatedAt: syntheticUpdatedAt(num),
     });
   }
 });

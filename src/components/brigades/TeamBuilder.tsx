@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, X } from "lucide-react";
 import { Avatar } from "../ui/Avatar";
+import { CustomSelect } from "../ui/CustomSelect";
 import { mockEmployees } from "../../data/mockEmployees";
 
 interface TeamBuilderProps {
@@ -41,18 +42,14 @@ export function TeamBuilder({ selectedIds, onToggle, foremanName }: TeamBuilderP
                 className="w-full rounded-lg border border-border-strong py-1.5 pl-7 pr-2 text-xs focus:border-primary focus:outline-none"
               />
             </div>
-            <select
+            <CustomSelect
+              size="sm"
+              fullWidth
+              aria-label="Специальность"
               value={specialtyFilter}
-              onChange={(e) => setSpecialtyFilter(e.target.value)}
-              className="w-full rounded-lg border border-border-strong px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
-            >
-              <option value="all">Все специальности</option>
-              {specialties.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+              onValueChange={setSpecialtyFilter}
+              options={[{ value: "all", label: "Все специальности" }, ...specialties.map((s) => ({ value: s, label: s }))]}
+            />
           </div>
           <div className="max-h-40 space-y-0.5 overflow-y-auto p-1.5">
             {available.length === 0 && <p className="px-2 py-3 text-center text-xs text-ink-muted">Никого не найдено</p>}

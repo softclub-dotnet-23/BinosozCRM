@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { mockMaterials, MATERIAL_WAREHOUSES } from "../../data/mockMaterials";
 import { RECEIPT_SUPPLIERS, RECEIPT_OBJECTS, RECEIPT_BRIGADES } from "../../data/mockMaterialReceipts";
+import { employeesRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { ResponsiblePersonSelect } from "./ResponsiblePersonField";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import type { MaterialReceipt, MaterialReceiptLine } from "../../types";
-
-const RESPONSIBLE_OPTIONS = ["Мирзоев Шахром", "Комрон Саидов", "Шариф Давлатов", "Мухиддин Холов", "Каримов Сухроб"];
 
 interface LineForm {
   materialName: string;
@@ -34,14 +36,14 @@ function emptyLine(): LineForm {
   return { materialName: first.name, quantity: "", unit: first.unit, price: String(first.price) };
 }
 
-function emptyForm(): FormState {
+function emptyForm(defaultResponsible: string): FormState {
   return {
     date: "",
     supplier: RECEIPT_SUPPLIERS[0],
     objectName: RECEIPT_OBJECTS[0],
     brigadeName: "",
     warehouse: MATERIAL_WAREHOUSES[0],
-    responsible: RESPONSIBLE_OPTIONS[0],
+    responsible: defaultResponsible,
     invoiceNumber: "",
     note: "",
     lines: [emptyLine()],
@@ -75,13 +77,14 @@ interface ReceiptFormModalProps {
 }
 
 export function ReceiptFormModal({ open, receipt, existingInvoiceNumbers, onClose, onSave }: ReceiptFormModalProps) {
-  const [form, setForm] = useState<FormState>(() => (receipt ? toForm(receipt) : emptyForm()));
+  const employees = useRepositorySnapshot(employeesRepository);
+  const [form, setForm] = useState<FormState>(() => (receipt ? toForm(receipt) : emptyForm(employees[0]?.id ?? "")));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(receipt ? toForm(receipt) : emptyForm());
+      setForm(receipt ? toForm(receipt) : emptyForm(employees[0]?.id ?? ""));
       setErrors({});
       setSaving(false);
     }
@@ -218,54 +221,46 @@ export function ReceiptFormModal({ open, receipt, existingInvoiceNumbers, onClos
         </Field>
 
         <Field label="Поставщик">
-          <select value={form.supplier} onChange={(e) => update("supplier", e.target.value)} className={inputClass}>
-            {RECEIPT_SUPPLIERS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.supplier}
+            onValueChange={(v) => update("supplier", v)}
+            options={RECEIPT_SUPPLIERS.map((s) => ({ value: s, label: s }))}
+          />
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectName} onChange={(e) => update("objectName", e.target.value)} className={inputClass}>
-            {RECEIPT_OBJECTS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.objectName}
+            onValueChange={(v) => update("objectName", v)}
+            options={RECEIPT_OBJECTS.map((o) => ({ value: o, label: o }))}
+          />
         </Field>
 
         <Field label="Бригада">
-          <select value={form.brigadeName} onChange={(e) => update("brigadeName", e.target.value)} className={inputClass}>
-            <option value="">Без бригады</option>
-            {RECEIPT_BRIGADES.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            clearable
+            placeholder="Без бригады"
+            className="mt-1.5"
+            value={form.brigadeName}
+            onValueChange={(v) => update("brigadeName", v)}
+            options={RECEIPT_BRIGADES.map((b) => ({ value: b, label: b }))}
+          />
         </Field>
 
         <Field label="Склад">
-          <select value={form.warehouse} onChange={(e) => update("warehouse", e.target.value)} className={inputClass}>
-            {MATERIAL_WAREHOUSES.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.warehouse}
+            onValueChange={(v) => update("warehouse", v)}
+            options={MATERIAL_WAREHOUSES.map((w) => ({ value: w, label: w }))}
+          />
         </Field>
 
         <Field label="Ответственный">
-          <select value={form.responsible} onChange={(e) => update("responsible", e.target.value)} className={inputClass}>
-            {RESPONSIBLE_OPTIONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <ResponsiblePersonSelect employees={employees} value={form.responsible} onChange={(value) => update("responsible", value)} />
         </Field>
 
         <Field label="Примечание">
@@ -293,17 +288,13 @@ export function ReceiptFormModal({ open, receipt, existingInvoiceNumbers, onClos
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.6fr_0.7fr_0.6fr_0.8fr_auto] sm:items-end">
                 <label className="block text-xs font-medium text-ink">
                   Материал
-                  <select
+                  <CustomSelect
+                    searchable
+                    className="mt-1.5"
                     value={line.materialName}
-                    onChange={(e) => updateLine(i, { materialName: e.target.value })}
-                    className={inputClass}
-                  >
-                    {mockMaterials.slice(0, 128).map((m) => (
-                      <option key={m.id} value={m.name}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(v) => updateLine(i, { materialName: v })}
+                    options={mockMaterials.slice(0, 128).map((m) => ({ value: m.name, label: m.name }))}
+                  />
                 </label>
                 <label className="block text-xs font-medium text-ink">
                   Кол-во

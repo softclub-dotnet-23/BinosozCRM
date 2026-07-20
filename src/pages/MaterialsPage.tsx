@@ -23,10 +23,12 @@ import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { MaterialThumbnail } from "../components/materials/MaterialThumbnail";
 import { MaterialStatusBadge } from "../components/materials/MaterialStatusBadge";
 import { MaterialFormModal } from "../components/materials/MaterialFormModal";
 import { MaterialDetailDrawer } from "../components/materials/MaterialDetailDrawer";
+import { Avatar } from "../components/ui/Avatar";
 import { MATERIAL_CATEGORIES, MATERIAL_SUPPLIERS } from "../data/mockMaterials";
 import { receiptQuantity } from "../data/mockMaterialReceipts";
 import { writeOffQuantity } from "../data/mockMaterialWriteOffs";
@@ -35,10 +37,12 @@ import {
   materialReceiptsRepository,
   materialWriteOffsRepository,
   materialTransfersRepository,
+  employeesRepository,
 } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { computeMaterialKpis, getMaterialStatus, getMaterialTotalValue } from "../utils/materialAnalytics";
+import { responsiblePersonName } from "../utils/responsiblePerson";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatNumber } from "../utils/format";
 import { formatDateShort } from "../utils/date";
@@ -85,6 +89,7 @@ export default function MaterialsPage() {
   const mockMaterialReceipts = useRepositorySnapshot(materialReceiptsRepository);
   const mockMaterialWriteOffs = useRepositorySnapshot(materialWriteOffsRepository);
   const transfersForDependencyCheck = useRepositorySnapshot(materialTransfersRepository);
+  const employees = useRepositorySnapshot(employeesRepository);
   const [tab, setTab] = usePersistentState<TabKey>("filters.materials.tab", "all");
   const [search, setSearch] = usePersistentState("filters.materials.search", "");
   const [filters, setFilters] = usePersistentState<MaterialFilters>("filters.materials.filters", DEFAULT_FILTERS);
@@ -136,7 +141,7 @@ export default function MaterialsPage() {
   );
 
   const recentOperations = useMemo(() => {
-    type Op = { id: string; tone: "green" | "red"; title: string; value: string; date: string };
+    type Op = { id: string; tone: "green" | "red"; title: string; value: string; date: string; responsibleName: string };
     const fromReceipts: Op[] = mockMaterialReceipts.flatMap((r) =>
       r.lines.map((l, i) => ({
         id: `${r.id}-${i}`,
@@ -144,6 +149,7 @@ export default function MaterialsPage() {
         title: `Поступление: ${l.materialName}`,
         value: `+${formatNumber(l.quantity)} ${l.unit}`,
         date: r.date,
+        responsibleName: responsiblePersonName(r.responsible, employees),
       })),
     );
     const fromWriteOffs: Op[] = mockMaterialWriteOffs.flatMap((w) =>
@@ -153,10 +159,11 @@ export default function MaterialsPage() {
         title: `Списание: ${l.materialName}`,
         value: `-${formatNumber(l.quantity)} ${l.unit}`,
         date: w.date,
+        responsibleName: responsiblePersonName(w.responsible, employees),
       })),
     );
     return [...fromReceipts, ...fromWriteOffs].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3);
-  }, [mockMaterialReceipts, mockMaterialWriteOffs]);
+  }, [mockMaterialReceipts, mockMaterialWriteOffs, employees]);
 
   const pageCount = Math.max(1, Math.ceil(filteredMaterials.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -424,37 +431,27 @@ export default function MaterialsPage() {
                 />
               </FilterField>
               <FilterField label="Категория">
-                <select value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))} className={selectClass}>
-                  <option value="all">Все категории</option>
-                  {MATERIAL_CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  searchable
+                  value={filters.category}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}
+                  options={[{ value: "all", label: "Все категории" }, ...MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+                />
               </FilterField>
               <FilterField label="Статус">
-                <select
+                <CustomSelect
                   value={filters.status}
-                  onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as MaterialStatus | "all" }))}
-                  className={selectClass}
-                >
-                  {STATUS_FILTER_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v as MaterialStatus | "all" }))}
+                  options={STATUS_FILTER_OPTIONS}
+                />
               </FilterField>
               <FilterField label="Поставщик">
-                <select value={filters.supplier} onChange={(e) => setFilters((f) => ({ ...f, supplier: e.target.value }))} className={selectClass}>
-                  <option value="all">Все поставщики</option>
-                  {MATERIAL_SUPPLIERS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  searchable
+                  value={filters.supplier}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, supplier: v }))}
+                  options={[{ value: "all", label: "Все поставщики" }, ...MATERIAL_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
+                />
               </FilterField>
             </div>
             <div className="mt-4 flex gap-2">
@@ -525,6 +522,7 @@ export default function MaterialsPage() {
                     title={op.title}
                     value={op.value}
                     time={formatDateShort(op.date)}
+                    responsibleName={op.responsibleName}
                   />
                 ))
               ) : (
@@ -579,12 +577,14 @@ function OperationRow({
   title,
   value,
   time,
+  responsibleName,
 }: {
   icon: React.ReactNode;
   tone: "green" | "red";
   title: string;
   value: string;
   time: string;
+  responsibleName: string;
 }) {
   const toneClass = tone === "green" ? "bg-green-soft text-green" : "bg-red-soft text-red";
   const valueClass = tone === "green" ? "text-green" : "text-red";
@@ -593,7 +593,12 @@ function OperationRow({
       <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${toneClass}`}>{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink">{title}</p>
-        <p className="text-xs text-ink-muted">{time}</p>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          <Avatar name={responsibleName} size="sm" className="h-4 w-4 text-[8px]" />
+          <p className="truncate text-xs text-ink-muted">
+            {responsibleName} · {time}
+          </p>
+        </div>
       </div>
       <span className={`shrink-0 text-xs font-semibold tabular ${valueClass}`}>{value}</span>
     </li>

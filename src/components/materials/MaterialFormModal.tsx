@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { MATERIAL_CATEGORIES, MATERIAL_SUPPLIERS, MATERIAL_WAREHOUSES, CATEGORY_IMAGE } from "../../data/mockMaterials";
 import type { Material } from "../../types";
@@ -116,6 +117,7 @@ export function MaterialFormModal({ open, material, onClose, onSave }: MaterialF
       price: Number(form.price),
       warehouse: form.warehouse,
       note: form.note.trim(),
+      updatedAt: new Date().toISOString(),
     };
     onSave(saved);
   }
@@ -150,33 +152,32 @@ export function MaterialFormModal({ open, material, onClose, onSave }: MaterialF
         </Field>
 
         <Field label="Категория">
-          <select value={form.category} onChange={(e) => update("category", e.target.value)} className={inputClass}>
-            {MATERIAL_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.category}
+            onValueChange={(v) => update("category", v)}
+            options={MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))}
+          />
         </Field>
 
         <Field label="Поставщик">
-          <select value={form.supplier} onChange={(e) => update("supplier", e.target.value)} className={inputClass}>
-            {MATERIAL_SUPPLIERS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.supplier}
+            onValueChange={(v) => update("supplier", v)}
+            options={MATERIAL_SUPPLIERS.map((s) => ({ value: s, label: s }))}
+          />
         </Field>
 
         <Field label="Склад">
-          <select value={form.warehouse} onChange={(e) => update("warehouse", e.target.value)} className={inputClass}>
-            {MATERIAL_WAREHOUSES.map((w) => (
-              <option key={w} value={w}>
-                {w}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.warehouse}
+            onValueChange={(v) => update("warehouse", v)}
+            options={MATERIAL_WAREHOUSES.map((w) => ({ value: w, label: w }))}
+          />
         </Field>
 
         <Field label="Единица измерения">

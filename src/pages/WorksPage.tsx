@@ -4,6 +4,7 @@ import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Pagination } from "../components/ui/Pagination";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -45,9 +46,6 @@ function matchesTab(status: WorkStatus, tab: TabKey): boolean {
   if (tab === "completed") return status === "completed";
   return status === "overdue";
 }
-
-const selectClass =
-  "h-9 rounded-lg border border-border-strong bg-card px-2.5 text-xs font-medium text-ink focus:border-primary focus:outline-none";
 
 export default function WorksPage() {
   const { showToast } = useToast();
@@ -384,41 +382,34 @@ export default function WorksPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <select
+                <CustomSelect
+                  size="sm"
+                  searchable
+                  aria-label="Объект"
                   value={filters.objectId}
-                  onChange={(e) => updateFilters({ ...filters, objectId: e.target.value })}
-                  className={selectClass}
-                >
-                  <option value="all">Все объекты</option>
-                  {mockObjects.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  onValueChange={(v) => updateFilters({ ...filters, objectId: v })}
+                  options={[{ value: "all", label: "Все объекты" }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
+                />
+                <CustomSelect
+                  size="sm"
+                  aria-label="Раздел"
                   value={filters.sectionId}
-                  onChange={(e) => updateFilters({ ...filters, sectionId: e.target.value as WorkFiltersState["sectionId"] })}
-                  className={selectClass}
-                >
-                  <option value="all">Все разделы</option>
-                  {WORK_SECTIONS.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  onValueChange={(v) => updateFilters({ ...filters, sectionId: v as WorkFiltersState["sectionId"] })}
+                  options={[{ value: "all", label: "Все разделы" }, ...WORK_SECTIONS.map((s) => ({ value: s.id, label: s.name }))]}
+                />
+                <CustomSelect
+                  size="sm"
+                  aria-label="Статус"
                   value={filters.status}
-                  onChange={(e) => updateFilters({ ...filters, status: e.target.value as WorkFiltersState["status"] })}
-                  className={selectClass}
-                >
-                  <option value="all">Статус: Все</option>
-                  <option value="completed">Завершено</option>
-                  <option value="in_progress">В процессе</option>
-                  <option value="overdue">Просрочено</option>
-                  <option value="planned">Запланировано</option>
-                </select>
+                  onValueChange={(v) => updateFilters({ ...filters, status: v as WorkFiltersState["status"] })}
+                  options={[
+                    { value: "all", label: "Статус: Все" },
+                    { value: "completed", label: "Завершено" },
+                    { value: "in_progress", label: "В процессе" },
+                    { value: "overdue", label: "Просрочено" },
+                    { value: "planned", label: "Запланировано" },
+                  ]}
+                />
               </div>
             </div>
 

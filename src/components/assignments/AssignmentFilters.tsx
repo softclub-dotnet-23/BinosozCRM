@@ -1,5 +1,6 @@
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { mockBrigades } from "../../data/mockAssignments";
 import { cn } from "../../utils/cn";
 import type { AssignmentStatus } from "../../types";
@@ -22,8 +23,6 @@ export const DEFAULT_ASSIGNMENT_FILTERS: AssignmentFiltersState = {
   dateTo: "2026-07-30",
 };
 
-const selectClass =
-  "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const dateInputClass =
   "rounded-[10px] border border-border-strong px-2.5 py-2 text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 
@@ -60,34 +59,26 @@ export function AssignmentFiltersCard({ filters, onChange, onApply, onReset }: A
 
         <label className="block text-sm font-medium text-ink">
           Прораб
-          <select
+          <CustomSelect
+            className="mt-1.5"
             value={filters.foremanName}
-            onChange={(e) => onChange({ ...filters, foremanName: e.target.value })}
-            className={selectClass}
-          >
-            <option value="all">Все прорабы</option>
-            {mockBrigades.map((b) => (
-              <option key={b.id} value={b.foremanName}>
-                {b.foremanName}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => onChange({ ...filters, foremanName: v })}
+            options={[
+              { value: "all", label: "Все прорабы" },
+              ...mockBrigades.map((b) => ({ value: b.foremanName, label: b.foremanName })),
+            ]}
+          />
         </label>
 
         <label className="block text-sm font-medium text-ink">
           Бригада
-          <select
+          <CustomSelect
+            searchable
+            className="mt-1.5"
             value={filters.brigadeId}
-            onChange={(e) => onChange({ ...filters, brigadeId: e.target.value })}
-            className={selectClass}
-          >
-            <option value="all">Все бригады</option>
-            {mockBrigades.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => onChange({ ...filters, brigadeId: v })}
+            options={[{ value: "all", label: "Все бригады" }, ...mockBrigades.map((b) => ({ value: b.id, label: b.name }))]}
+          />
         </label>
       </div>
 

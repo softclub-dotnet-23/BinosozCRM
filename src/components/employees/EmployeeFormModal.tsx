@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { BRIGADE_OPTIONS, DEPARTMENT_OPTIONS } from "../../data/mockStaff";
 import type { StaffCategory, StaffMember, StaffStatus } from "../../types";
@@ -181,51 +182,54 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
         </Field>
 
         <Field label="Категория">
-          <select value={form.category} onChange={(e) => update("category", e.target.value as StaffCategory)} className={inputClass}>
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.category}
+            onValueChange={(v) => update("category", v as StaffCategory)}
+            options={CATEGORY_OPTIONS}
+          />
         </Field>
 
         <Field label="Статус">
-          <select value={form.status} onChange={(e) => update("status", e.target.value as StaffStatus)} className={inputClass}>
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.status}
+            onValueChange={(v) => update("status", v as StaffStatus)}
+            options={STATUS_OPTIONS}
+          />
         </Field>
 
         <Field label="Тип подразделения">
-          <select value={form.unitType} onChange={(e) => update("unitType", e.target.value as UnitType)} className={inputClass}>
-            <option value="brigade">Бригада</option>
-            <option value="department">Отдел</option>
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.unitType}
+            onValueChange={(v) => update("unitType", v as UnitType)}
+            options={[
+              { value: "brigade", label: "Бригада" },
+              { value: "department", label: "Отдел" },
+            ]}
+          />
         </Field>
 
         {form.unitType === "brigade" ? (
           <Field label="Бригада">
-            <select value={form.brigadeName} onChange={(e) => update("brigadeName", e.target.value)} className={inputClass}>
-              {BRIGADE_OPTIONS.map((b) => (
-                <option key={b.name} value={b.name}>
-                  {b.name} — {b.specialization}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              searchable
+              className="mt-1.5"
+              value={form.brigadeName}
+              onValueChange={(v) => update("brigadeName", v)}
+              options={BRIGADE_OPTIONS.map((b) => ({ value: b.name, label: `${b.name} — ${b.specialization}` }))}
+            />
           </Field>
         ) : (
           <Field label="Отдел">
-            <select value={form.department} onChange={(e) => update("department", e.target.value)} className={inputClass}>
-              {DEPARTMENT_OPTIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              searchable
+              className="mt-1.5"
+              value={form.department}
+              onValueChange={(v) => update("department", v)}
+              options={DEPARTMENT_OPTIONS.map((d) => ({ value: d, label: d }))}
+            />
           </Field>
         )}
 

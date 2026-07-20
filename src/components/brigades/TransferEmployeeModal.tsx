@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
+import { CustomSelect } from "../ui/CustomSelect";
 import { mockBrigades } from "../../data/mockBrigades";
 import { cn } from "../../utils/cn";
 import type { BrigadeMemberRole, Employee } from "../../types";
@@ -117,23 +118,29 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
 
         <label className="block text-sm font-medium text-ink">
           Новая бригада
-          <select value={form.toBrigadeId} onChange={(e) => update("toBrigadeId", e.target.value)} className={cn(inputClass, errors.toBrigadeId && errorInputClass)}>
-            {mockBrigades.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            error={Boolean(errors.toBrigadeId)}
+            className="mt-1.5"
+            value={form.toBrigadeId}
+            onValueChange={(v) => update("toBrigadeId", v)}
+            options={mockBrigades.map((b) => ({ value: b.id, label: b.name }))}
+          />
           {errors.toBrigadeId && <span className="mt-1 block text-xs font-normal text-red">{errors.toBrigadeId}</span>}
         </label>
 
         <label className="block text-sm font-medium text-ink">
           Новая роль
-          <select value={form.newRole} onChange={(e) => update("newRole", e.target.value as BrigadeMemberRole)} className={inputClass}>
-            <option value="worker">Рабочий</option>
-            <option value="helper">Разнорабочий</option>
-            <option value="foreman">Прораб</option>
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.newRole}
+            onValueChange={(v) => update("newRole", v as BrigadeMemberRole)}
+            options={[
+              { value: "worker", label: "Рабочий" },
+              { value: "helper", label: "Разнорабочий" },
+              { value: "foreman", label: "Прораб" },
+            ]}
+          />
         </label>
 
         <label className="block text-sm font-medium text-ink">
@@ -155,14 +162,15 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
         {replaceCandidates.length > 0 && (
           <label className="block text-sm font-medium text-ink">
             Заменить другого сотрудника
-            <select value={form.replaceEmployeeId} onChange={(e) => update("replaceEmployeeId", e.target.value)} className={inputClass}>
-              <option value="">Не заменять</option>
-              {replaceCandidates.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.fullName}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              searchable
+              clearable
+              placeholder="Не заменять"
+              className="mt-1.5"
+              value={form.replaceEmployeeId}
+              onValueChange={(v) => update("replaceEmployeeId", v)}
+              options={replaceCandidates.map((e) => ({ value: e.id, label: e.fullName }))}
+            />
           </label>
         )}
 

@@ -10,6 +10,7 @@ import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { WriteOffFormModal } from "../components/materials/WriteOffFormModal";
 import { WriteOffDetailDrawer } from "../components/materials/WriteOffDetailDrawer";
 import { writeOffReasonLabel, WRITE_OFF_REASONS } from "../components/materials/InventoryStatusBadges";
@@ -19,9 +20,10 @@ import {
   writeOffQuantity,
   writeOffTotal,
 } from "../data/mockMaterialWriteOffs";
-import { materialWriteOffsRepository } from "../data/repositories";
-import { useRepositoryState } from "../hooks/useRepositoryState";
+import { materialWriteOffsRepository, employeesRepository } from "../data/repositories";
+import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
+import { responsiblePersonName } from "../utils/responsiblePerson";
 import { computeWriteOffKpis, computeFrequentReasons } from "../utils/writeOffAnalytics";
 import { adjustMaterialStock } from "../utils/materialStockEffects";
 import { useToast } from "../hooks/useToast";
@@ -39,8 +41,6 @@ const DEFAULT_FILTERS: WriteOffFilters = {
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const toolbarSelectClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
 
@@ -60,6 +60,7 @@ export default function WriteOffsPage() {
   const { showToast } = useToast();
 
   const [writeOffs, setWriteOffs] = useRepositoryState(materialWriteOffsRepository);
+  const employees = useRepositorySnapshot(employeesRepository);
   const [search, setSearch] = usePersistentState("filters.writeOffs.search", "");
   const [filters, setFilters] = usePersistentState<WriteOffFilters>("filters.writeOffs.filters", DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
@@ -73,9 +74,10 @@ export default function WriteOffsPage() {
     const query = search.trim().toLowerCase();
     return writeOffs.filter((w) => {
       if (query) {
-        const haystack = `${w.documentNumber} ${w.objectName} ${w.brigadeName ?? ""} ${w.responsible} ${w.note} ${writeOffReasonLabel(
-          w.reason,
-        )} ${w.lines.map((l) => l.materialName).join(" ")}`.toLowerCase();
+        const haystack = `${w.documentNumber} ${w.objectName} ${w.brigadeName ?? ""} ${responsiblePersonName(
+          w.responsible,
+          employees,
+        )} ${w.note} ${writeOffReasonLabel(w.reason)} ${w.lines.map((l) => l.materialName).join(" ")}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       if (filters.objectName !== "all" && w.objectName !== filters.objectName) return false;
@@ -85,7 +87,7 @@ export default function WriteOffsPage() {
       if (filters.dateTo && w.date > filters.dateTo) return false;
       return true;
     });
-  }, [writeOffs, search, filters]);
+  }, [writeOffs, search, filters, employees]);
 
   const kpis = useMemo(() => computeWriteOffKpis(filteredWriteOffs), [filteredWriteOffs]);
   const frequentReasons = useMemo(() => computeFrequentReasons(filteredWriteOffs), [filteredWriteOffs]);
@@ -139,7 +141,7 @@ export default function WriteOffsPage() {
       writeOffQuantity(w).toFixed(2),
       writeOffTotal(w).toFixed(2),
       writeOffReasonLabel(w.reason),
-      w.responsible,
+      responsiblePersonName(w.responsible, employees),
     ]);
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
@@ -173,12 +175,15 @@ export default function WriteOffsPage() {
     {
       key: "responsible",
       header: "Кто списал",
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <Avatar name={row.responsible} size="sm" />
-          <span className="whitespace-nowrap text-ink">{row.responsible}</span>
-        </div>
-      ),
+      render: (row) => {
+        const name = responsiblePersonName(row.responsible, employees);
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar name={name} size="sm" />
+            <span className="whitespace-nowrap text-ink">{name}</span>
+          </div>
+        );
+      },
     },
     {
       key: "actions",
@@ -250,51 +255,39 @@ export default function WriteOffsPage() {
                 className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
               />
             </div>
-            <select
+            <CustomSelect
+              size="sm"
+              aria-label="Объект"
               value={filters.objectName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, objectName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, objectName: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Объект: Все</option>
-              {WRITE_OFF_OBJECTS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Объект: Все" }, ...WRITE_OFF_OBJECTS.map((o) => ({ value: o, label: o }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Бригада"
               value={filters.brigadeName}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, brigadeName: e.target.value }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, brigadeName: v }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Бригада: Все</option>
-              {WRITE_OFF_BRIGADES.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-            <select
+              options={[{ value: "all", label: "Бригада: Все" }, ...WRITE_OFF_BRIGADES.map((b) => ({ value: b, label: b }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Причина"
               value={filters.reason}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, reason: e.target.value as WriteOffFilters["reason"] }));
+              onValueChange={(v) => {
+                setFilters((f) => ({ ...f, reason: v as WriteOffFilters["reason"] }));
                 setPage(1);
               }}
-              className={toolbarSelectClass}
-            >
-              <option value="all">Причина: Все</option>
-              {WRITE_OFF_REASONS.map((r) => (
-                <option key={r} value={r}>
-                  {writeOffReasonLabel(r)}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "all", label: "Причина: Все" },
+                ...WRITE_OFF_REASONS.map((r) => ({ value: r, label: writeOffReasonLabel(r) })),
+              ]}
+            />
             <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
               <RefreshCw size={14} /> Сбросить фильтры
             </Button>
@@ -362,44 +355,30 @@ export default function WriteOffsPage() {
               </div>
 
               <FilterField label="Объект">
-                <select
+                <CustomSelect
                   value={filters.objectName}
-                  onChange={(e) => setFilters((f) => ({ ...f, objectName: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все объекты</option>
-                  {WRITE_OFF_OBJECTS.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
+                  options={[{ value: "all", label: "Все объекты" }, ...WRITE_OFF_OBJECTS.map((o) => ({ value: o, label: o }))]}
+                />
               </FilterField>
 
               <FilterField label="Бригада">
-                <select
+                <CustomSelect
                   value={filters.brigadeName}
-                  onChange={(e) => setFilters((f) => ({ ...f, brigadeName: e.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="all">Все бригады</option>
-                  {WRITE_OFF_BRIGADES.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
+                  options={[{ value: "all", label: "Все бригады" }, ...WRITE_OFF_BRIGADES.map((b) => ({ value: b, label: b }))]}
+                />
               </FilterField>
 
               <FilterField label="Причина">
-                <select value={filters.reason} onChange={(e) => setFilters((f) => ({ ...f, reason: e.target.value as WriteOffFilters["reason"] }))} className={selectClass}>
-                  <option value="all">Все причины</option>
-                  {WRITE_OFF_REASONS.map((r) => (
-                    <option key={r} value={r}>
-                      {writeOffReasonLabel(r)}
-                    </option>
-                  ))}
-                </select>
+                <CustomSelect
+                  value={filters.reason}
+                  onValueChange={(v) => setFilters((f) => ({ ...f, reason: v as WriteOffFilters["reason"] }))}
+                  options={[
+                    { value: "all", label: "Все причины" },
+                    ...WRITE_OFF_REASONS.map((r) => ({ value: r, label: writeOffReasonLabel(r) })),
+                  ]}
+                />
               </FilterField>
             </div>
             <div className="mt-4 flex gap-2">

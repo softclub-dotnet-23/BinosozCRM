@@ -2,9 +2,13 @@ import { Building2, Calendar, Copy, Download, FileText, Pencil, Printer, RotateC
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { ReceiptStatusBadge } from "./InventoryStatusBadges";
+import { ResponsiblePersonSummary } from "./ResponsiblePersonField";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
 import { receiptQuantity, receiptTotal } from "../../data/mockMaterialReceipts";
+import { employeesRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { responsiblePersonName } from "../../utils/responsiblePerson";
 import { useToast } from "../../hooks/useToast";
 import type { MaterialReceipt } from "../../types";
 
@@ -18,6 +22,7 @@ interface ReceiptDetailDrawerProps {
 
 export function ReceiptDetailDrawer({ receipt, onClose, onEdit, onDuplicate, onDelete }: ReceiptDetailDrawerProps) {
   const { showToast } = useToast();
+  const employees = useRepositorySnapshot(employeesRepository);
 
   return (
     <Drawer open={Boolean(receipt)} onClose={onClose} title="Поступление">
@@ -46,7 +51,7 @@ export function ReceiptDetailDrawer({ receipt, onClose, onEdit, onDuplicate, onD
               {receipt.warehouse}
             </Row>
             <Row icon={User} label="Ответственный">
-              {receipt.responsible}
+              <ResponsiblePersonSummary value={receipt.responsible} employees={employees} />
             </Row>
           </dl>
 
@@ -82,7 +87,7 @@ export function ReceiptDetailDrawer({ receipt, onClose, onEdit, onDuplicate, onD
 
           <div className="border-t border-border pt-4 text-xs text-ink-muted">
             <div className="flex items-center gap-1.5">
-              <FileText size={12} /> Создано {formatDateShort(receipt.createdDate)} · {receipt.createdBy}
+              <FileText size={12} /> Создано {formatDateShort(receipt.createdDate)} · {responsiblePersonName(receipt.createdBy, employees)}
             </div>
           </div>
 

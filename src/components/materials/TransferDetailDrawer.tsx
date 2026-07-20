@@ -2,9 +2,13 @@ import { ArrowRight, Ban, Building2, Calendar, Copy, FileText, Pencil, Printer, 
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { TransferStatusBadge } from "./InventoryStatusBadges";
+import { ResponsiblePersonSummary } from "./ResponsiblePersonField";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
 import { transferQuantity, transferTotal } from "../../data/mockMaterialTransfers";
+import { employeesRepository } from "../../data/repositories";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { responsiblePersonName } from "../../utils/responsiblePerson";
 import { useToast } from "../../hooks/useToast";
 import type { MaterialTransfer } from "../../types";
 
@@ -19,6 +23,7 @@ interface TransferDetailDrawerProps {
 
 export function TransferDetailDrawer({ transfer, onClose, onEdit, onDuplicate, onCancel, onDelete }: TransferDetailDrawerProps) {
   const { showToast } = useToast();
+  const employees = useRepositorySnapshot(employeesRepository);
   return (
     <Drawer open={Boolean(transfer)} onClose={onClose} title="Перемещение">
       {transfer && (
@@ -43,7 +48,7 @@ export function TransferDetailDrawer({ transfer, onClose, onEdit, onDuplicate, o
               </Row>
             )}
             <Row icon={User} label="Ответственный">
-              {transfer.responsible}
+              <ResponsiblePersonSummary value={transfer.responsible} employees={employees} />
             </Row>
           </dl>
 
@@ -86,7 +91,7 @@ export function TransferDetailDrawer({ transfer, onClose, onEdit, onDuplicate, o
 
           <div className="border-t border-border pt-4 text-xs text-ink-muted">
             <div className="flex items-center gap-1.5">
-              <FileText size={12} /> Создано {formatDateShort(transfer.createdDate)} · {transfer.createdBy}
+              <FileText size={12} /> Создано {formatDateShort(transfer.createdDate)} · {responsiblePersonName(transfer.createdBy, employees)}
             </div>
           </div>
 

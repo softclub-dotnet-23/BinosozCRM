@@ -11,7 +11,10 @@ import type {
   MaterialTransfer,
   MaterialWriteOff,
   ConstructionObject,
+  PayrollRecord,
   StaffMember,
+  StockAdjustment,
+  StockReservation,
   Work,
 } from "../types";
 import { mockObjects } from "./mockObjects";
@@ -27,6 +30,9 @@ import { mockMaterials } from "./mockMaterials";
 import { mockMaterialReceipts } from "./mockMaterialReceipts";
 import { mockMaterialWriteOffs } from "./mockMaterialWriteOffs";
 import { mockMaterialTransfers } from "./mockMaterialTransfers";
+import { mockStockReservations } from "./mockStockReservations";
+import { mockStockAdjustments } from "./mockStockAdjustments";
+import { mockPayroll } from "./mockPayroll";
 
 /**
  * Single source of truth for every persisted entity collection in the app.
@@ -48,6 +54,19 @@ export const assignmentsRepository = createCollectionRepository<Assignment>("ass
 export const staffRepository = createCollectionRepository<StaffMember>("staff.v1", mockStaff);
 export const attendanceRepository = createCollectionRepository<AttendanceRecord>("attendance.v1", mockAttendance);
 export const materialsRepository = createCollectionRepository<Material>("materials.v1", mockMaterials);
+
+// One-time migration: browsers that persisted "materials.v1" before the `updatedAt`
+// field existed have materials without it. Backfill instead of crashing every reader
+// that formats it (Stock page, detail drawers, exports).
+(() => {
+  const snapshot = materialsRepository.getSnapshot();
+  const needsMigration = snapshot.some((m) => !m.updatedAt);
+  if (needsMigration) {
+    void materialsRepository.setAll(
+      snapshot.map((m) => (m.updatedAt ? m : { ...m, updatedAt: new Date().toISOString() })),
+    );
+  }
+})();
 export const materialReceiptsRepository = createCollectionRepository<MaterialReceipt>(
   "material-receipts.v1",
   mockMaterialReceipts,
@@ -60,3 +79,12 @@ export const materialTransfersRepository = createCollectionRepository<MaterialTr
   "material-transfers.v1",
   mockMaterialTransfers,
 );
+export const stockReservationsRepository = createCollectionRepository<StockReservation>(
+  "stock-reservations.v1",
+  mockStockReservations,
+);
+export const stockAdjustmentsRepository = createCollectionRepository<StockAdjustment>(
+  "stock-adjustments.v1",
+  mockStockAdjustments,
+);
+export const payrollRepository = createCollectionRepository<PayrollRecord>("payroll.v1", mockPayroll);

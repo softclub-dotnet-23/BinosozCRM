@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { TeamBuilder } from "./TeamBuilder";
 import { mockObjects } from "../../data/mockObjects";
 import { mockEmployees } from "../../data/mockEmployees";
@@ -193,13 +194,15 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
         </Field>
 
         <Field label="Статус">
-          <select value={form.status} onChange={(e) => update("status", e.target.value as BrigadeStatus)} className={inputClass}>
-            {(Object.keys(BRIGADE_STATUS_CONFIG) as BrigadeStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {BRIGADE_STATUS_CONFIG[s].label}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            className="mt-1.5"
+            value={form.status}
+            onValueChange={(v) => update("status", v as BrigadeStatus)}
+            options={(Object.keys(BRIGADE_STATUS_CONFIG) as BrigadeStatus[]).map((s) => ({
+              value: s,
+              label: BRIGADE_STATUS_CONFIG[s].label,
+            }))}
+          />
         </Field>
 
         <div className="sm:col-span-2">
@@ -219,13 +222,13 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
         </Field>
 
         <Field label="Объект">
-          <select value={form.objectId} onChange={(e) => update("objectId", e.target.value)} className={inputClass}>
-            {mockObjects.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.objectId}
+            onValueChange={(v) => update("objectId", v)}
+            options={mockObjects.map((o) => ({ value: o.id, label: o.name }))}
+          />
         </Field>
 
         <div className="sm:col-span-2">

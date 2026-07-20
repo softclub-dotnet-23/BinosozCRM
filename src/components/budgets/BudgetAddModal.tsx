@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { mockObjects } from "../../data/mockObjects";
 import type { BudgetLine, BudgetLineStatus } from "../../types";
@@ -102,27 +103,22 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Объект">
-          <select value={form.objectId} onChange={(e) => update("objectId", e.target.value)} className={inputClass}>
-            {mockObjects.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            searchable
+            className="mt-1.5"
+            value={form.objectId}
+            onValueChange={(v) => update("objectId", v)}
+            options={mockObjects.map((o) => ({ value: o.id, label: o.name }))}
+          />
         </Field>
 
         <Field label="Статус">
-          <select
+          <CustomSelect
+            className="mt-1.5"
             value={form.status}
-            onChange={(e) => update("status", e.target.value as BudgetLineStatus)}
-            className={inputClass}
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => update("status", v as BudgetLineStatus)}
+            options={STATUS_OPTIONS}
+          />
         </Field>
 
         <Field label="Общий бюджет, сомони" error={errors.totalBudget}>

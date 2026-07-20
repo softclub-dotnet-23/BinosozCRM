@@ -10,13 +10,11 @@ import { AttentionList } from "../components/tables/AttentionList";
 import { BudgetChart } from "../components/charts/BudgetChart";
 import { BudgetSummaryBlocks } from "../components/dashboard/BudgetSummaryBlocks";
 import { PayrollCard } from "../components/dashboard/PayrollCard";
-import {
-  attentionItems,
-  budgetSeriesByPeriod,
-  dashboardKpis,
-  objectStateRows,
-  payrollSummary,
-} from "../data/mockDashboard";
+import { attentionItems, budgetSeriesByPeriod, dashboardKpis, objectStateRows } from "../data/mockDashboard";
+import { payrollRepository } from "../data/repositories";
+import { useRepositoryState } from "../hooks/useRepositoryState";
+import { getDashboardPayrollSummary } from "../utils/payrollAnalytics";
+import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatPercent } from "../utils/format";
 import type { PeriodFilter } from "../types";
 
@@ -29,13 +27,36 @@ const PERIOD_TABS: { key: PeriodFilter; label: string }[] = [
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [period, setPeriod] = useState<PeriodFilter>("month");
+  const [payrollRecords, setPayrollRecords] = useRepositoryState(payrollRepository);
 
   const chartData = budgetSeriesByPeriod[period];
   const remaining = dashboardKpis.totalBudget - dashboardKpis.spentBudget;
   const budgetProgress = Math.round((dashboardKpis.spentBudget / dashboardKpis.totalBudget) * 100);
 
   const overBudget = useMemo(() => Math.max(0, dashboardKpis.spentBudget - dashboardKpis.totalBudget), []);
+  const payrollSummary = useMemo(() => getDashboardPayrollSummary(payrollRecords), [payrollRecords]);
+
+  function transitionBatch(status: "pending_approval" | "returned", nextStatus: "approved" | "returned", comment: string) {
+    const now = new Date().toISOString();
+    const actor = "Садди Имомов";
+    setPayrollRecords((prev) =>
+      prev.map((r) => {
+        if (r.status !== status || !payrollSummary || r.periodLabel !== payrollSummary.period) return r;
+        return {
+          ...r,
+          status: nextStatus,
+          updatedAt: now,
+          ...(nextStatus === "approved" ? { approvedBy: actor, approvedAt: now } : { returnedBy: actor, returnedAt: now, returnReason: comment }),
+          statusHistory: [
+            ...r.statusHistory,
+            { id: `${r.id}-${r.statusHistory.length + 1}`, status: nextStatus, date: now, actor, comment: comment || (nextStatus === "approved" ? "Утверждено с Обзора" : "") },
+          ],
+        };
+      }),
+    );
+  }
 
   return (
     <AppLayout title="Обзор компании" subtitle="Контроль объектов, финансов и выполнения работ">
@@ -131,7 +152,19 @@ export default function DashboardPage() {
           </div>
         </Card>
 
-        <PayrollCard summary={payrollSummary} />
+        {payrollSummary && (
+          <PayrollCard
+            summary={payrollSummary}
+            onApprove={() => {
+              transitionBatch("pending_approval", "approved", "");
+              showToast("Зарплата утверждена");
+            }}
+            onReturn={(comment) => {
+              transitionBatch("pending_approval", "returned", comment);
+              showToast("Расчёт возвращён бухгалтеру", "info");
+            }}
+          />
+        )}
       </div>
     </AppLayout>
   );

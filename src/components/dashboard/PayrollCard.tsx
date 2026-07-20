@@ -6,12 +6,16 @@ import { Avatar } from "../ui/Avatar";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Modal } from "../ui/Modal";
 import { formatCurrency, formatNumber } from "../../utils/format";
-import { useToast } from "../../hooks/useToast";
 import type { PayrollSummary } from "../../types";
 
-export function PayrollCard({ summary }: { summary: PayrollSummary }) {
-  const { showToast } = useToast();
-  const [status, setStatus] = useState(summary.status);
+interface PayrollCardProps {
+  summary: PayrollSummary;
+  onApprove: () => void;
+  onReturn: (comment: string) => void;
+}
+
+export function PayrollCard({ summary, onApprove, onReturn }: PayrollCardProps) {
+  const status = summary.status;
   const [approveOpen, setApproveOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [comment, setComment] = useState("");
@@ -74,10 +78,7 @@ export function PayrollCard({ summary }: { summary: PayrollSummary }) {
         title="Утвердить зарплату?"
         description={`Период: ${summary.period}. Итого к выплате: ${formatCurrency(summary.toPay)}.`}
         confirmLabel="Утвердить"
-        onConfirm={() => {
-          setStatus("approved");
-          showToast("Зарплата утверждена");
-        }}
+        onConfirm={onApprove}
       />
 
       <Modal
@@ -93,9 +94,8 @@ export function PayrollCard({ summary }: { summary: PayrollSummary }) {
             <Button
               variant="danger"
               onClick={() => {
-                setStatus("returned");
+                onReturn(comment.trim());
                 setReturnOpen(false);
-                showToast("Расчёт возвращён бухгалтеру", "info");
                 setComment("");
               }}
             >
