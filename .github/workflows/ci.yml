@@ -1,0 +1,32 @@
+name: CI
+
+# master is already covered by backend-ci.yml (build+test+vulnerability
+# check) — trigger here is scoped to feature/* only, so pushes/PRs against
+# master don't run two workflows doing the same build+test in parallel.
+on:
+  push:
+    branches: ["feature/**"]
+  pull_request:
+    branches: ["feature/**"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore backend/backend.slnx
+
+      - name: Build
+        run: dotnet build backend/backend.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test backend/backend.slnx --configuration Release --no-build
