@@ -1,0 +1,263 @@
+import { mockObjects } from "./mockObjects";
+import type { Brigade } from "../types";
+
+function findObject(id: string) {
+  const object = mockObjects.find((o) => o.id === id);
+  if (!object) throw new Error(`Unknown mock object id: ${id}`);
+  return object;
+}
+
+interface RawBrigade {
+  number: number;
+  name: string;
+  specialization: string;
+  foremanName: string;
+  workersCount: number;
+  helpersCount: number;
+  objectId: string;
+  sectionName: string;
+  currentWork: string;
+  workProgress: number;
+  remainingDays: number;
+  efficiency: number;
+  status: Brigade["status"];
+  createdDate: string;
+  /** Target roster size used to compute staffing completeness (members / capacity). */
+  staffingCapacity: number;
+}
+
+// Brigades 1-6 reproduce the reference screenshot's table exactly. Brigades 7-12 extend the
+// roster so KPIs (12 total brigades, 86 assigned employees) are internally consistent.
+const RAW_BRIGADES: RawBrigade[] = [
+  {
+    number: 1,
+    name: "Бригада №1",
+    specialization: "Монолитные работы",
+    foremanName: "Фируз Рахмонов",
+    workersCount: 10,
+    helpersCount: 2,
+    objectId: "obj-1",
+    sectionName: "Подготовительные работы",
+    currentWork: "Устройство котлована",
+    workProgress: 70,
+    remainingDays: 3,
+    efficiency: 85,
+    status: "active",
+    createdDate: "2026-01-15",
+    staffingCapacity: 13,
+  },
+  {
+    number: 2,
+    name: "Бригада №2",
+    specialization: "Кладочные работы",
+    foremanName: "Комрон Саидов",
+    workersCount: 8,
+    helpersCount: 0,
+    objectId: "obj-2",
+    sectionName: "Монтажные работы",
+    currentWork: "Кладка стен 1-го этажа",
+    workProgress: 45,
+    remainingDays: 5,
+    efficiency: 65,
+    status: "active",
+    createdDate: "2026-02-01",
+    staffingCapacity: 9,
+  },
+  {
+    number: 3,
+    name: "Бригада №3",
+    specialization: "Отделочные работы",
+    foremanName: "Шариф Давлатов",
+    workersCount: 7,
+    helpersCount: 2,
+    objectId: "obj-3",
+    sectionName: "Отделочные работы",
+    currentWork: "Штукатурка стен",
+    workProgress: 20,
+    remainingDays: 7,
+    efficiency: 40,
+    status: "active",
+    createdDate: "2026-03-01",
+    staffingCapacity: 11,
+  },
+  {
+    number: 4,
+    name: "Бригада №4",
+    specialization: "Электромонтажные работы",
+    foremanName: "Мухиддин Холов",
+    workersCount: 6,
+    helpersCount: 0,
+    objectId: "obj-1",
+    sectionName: "Инженерные сети",
+    currentWork: "Прокладка кабеля",
+    workProgress: 80,
+    remainingDays: 2,
+    efficiency: 90,
+    status: "active",
+    createdDate: "2026-01-20",
+    staffingCapacity: 8,
+  },
+  {
+    number: 5,
+    name: "Бригада №5",
+    specialization: "Сантехнические работы",
+    foremanName: "Далер Юсупов",
+    workersCount: 6,
+    helpersCount: 1,
+    objectId: "obj-4",
+    sectionName: "Инженерные сети",
+    currentWork: "Монтаж трубопроводов",
+    workProgress: 60,
+    remainingDays: 4,
+    efficiency: 75,
+    status: "active",
+    createdDate: "2026-02-10",
+    staffingCapacity: 12,
+  },
+  {
+    number: 6,
+    name: "Бригада №6",
+    specialization: "Благоустройство",
+    foremanName: "Нозим Икромов",
+    workersCount: 8,
+    helpersCount: 2,
+    objectId: "obj-13",
+    sectionName: "Благоустройство",
+    currentWork: "Укладка бордюров",
+    workProgress: 10,
+    remainingDays: 10,
+    efficiency: 30,
+    status: "paused",
+    createdDate: "2026-04-01",
+    staffingCapacity: 22,
+  },
+  {
+    number: 7,
+    name: "Бригада №7",
+    specialization: "Столярные работы",
+    foremanName: "Рахим Назаров",
+    workersCount: 5,
+    helpersCount: 1,
+    objectId: "obj-7",
+    sectionName: "Отделочные работы",
+    currentWork: "Монтаж дверных блоков",
+    workProgress: 55,
+    remainingDays: 6,
+    efficiency: 25,
+    status: "active",
+    createdDate: "2026-03-15",
+    staffingCapacity: 7,
+  },
+  {
+    number: 8,
+    name: "Бригада №8",
+    specialization: "Кровельные работы",
+    foremanName: "Азизбек Юсупов",
+    workersCount: 4,
+    helpersCount: 1,
+    objectId: "obj-8",
+    sectionName: "Кровельные работы",
+    currentWork: "Устройство кровли",
+    workProgress: 35,
+    remainingDays: 8,
+    efficiency: 20,
+    status: "active",
+    createdDate: "2026-04-10",
+    staffingCapacity: 7,
+  },
+  {
+    number: 9,
+    name: "Бригада №9",
+    specialization: "Малярные работы",
+    foremanName: "Бахтиёр Курбонов",
+    workersCount: 5,
+    helpersCount: 1,
+    objectId: "obj-9",
+    sectionName: "Отделочные работы",
+    currentWork: "Покраска фасада",
+    workProgress: 15,
+    remainingDays: 9,
+    efficiency: 15,
+    status: "forming",
+    createdDate: "2026-05-01",
+    staffingCapacity: 12,
+  },
+  {
+    number: 10,
+    name: "Бригада №10",
+    specialization: "Земляные работы",
+    foremanName: "Гулмурод Шарипов",
+    workersCount: 7,
+    helpersCount: 0,
+    objectId: "obj-10",
+    sectionName: "Подготовительные работы",
+    currentWork: "Разработка котлована",
+    workProgress: 90,
+    remainingDays: 1,
+    efficiency: 28,
+    status: "active",
+    createdDate: "2026-01-25",
+    staffingCapacity: 8,
+  },
+  {
+    number: 11,
+    name: "Бригада №11",
+    specialization: "Фасадные работы",
+    foremanName: "Зафар Одинаев",
+    workersCount: 4,
+    helpersCount: 1,
+    objectId: "obj-11",
+    sectionName: "Отделочные работы",
+    currentWork: "Утепление фасада",
+    workProgress: 0,
+    remainingDays: 12,
+    efficiency: 0,
+    status: "inactive",
+    createdDate: "2026-05-20",
+    staffingCapacity: 11,
+  },
+  {
+    number: 12,
+    name: "Бригада №12",
+    specialization: "Демонтажные работы",
+    foremanName: "Рустам Каримов",
+    workersCount: 4,
+    helpersCount: 1,
+    objectId: "obj-12",
+    sectionName: "Подготовительные работы",
+    currentWork: "Демонтаж старых конструкций",
+    workProgress: 25,
+    remainingDays: 5,
+    efficiency: 22,
+    status: "overloaded",
+    createdDate: "2026-06-01",
+    staffingCapacity: 6,
+  },
+];
+
+export const mockBrigades: Brigade[] = RAW_BRIGADES.map((raw) => {
+  const object = findObject(raw.objectId);
+  const membersCount = raw.workersCount + raw.helpersCount;
+  return {
+    id: `brigade-${raw.number}`,
+    number: raw.number,
+    name: raw.name,
+    specialization: raw.specialization,
+    foremanName: raw.foremanName,
+    membersCount,
+    workersCount: raw.workersCount,
+    helpersCount: raw.helpersCount,
+    objectId: object.id,
+    objectName: object.name,
+    objectType: object.objectType,
+    imageUrl: object.imageUrl,
+    sectionName: raw.sectionName,
+    currentWork: raw.currentWork,
+    workProgress: raw.workProgress,
+    remainingDays: raw.remainingDays,
+    efficiency: raw.efficiency,
+    status: raw.status,
+    createdDate: raw.createdDate,
+    staffingCapacity: raw.staffingCapacity,
+  };
+});

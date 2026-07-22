@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #ff6b00;
+  --color-primary-hover: #e85f00;
+  --color-primary-soft: #fff2e8;
+
+  --color-ink: #171717;
+  --color-ink-secondary: #6b7280;
+  --color-ink-muted: #9ca3af;
+
+  --color-app-bg: #fafaf9;
+  --color-card: #ffffff;
+  --color-border: #ededed;
+  --color-border-strong: #e4e4e4;
+
+  --color-green: #22a447;
+  --color-green-soft: #eaf7ed;
+  --color-blue: #2869c9;
+  --color-blue-soft: #edf4ff;
+  --color-red: #e83939;
+  --color-red-soft: #fff0f0;
+  --color-warning: #f58a1f;
+  --color-warning-soft: #fff5e8;
+  --color-purple: #9333ea;
+  --color-purple-soft: #f5ecff;
+
+  --shadow-card: 0 1px 2px rgba(23, 23, 23, 0.04), 0 4px 16px rgba(23, 23, 23, 0.04);
+  --shadow-card-hover: 0 2px 4px rgba(23, 23, 23, 0.05), 0 8px 24px rgba(23, 23, 23, 0.07);
+  --shadow-popover: 0 8px 24px rgba(23, 23, 23, 0.10), 0 2px 8px rgba(23, 23, 23, 0.06);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-app-bg);
+    color: var(--color-ink);
+    font-feature-settings: "tnum" 1, "cv05" 1;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #d4d4d4;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
