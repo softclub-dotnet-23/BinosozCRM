@@ -22,6 +22,8 @@ import { computeAttendanceKpis, computeAttendanceStatusSlices, computeFrequentLa
 import { useToast } from "../hooks/useToast";
 import { formatDateShort, formatWeekdayShort } from "../utils/date";
 import type { AttendanceFilters, AttendanceRecord, AttendanceStatus } from "../types";
+import { useAuth } from "../context/AuthContext";
+import BrigadirAttendancePage from "./BrigadirAttendancePage";
 
 const DEFAULT_FILTERS: AttendanceFilters = {
   objectName: "all",
@@ -45,6 +47,12 @@ const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
 
 export default function AttendancePage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirAttendancePage />;
+  return <CompanyAttendancePage />;
+}
+
+function CompanyAttendancePage() {
   const { showToast } = useToast();
 
   const [records, setRecords] = useRepositoryState(attendanceRepository);

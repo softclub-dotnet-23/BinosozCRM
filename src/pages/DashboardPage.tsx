@@ -10,13 +10,25 @@ import { AttentionList } from "../components/tables/AttentionList";
 import { BudgetChart } from "../components/charts/BudgetChart";
 import { BudgetSummaryBlocks } from "../components/dashboard/BudgetSummaryBlocks";
 import { PayrollCard } from "../components/dashboard/PayrollCard";
-import { attentionItems, budgetSeriesByPeriod, dashboardKpis, objectStateRows } from "../data/mockDashboard";
-import { payrollRepository } from "../data/repositories";
-import { useRepositoryState } from "../hooks/useRepositoryState";
-import { getDashboardPayrollSummary } from "../utils/payrollAnalytics";
+import { budgetSeriesByPeriod } from "../data/mockDashboard";
+import { objectsRepository, worksRepository, materialsRepository, payrollRepository } from "../data/repositories";
+import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
+import { getDashboardPayrollSummary, getUpcomingPayments } from "../utils/payrollAnalytics";
+import { computeWorkAnalytics, computeCriticalWorks } from "../utils/workAnalytics";
+import { getCriticalMaterials } from "../utils/materialAnalytics";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatPercent } from "../utils/format";
-import type { PeriodFilter } from "../types";
+import { formatDateRu } from "../utils/date";
+import type { AttentionItem, ObjectStatus, ObjectSummaryRow, PeriodFilter } from "../types";
+import { useAuth } from "../context/AuthContext";
+import BrigadirDashboardPage from "./BrigadirDashboardPage";
+
+const OBJECT_STATUS_PRIORITY: Record<ObjectStatus, number> = {
+  at_risk: 0,
+  in_progress: 1,
+  almost_done: 2,
+  completed: 3,
+};
 
 const PERIOD_TABS: { key: PeriodFilter; label: string }[] = [
   { key: "week", label: "Неделя" },
@@ -26,17 +38,86 @@ const PERIOD_TABS: { key: PeriodFilter; label: string }[] = [
 ];
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+
+  if (user?.role === "brigadir") return <BrigadirDashboardPage />;
+
+  return <CompanyDashboard />;
+}
+
+function CompanyDashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [period, setPeriod] = useState<PeriodFilter>("month");
   const [payrollRecords, setPayrollRecords] = useRepositoryState(payrollRepository);
+  const objects = useRepositorySnapshot(objectsRepository);
+  const works = useRepositorySnapshot(worksRepository);
+  const materials = useRepositorySnapshot(materialsRepository);
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const dashboardKpis = useMemo(() => {
+    const totalBudget = objects.reduce((sum, o) => sum + o.budget, 0);
+    const spentBudget = objects.reduce((sum, o) => sum + o.spent, 0);
+    const completedObjects = objects.filter((o) => o.status === "completed").length;
+    const activeObjects = objects.length;
+    const workAnalytics = computeWorkAnalytics(works);
+    return {
+      totalBudget,
+      spentBudget,
+      activeObjects,
+      inProgressObjects: activeObjects - completedObjects,
+      completedObjects,
+      completedWorksPercent: workAnalytics.completedPercent,
+    };
+  }, [objects, works]);
+
+  const objectStateRows: ObjectSummaryRow[] = useMemo(
+    () =>
+      [...objects]
+        .sort(
+          (a, b) =>
+            OBJECT_STATUS_PRIORITY[a.status] - OBJECT_STATUS_PRIORITY[b.status] || a.progress - b.progress,
+        )
+        .slice(0, 6)
+        .map((o) => ({ id: o.id, name: o.name, foreman: o.foreman, progress: o.progress, budget: o.budget, status: o.status })),
+    [objects],
+  );
+
+  const attentionItems: AttentionItem[] = useMemo(() => {
+    const overdueWorks = computeCriticalWorks(works, todayIso, 4).map(({ work, overdueDays }) => ({
+      id: `work-${work.id}`,
+      title: work.title,
+      objectName: work.objectName,
+      responsible: work.responsible.name,
+      alertLabel: `Просрочено на ${overdueDays} дн.`,
+      severity: "red" as const,
+      icon: "clock" as const,
+    }));
+    const criticalMaterials = getCriticalMaterials(materials)
+      .slice(0, 3)
+      .map((material) => ({
+        id: `material-${material.id}`,
+        title: material.name,
+        objectName: material.warehouse,
+        responsible: material.supplier,
+        alertLabel: material.stock <= 0 ? "Остаток исчерпан" : "Остаток ниже минимума",
+        severity: material.stock <= 0 ? ("red" as const) : ("orange" as const),
+        icon: "box" as const,
+      }));
+    return [...overdueWorks, ...criticalMaterials].slice(0, 6);
+  }, [works, materials, todayIso]);
 
   const chartData = budgetSeriesByPeriod[period];
   const remaining = dashboardKpis.totalBudget - dashboardKpis.spentBudget;
-  const budgetProgress = Math.round((dashboardKpis.spentBudget / dashboardKpis.totalBudget) * 100);
+  const budgetProgress = dashboardKpis.totalBudget > 0 ? Math.round((dashboardKpis.spentBudget / dashboardKpis.totalBudget) * 100) : 0;
 
-  const overBudget = useMemo(() => Math.max(0, dashboardKpis.spentBudget - dashboardKpis.totalBudget), []);
+  const overBudget = Math.max(0, dashboardKpis.spentBudget - dashboardKpis.totalBudget);
   const payrollSummary = useMemo(() => getDashboardPayrollSummary(payrollRecords), [payrollRecords]);
+  const nextPayment = useMemo(() => getUpcomingPayments(payrollRecords, 1)[0], [payrollRecords]);
+  const payrollDebt = payrollRecords
+    .filter((r) => r.status !== "paid" && r.status !== "cancelled")
+    .reduce((sum, r) => sum + r.netPayable, 0);
 
   function transitionBatch(status: "pending_approval" | "returned", nextStatus: "approved" | "returned", comment: string) {
     const now = new Date().toISOString();
@@ -84,10 +165,10 @@ export default function DashboardPage() {
         />
         <MetricCard
           label="Задолженность по зарплате"
-          value={formatCurrency(dashboardKpis.payrollDebt)}
+          value={formatCurrency(payrollDebt)}
           icon={Banknote}
           tone="green"
-          footer={<>Следующая выплата: {dashboardKpis.nextPayoutDate}</>}
+          footer={<>Следующая выплата: {nextPayment?.paymentDate ? formatDateRu(nextPayment.paymentDate) : "не запланирована"}</>}
         />
         <MetricCard
           label="Выполненные работы"

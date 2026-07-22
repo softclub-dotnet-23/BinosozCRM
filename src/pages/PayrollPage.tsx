@@ -21,12 +21,13 @@ import { CustomSelect } from "../components/ui/CustomSelect";
 import { payrollRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { canEditPayroll, PAYROLL_ROLE_LABEL, PAYROLL_ROLES } from "../utils/payrollPermissions";
+import { canEditPayroll, toPayrollRole } from "../utils/payrollPermissions";
+import { useAuth } from "../context/AuthContext";
 import { computePayrollKpis, computePayrollStatusBuckets, getUpcomingPayments } from "../utils/payrollAnalytics";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatNumber } from "../utils/format";
 import { formatDateShort } from "../utils/date";
-import type { PayrollFilters, PayrollRecord, PayrollRole, PayrollStatus } from "../types";
+import type { PayrollFilters, PayrollRecord, PayrollStatus } from "../types";
 
 const DEFAULT_FILTERS: PayrollFilters = {
   status: "all",
@@ -61,8 +62,9 @@ function withHistory(record: PayrollRecord, status: PayrollStatus, actor: string
 
 export default function PayrollPage() {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [records, setRecords] = useRepositoryState(payrollRepository);
-  const [role, setRole] = usePersistentState<PayrollRole>("payroll.role", "accountant");
+  const role = toPayrollRole(user!.role);
 
   const [search, setSearch] = usePersistentState("filters.payroll.search", "");
   const [filters, setFilters] = usePersistentState<PayrollFilters>("filters.payroll.filters", DEFAULT_FILTERS);
@@ -118,7 +120,7 @@ export default function PayrollPage() {
   }
 
   function currentActorName(): string {
-    return role === "owner" ? "Садди Имомов" : PAYROLL_ROLE_LABEL[role];
+    return user!.fullName;
   }
 
   function handleGenerate(newRecords: PayrollRecord[]) {
@@ -378,13 +380,6 @@ export default function PayrollPage() {
             <Button variant="outline" size="sm" className="h-9" onClick={handleExport}>
               <Download size={14} /> Экспорт
             </Button>
-            <CustomSelect
-              size="sm"
-              aria-label="Роль"
-              value={role}
-              onValueChange={(v) => setRole(v as PayrollRole)}
-              options={PAYROLL_ROLES.map((r) => ({ value: r, label: `Роль: ${PAYROLL_ROLE_LABEL[r]}` }))}
-            />
           </div>
 
           <Card>

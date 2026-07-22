@@ -20,6 +20,8 @@ interface WorksTableProps {
   onRowClick: (work: Work) => void;
   onAction: (action: WorkActionKind, work: Work) => void;
   todayIso: string;
+  /** Restricts which row actions render, e.g. for roles without Prorab/Admin-level management rights. */
+  actions?: WorkActionKind[];
 }
 
 export function WorksTable({
@@ -32,6 +34,7 @@ export function WorksTable({
   onRowClick,
   onAction,
   todayIso,
+  actions,
 }: WorksTableProps) {
   const columns: DataTableColumn<Work>[] = [
     {
@@ -132,7 +135,7 @@ export function WorksTable({
       className: "text-right sm:!pr-3",
       render: (row) => (
         <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <WorkActionMenu work={row} onAction={onAction} />
+          <WorkActionMenu work={row} onAction={onAction} actions={actions} />
         </div>
       ),
     },

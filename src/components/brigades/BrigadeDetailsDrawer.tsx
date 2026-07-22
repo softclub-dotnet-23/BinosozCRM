@@ -155,7 +155,9 @@ export function BrigadeDetailsDrawer({
                 <Avatar name={m.fullName} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">
-                    {m.fullName} {m.memberRole === "foreman" && <span className="text-xs text-ink-muted">(прораб)</span>}
+                    {m.fullName}{" "}
+                    {m.memberRole === "foreman" && <span className="text-xs text-ink-muted">(прораб)</span>}
+                    {m.memberRole === "brigadir" && <span className="text-xs text-ink-muted">(бригадир)</span>}
                   </p>
                 </div>
                 <EmployeeRoleBadge specialty={m.specialty} />

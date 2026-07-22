@@ -176,7 +176,7 @@ const FEATURED: StaffMember[] = [
     index: 1,
     id: "EMP-0001",
     fullName: "Мирзоев Шахром",
-    position: "Прораб",
+    position: "Бригадир",
     category: "engineer",
     brigadeName: "Бригада №1",
     brigadeSpecialization: "Монолитные работы",

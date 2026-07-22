@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
   Calculator,
@@ -18,7 +18,9 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "../../utils/cn";
-import { OwnerAvatar } from "../ui/OwnerAvatar";
+import { SessionAvatar } from "./SessionAvatar";
+import { useAuth } from "../../context/AuthContext";
+import { isRouteAllowed, ROLE_LABEL } from "../../lib/auth/roleAccess";
 
 interface NavItem {
   to: string;
@@ -78,6 +80,15 @@ const NAV_ITEMS: NavEntry[] = [
   { to: "/settings", label: "Настройки", icon: Settings },
 ];
 
+const BRIGADIR_NAV_ITEMS: NavEntry[] = [
+  { to: "/dashboard", label: "Обзор", icon: Home },
+  { to: "/brigades", label: "Моя бригада", icon: Users },
+  { to: "/works", label: "Назначенные работы", icon: ClipboardCheck },
+  { to: "/attendance", label: "Посещаемость", icon: Calendar },
+  { to: "/inventory/materials", label: "Материалы", icon: Package },
+  { to: "/reports", label: "Отчёты", icon: BarChart3 },
+];
+
 interface SidebarProps {
   collapsed?: boolean;
   mobileOpen?: boolean;
@@ -86,15 +97,32 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
+  const visibleNavItems = useMemo(
+    () =>
+      user
+        ? (user.role === "brigadir" ? BRIGADIR_NAV_ITEMS : NAV_ITEMS).map((entry) =>
+            isNavGroup(entry) ? { ...entry, children: entry.children.filter((c) => isRouteAllowed(user.role, c.to)) } : entry,
+          ).filter((entry) => (isNavGroup(entry) ? entry.children.length > 0 : isRouteAllowed(user.role, entry.to)))
+        : [],
+    [user],
+  );
+
   useEffect(() => {
-    NAV_ITEMS.forEach((entry) => {
+    visibleNavItems.forEach((entry) => {
       if (isNavGroup(entry) && entry.children.some((c) => location.pathname.startsWith(c.to))) {
         setExpandedGroups((prev) => (prev.has(entry.label) ? prev : new Set(prev).add(entry.label)));
       }
     });
-  }, [location.pathname]);
+  }, [location.pathname, visibleNavItems]);
+
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
 
   function toggleGroup(label: string) {
     setExpandedGroups((prev) => {
@@ -151,7 +179,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {NAV_ITEMS.map((entry) => {
+          {visibleNavItems.map((entry) => {
             if (isNavGroup(entry)) {
               const isGroupActive = entry.children.some((c) => location.pathname.startsWith(c.to));
               const isExpanded = expandedGroups.has(entry.label);
@@ -244,26 +272,29 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
           })}
         </nav>
 
-        <div className="border-t border-border p-4">
-          <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-            <OwnerAvatar />
-            {!collapsed && (
-              <div className="min-w-0 leading-tight">
-                <p className="truncate text-sm font-semibold text-ink">Садди Имомов</p>
-                <p className="truncate text-xs text-ink-muted">Владелец</p>
-              </div>
-            )}
+        {user && (
+          <div className="border-t border-border p-4">
+            <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+              <SessionAvatar user={user} />
+              {!collapsed && (
+                <div className="min-w-0 leading-tight">
+                  <p className="truncate text-sm font-semibold text-ink">{user.fullName}</p>
+                  <p className="truncate text-xs text-ink-muted">{ROLE_LABEL[user.role]}</p>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={cn(
+                "mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-[#F7F7F6] hover:text-ink",
+              )}
+            >
+              <LogOut size={16} />
+              {!collapsed && "Выйти"}
+            </button>
           </div>
-          <button
-            type="button"
-            className={cn(
-              "mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-[#F7F7F6] hover:text-ink",
-            )}
-          >
-            <LogOut size={16} />
-            {!collapsed && "Выйти"}
-          </button>
-        </div>
+        )}
       </aside>
     </>
   );

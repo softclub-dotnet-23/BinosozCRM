@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ToastProvider } from "./hooks/useToast";
+import { AuthProvider } from "./context/AuthContext";
+import { ProtectedRoute, PublicOnlyRoute } from "./components/auth/RouteGuards";
+import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ObjectsPage from "./pages/ObjectsPage";
 import EstimatesPage from "./pages/EstimatesPage";
@@ -22,32 +25,44 @@ import SettingsPage from "./pages/SettingsPage";
 
 function App() {
   return (
-    <ToastProvider>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/objects" element={<ObjectsPage />} />
-        <Route path="/estimates" element={<EstimatesPage />} />
-        <Route path="/budgets" element={<BudgetsPage />} />
-        <Route path="/works" element={<WorksPage />} />
-        <Route path="/brigades" element={<BrigadesPage />} />
-        <Route path="/brigades/composition" element={<BrigadeCompositionPage />} />
-        <Route path="/brigades/assignments" element={<AssignmentsPage />} />
-        <Route path="/employees" element={<EmployeesPage />} />
-        <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/warehouse" element={<Navigate to="/inventory/materials" replace />} />
-        <Route path="/inventory/materials" element={<MaterialsPage />} />
-        <Route path="/inventory/receipts" element={<ReceiptsPage />} />
-        <Route path="/inventory/write-offs" element={<WriteOffsPage />} />
-        <Route path="/inventory/transfers" element={<TransfersPage />} />
-        <Route path="/inventory/stock" element={<StockPage />} />
-        <Route path="/payroll" element={<PayrollPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            }
+          />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/objects" element={<ObjectsPage />} />
+            <Route path="/estimates" element={<EstimatesPage />} />
+            <Route path="/budgets" element={<BudgetsPage />} />
+            <Route path="/works" element={<WorksPage />} />
+            <Route path="/brigades" element={<BrigadesPage />} />
+            <Route path="/brigades/composition" element={<BrigadeCompositionPage />} />
+            <Route path="/brigades/assignments" element={<AssignmentsPage />} />
+            <Route path="/employees" element={<EmployeesPage />} />
+            <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/warehouse" element={<Navigate to="/inventory/materials" replace />} />
+            <Route path="/inventory/materials" element={<MaterialsPage />} />
+            <Route path="/inventory/receipts" element={<ReceiptsPage />} />
+            <Route path="/inventory/write-offs" element={<WriteOffsPage />} />
+            <Route path="/inventory/transfers" element={<TransfersPage />} />
+            <Route path="/inventory/stock" element={<StockPage />} />
+            <Route path="/payroll" element={<PayrollPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        </Routes>
+      </ToastProvider>
+    </AuthProvider>
   );
 }
 

@@ -28,6 +28,8 @@ import { usePersistentState } from "../hooks/usePersistentState";
 import { computeCriticalWorks, computeSectionBreakdown, computeWorkAnalytics } from "../utils/workAnalytics";
 import { useToast } from "../hooks/useToast";
 import type { Work, WorkStatus } from "../types";
+import { useAuth } from "../context/AuthContext";
+import BrigadirAssignmentsPage from "./BrigadirAssignmentsPage";
 
 const TODAY_ISO = "2026-07-17";
 
@@ -48,6 +50,12 @@ function matchesTab(status: WorkStatus, tab: TabKey): boolean {
 }
 
 export default function WorksPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirAssignmentsPage />;
+  return <CompanyWorksPage />;
+}
+
+function CompanyWorksPage() {
   const { showToast } = useToast();
 
   const [works, setWorks] = useRepositoryState(worksRepository);

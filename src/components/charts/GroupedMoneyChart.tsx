@@ -17,6 +17,8 @@ interface GroupedMoneyChartProps {
   maxBarSize?: number;
   /** Key on each data row holding the full (un-shortened) category label to show in the tooltip. */
   tooltipLabelKey?: string;
+  /** Recharts XAxis `interval` — number of ticks to skip between labels. 0 (default) shows every tick, fine for a handful of categories; pass a larger value for long daily series to avoid overlapping labels. */
+  tickInterval?: number;
 }
 
 interface CategoryTickProps {
@@ -56,6 +58,7 @@ export function GroupedMoneyChart({
   height = 300,
   maxBarSize = 20,
   tooltipLabelKey,
+  tickInterval = 0,
 }: GroupedMoneyChartProps) {
   const maxValue = Math.max(0, ...data.flatMap((row) => series.map((s) => Number(row[s.key]) || 0)));
   const ticks = computeNiceTicks(maxValue);
@@ -78,7 +81,7 @@ export function GroupedMoneyChart({
             dataKey={categoryKey}
             tickLine={false}
             axisLine={false}
-            interval={0}
+            interval={tickInterval}
             height={40}
             tick={<CategoryTick />}
           />

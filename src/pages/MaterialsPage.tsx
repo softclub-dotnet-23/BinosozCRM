@@ -46,6 +46,7 @@ import { responsiblePersonName } from "../utils/responsiblePerson";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatNumber } from "../utils/format";
 import { formatDateShort } from "../utils/date";
+import { useAuth } from "../context/AuthContext";
 import type { Material, MaterialFilters, MaterialStatus } from "../types";
 
 type TabKey = "all" | "critical" | "categories";
@@ -84,6 +85,10 @@ function stockColorClass(status: MaterialStatus): string {
 export default function MaterialsPage() {
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Brigadir gets read-only visibility into stock (to check availability / report shortages to
+  // their Prorab) but not full warehouse management — that stays with Storekeeper/Prorab/Admin.
+  const canManage = user?.role !== "brigadir";
 
   const [materials, setMaterials] = useRepositoryState(materialsRepository);
   const mockMaterialReceipts = useRepositorySnapshot(materialReceiptsRepository);
@@ -303,19 +308,23 @@ export default function MaterialsPage() {
           <button type="button" aria-label="Просмотреть материал" onClick={() => setViewMaterial(row)} className={iconButtonClass}>
             <Eye size={14} />
           </button>
-          <button type="button" aria-label="Редактировать материал" onClick={() => setFormMaterial(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
-          <DropdownMenu
-            trigger={<span className={iconButtonClass}>⋯</span>}
-            items={[
-              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setViewMaterial(row) },
-              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormMaterial(row) },
-              { label: "Создать поступление", icon: <TrendingUp size={14} />, onClick: () => showToast("Форма поступления пока в разработке", "info") },
-              { label: "Создать списание", icon: <TrendingDown size={14} />, onClick: () => showToast("Форма списания пока в разработке", "info") },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
-            ]}
-          />
+          {canManage && (
+            <>
+              <button type="button" aria-label="Редактировать материал" onClick={() => setFormMaterial(row)} className={iconButtonClass}>
+                <Pencil size={14} />
+              </button>
+              <DropdownMenu
+                trigger={<span className={iconButtonClass}>⋯</span>}
+                items={[
+                  { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setViewMaterial(row) },
+                  { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormMaterial(row) },
+                  { label: "Создать поступление", icon: <TrendingUp size={14} />, onClick: () => showToast("Форма поступления пока в разработке", "info") },
+                  { label: "Создать списание", icon: <TrendingDown size={14} />, onClick: () => showToast("Форма списания пока в разработке", "info") },
+                  { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+                ]}
+              />
+            </>
+          )}
         </div>
       ),
     },
@@ -410,9 +419,11 @@ export default function MaterialsPage() {
 
         <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
           <div className="flex flex-col gap-2">
-            <Button className="w-full" onClick={() => setFormMaterial(null)}>
-              <Plus size={16} /> Добавить материал
-            </Button>
+            {canManage && (
+              <Button className="w-full" onClick={() => setFormMaterial(null)}>
+                <Plus size={16} /> Добавить материал
+              </Button>
+            )}
             <Button variant="outline" className="w-full" onClick={handleExport}>
               <Download size={16} /> Экспорт
             </Button>

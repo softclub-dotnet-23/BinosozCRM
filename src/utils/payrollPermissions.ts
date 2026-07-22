@@ -1,12 +1,10 @@
-import type { PayrollRole, PayrollStatus } from "../types";
+import type { PayrollRole, UserRole, PayrollStatus } from "../types";
 
 /**
- * There's no real authentication/session system in this app yet (the header's
- * "Садди Имомов / Владелец" is static decoration). Payroll's approval chain still
- * needs a role concept to enforce and demo, so PayrollPage exposes a small,
- * persisted "current role" switcher and every action is gated through these
- * functions — centralized so they map cleanly onto real backend authorization
- * once accounts/roles exist.
+ * Payroll's approval chain is gated through these functions using the real
+ * logged-in user's role (see AuthContext / toPayrollRole below) — centralized
+ * so the same rules stay in one place regardless of where the session role
+ * comes from.
  */
 export const PAYROLL_TRANSITIONS: Record<PayrollStatus, PayrollStatus[]> = {
   prepared: ["pending_approval", "needs_review", "cancelled"],
@@ -68,4 +66,14 @@ export const PAYROLL_ROLE_LABEL: Record<PayrollRole, string> = {
   prorab: "Прораб",
 };
 
-export const PAYROLL_ROLES: PayrollRole[] = ["accountant", "owner", "prorab"];
+/**
+ * PayrollRole only distinguishes the three roles Payroll actually branches
+ * on. An administrator account carries the same authority as the owner here;
+ * brigadir/storekeeper never reach this page (see roleAccess.ts) but fall
+ * back to the least-privileged option rather than something that would type-error.
+ */
+export function toPayrollRole(role: UserRole): PayrollRole {
+  if (role === "owner" || role === "administrator") return "owner";
+  if (role === "accountant") return "accountant";
+  return "prorab";
+}

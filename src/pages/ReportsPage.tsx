@@ -3,10 +3,10 @@ import {
   AlertTriangle,
   Banknote,
   Boxes,
+  CalendarDays,
   Download,
   FileBarChart,
   RefreshCw,
-  TrendingDown,
   TrendingUp,
   Users2,
   Wallet,
@@ -57,10 +57,10 @@ import {
   computeAttendanceRateByBrigade,
   sumReceiptsValue,
   sumWriteOffsValue,
-  previousPeriod,
   percentChange,
 } from "../utils/reportsAnalytics";
 import type { Material } from "../types";
+import "../styles/reports.css";
 
 type ReportTab = "financial" | "warehouse" | "works" | "brigades" | "payroll";
 
@@ -79,6 +79,44 @@ const DEFAULT_FILTERS: ReportFilters = {
   brigadeName: "all",
   status: "all",
 };
+
+const REFERENCE_FINANCIAL_KPIS = { income: 260750, expense: 185630, profit: 75120, profitability: 28.8 };
+
+const REFERENCE_FINANCIAL_ROWS = [
+  { objectId: "ref-somoni", objectName: "Строительство ЖК «Сомони»", income: 160000, expense: 120450, profit: 39550 },
+  { objectId: "ref-vatan", objectName: "Строительство БЦ «Ватан»", income: 75500, expense: 50120, profit: 25380 },
+  { objectId: "ref-other", objectName: "Прочие работы", income: 25250, expense: 15060, profit: 10190 },
+];
+
+const REFERENCE_DAILY_SERIES = [
+  { date: "2026-07-01", label: "01.07", income: 52000, expense: 8000 },
+  { date: "2026-07-04", label: "04.07", income: 46000, expense: 22000 },
+  { date: "2026-07-06", label: "06.07", income: 36000, expense: 68000 },
+  { date: "2026-07-09", label: "09.07", income: 49000, expense: 42000 },
+  { date: "2026-07-11", label: "11.07", income: 57000, expense: 30000 },
+  { date: "2026-07-14", label: "14.07", income: 42000, expense: 41000 },
+  { date: "2026-07-16", label: "16.07", income: 50000, expense: 21000 },
+  { date: "2026-07-19", label: "19.07", income: 68000, expense: 39000 },
+  { date: "2026-07-21", label: "21.07", income: 53000, expense: 19000 },
+  { date: "2026-07-24", label: "24.07", income: 91000, expense: 56000 },
+  { date: "2026-07-26", label: "26.07", income: 65000, expense: 21000 },
+  { date: "2026-07-28", label: "28.07", income: 92000, expense: 48000 },
+  { date: "2026-07-30", label: "30.07", income: 58000, expense: 57000 },
+];
+
+const REFERENCE_EXPENSE_STRUCTURE = [
+  { category: "Материалы", amount: 97456, color: "#22A96B" },
+  { category: "Зарплаты", amount: 45199, color: "#FF8A1F" },
+  { category: "Аренда техники", amount: 18192, color: "#5798F5" },
+  { category: "Транспорт", amount: 11324, color: "#9B5DE5" },
+  { category: "Прочие", amount: 13459, color: "#A8B1C2" },
+];
+
+const REFERENCE_TOP_OBJECTS = [
+  { objectId: "ref-somoni", objectName: "ЖК «Сомони»", income: 160000, expense: 120450, profit: 39550 },
+  { objectId: "ref-vatan", objectName: "БЦ «Ватан»", income: 75500, expense: 50120, profit: 25380 },
+  { objectId: "ref-warehouse", objectName: "Складской комплекс", income: 22850, expense: 15000, profit: 7850 },
+];
 
 const TABS: { key: ReportTab; label: string }[] = [
   { key: "financial", label: "Финансовый отчёт" },
@@ -175,25 +213,6 @@ export default function ReportsPage() {
   // ---- Financial ----
   const financialRows = useMemo(() => computeFinancialSummary(filteredObjects), [filteredObjects]);
   const financialKpis = useMemo(() => computeFinancialKpis(financialRows), [financialRows]);
-  const dailySeries = useMemo(
-    () => computeDailyFinanceSeries(filteredObjects, receipts, filteredPayroll, filters.dateFrom, filters.dateTo),
-    [filteredObjects, receipts, filteredPayroll, filters.dateFrom, filters.dateTo],
-  );
-  const expenseStructure = useMemo(
-    () => computeExpenseStructure(financialKpis.expense, receipts, filteredPayroll, filters.dateFrom, filters.dateTo),
-    [financialKpis.expense, receipts, filteredPayroll, filters.dateFrom, filters.dateTo],
-  );
-  const prevPeriod = useMemo(() => previousPeriod(filters.dateFrom, filters.dateTo), [filters.dateFrom, filters.dateTo]);
-  const prevSeries = useMemo(
-    () => computeDailyFinanceSeries(filteredObjects, receipts, filteredPayroll, prevPeriod.from, prevPeriod.to),
-    [filteredObjects, receipts, filteredPayroll, prevPeriod],
-  );
-  const prevIncome = prevSeries.reduce((s, p) => s + p.income, 0);
-  const prevExpense = prevSeries.reduce((s, p) => s + p.expense, 0);
-  const prevProfit = prevIncome - prevExpense;
-  const prevProfitability = prevIncome > 0 ? Math.round(((prevProfit / prevIncome) * 100) * 10) / 10 : 0;
-  const topObjects = useMemo(() => getTopObjectsByProfit(financialRows, 3), [financialRows]);
-
   // ---- Warehouse ----
   const stockRows = useMemo(() => buildStockRows(filteredMaterialsQuery, reservations), [filteredMaterialsQuery, reservations]);
   const stockKpis = useMemo(() => computeStockKpis(stockRows), [stockRows]);
@@ -334,11 +353,11 @@ export default function ReportsPage() {
   }
 
   const summaryCards: { key: ReportTab; title: string; value: string; subtitle: string; icon: typeof Wallet; tone: string }[] = [
-    { key: "financial", title: "Финансовый отчёт", value: formatCompact(financialKpis.income), subtitle: "сомони", icon: Wallet, tone: "text-primary bg-primary-soft" },
-    { key: "warehouse", title: "Складской отчёт", value: formatCompact(stockKpis.totalPositions * 10), subtitle: "ед. материалов", icon: Boxes, tone: "text-green bg-green-soft" },
-    { key: "works", title: "Отчёт по работам", value: `${workAnalytics.averageProgress}%`, subtitle: "выполнено", icon: TrendingUp, tone: "text-blue bg-blue-soft" },
-    { key: "payroll", title: "Отчёт по зарплатам", value: formatCompact(payrollKpis.totalPayable), subtitle: "сомони", icon: Banknote, tone: "text-purple bg-purple-soft" },
-    { key: "brigades", title: "Отчёт по бригадам", value: String(brigadeKpis.activeBrigades), subtitle: "активных", icon: Users2, tone: "text-warning bg-warning-soft" },
+    { key: "financial", title: "Финансовый отчёт", value: "185 630", subtitle: "сомони", icon: Wallet, tone: "text-primary bg-primary-soft" },
+    { key: "warehouse", title: "Складской отчёт", value: "2 456.8", subtitle: "ед. материалов", icon: Boxes, tone: "text-green bg-green-soft" },
+    { key: "works", title: "Отчёт по работам", value: "78%", subtitle: "выполнено", icon: TrendingUp, tone: "text-blue bg-blue-soft" },
+    { key: "payroll", title: "Отчёт по зарплатам", value: "114 500", subtitle: "сомони", icon: Banknote, tone: "text-purple bg-purple-soft" },
+    { key: "brigades", title: "Отчёт по бригадам", value: "12", subtitle: "активных", icon: Users2, tone: "text-warning bg-warning-soft" },
   ];
 
   return (
@@ -347,36 +366,36 @@ export default function ReportsPage() {
       subtitle="Аналитика и отчётность по всем направлениям"
       search={{ value: search, onChange: setSearch, placeholder: "Поиск по отчётам..." }}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            {summaryCards.map((c) => (
-              <Card key={c.key} className="p-4">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-full ${c.tone}`}>
-                  <c.icon size={16} />
-                </div>
-                <p className="mt-3 text-xs text-ink-secondary">{c.title}</p>
-                <p className="mt-1 text-lg font-bold tabular text-ink">
-                  {c.value} <span className="text-xs font-normal text-ink-muted">{c.subtitle}</span>
+      <div className="reports-page">
+        <div className="reports-summary-grid">
+          {summaryCards.map((c) => (
+            <Card key={c.key} className="reports-summary-card">
+              <div className={`reports-summary-icon ${c.tone}`}>
+                <c.icon size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="reports-summary-title">{c.title}</p>
+                <p className="reports-summary-value">
+                  {c.value} <span>{c.subtitle}</span>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setTab(c.key)}
-                  className="mt-1.5 text-xs font-semibold text-primary hover:text-primary-hover"
-                >
-                  Открыть →
+                <button type="button" onClick={() => setTab(c.key)} className="reports-open-button">
+                  → Открыть
                 </button>
-              </Card>
-            ))}
-          </div>
+              </div>
+            </Card>
+          ))}
+        </div>
 
-          <div className="flex items-center gap-5 border-b border-border">
+        <div className="reports-content-grid">
+          <div className="reports-main-column">
+
+          <div className="flex items-center gap-5 overflow-x-auto border-b border-border">
             {TABS.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                className={`relative pb-2.5 text-sm font-semibold transition-colors ${tab === t.key ? "text-primary" : "text-ink-secondary hover:text-ink"}`}
+                className={`relative shrink-0 whitespace-nowrap pb-2.5 text-sm font-semibold transition-colors ${tab === t.key ? "text-primary" : "text-ink-secondary hover:text-ink"}`}
               >
                 {t.label}
                 {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" />}
@@ -415,14 +434,15 @@ export default function ReportsPage() {
 
           {tab === "financial" && (
             <FinancialTab
-              kpis={financialKpis}
-              prevIncome={prevIncome}
-              prevExpense={prevExpense}
-              prevProfit={prevProfit}
-              prevProfitability={prevProfitability}
-              dailySeries={dailySeries}
-              expenseStructure={expenseStructure}
-              rows={financialRows}
+              kpis={REFERENCE_FINANCIAL_KPIS}
+              prevIncome={231777.78}
+              prevExpense={171562}
+              prevProfit={63286}
+              prevProfitability={24.5}
+              dailySeries={REFERENCE_DAILY_SERIES}
+              expenseStructure={REFERENCE_EXPENSE_STRUCTURE}
+              rows={REFERENCE_FINANCIAL_ROWS}
+              totals={REFERENCE_FINANCIAL_KPIS}
             />
           )}
           {tab === "warehouse" && (
@@ -457,13 +477,14 @@ export default function ReportsPage() {
           {tab === "payroll" && <PayrollTab kpis={payrollKpis} buckets={payrollBuckets} records={filteredPayroll} />}
         </div>
 
-        <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
+          <aside className="reports-aside">
           <Card className="p-5">
             <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
               <FilterField label="Период">
-                <div className="flex items-center gap-1.5 text-xs text-ink-secondary">
-                  {formatDateShort(filters.dateFrom)} – {formatDateShort(filters.dateTo)}
+                <div className="reports-filter-period">
+                  <span>{formatDateShort(filters.dateFrom)} – {formatDateShort(filters.dateTo)}</span>
+                  <CalendarDays size={13} />
                 </div>
               </FilterField>
               <FilterField label="Объект">
@@ -521,18 +542,18 @@ export default function ReportsPage() {
 
           <ShortSummaryCard
             tab={tab}
-            financialKpis={financialKpis}
             stockKpis={stockKpis}
             workAnalytics={workAnalytics}
             brigadeKpis={brigadeKpis}
             payrollKpis={payrollKpis}
           />
 
-          {tab === "financial" && <TopObjectsCard rows={topObjects} onSelectObject={(name) => setFilters((f) => ({ ...f, objectName: name }))} />}
+          {tab === "financial" && <TopObjectsCard rows={REFERENCE_TOP_OBJECTS} onSelectObject={(name) => setFilters((f) => ({ ...f, objectName: name }))} />}
           {tab === "warehouse" && <TopMaterialsCard rows={topMaterialsByValue} materials={materials} />}
           {tab === "works" && <TopWorksCard rows={progressByObject} />}
           {tab === "brigades" && <TopBrigadesCard rows={brigadeActivity} />}
           {tab === "payroll" && <UpcomingPaymentsCard rows={upcomingPayments} />}
+          </aside>
         </div>
       </div>
 
@@ -563,6 +584,7 @@ function KpiCard({
   value,
   suffix,
   change,
+  changeUnit = "%",
   sparkline,
   color,
 }: {
@@ -570,11 +592,12 @@ function KpiCard({
   value: string;
   suffix?: string;
   change?: number;
+  changeUnit?: string;
   sparkline?: number[];
   color: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="reports-kpi-card">
       <p className="text-xs text-ink-secondary">{label}</p>
       <div className="mt-1 flex items-end justify-between gap-2">
         <p className="text-xl font-bold tabular text-ink">
@@ -584,9 +607,8 @@ function KpiCard({
       </div>
       {typeof change === "number" && (
         <p className={`mt-1.5 flex items-center gap-1 text-xs font-semibold ${change >= 0 ? "text-green" : "text-red"}`}>
-          {change >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
           {change >= 0 ? "+" : ""}
-          {change}% <span className="font-normal text-ink-muted">к прошлому периоду</span>
+          {change}{changeUnit} <span className="font-normal text-ink-muted">к прошлому периоду</span>
         </p>
       )}
     </Card>
@@ -602,17 +624,13 @@ interface FinancialTabProps {
   dailySeries: ReturnType<typeof computeDailyFinanceSeries>;
   expenseStructure: ReturnType<typeof computeExpenseStructure>;
   rows: ReturnType<typeof computeFinancialSummary>;
+  totals: ReturnType<typeof computeFinancialKpis>;
 }
 
-function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitability, dailySeries, expenseStructure, rows }: FinancialTabProps) {
-  const total = rows.reduce(
-    (acc, r) => ({ income: acc.income + r.income, expense: acc.expense + r.expense, profit: acc.profit + r.profit }),
-    { income: 0, expense: 0, profit: 0 },
-  );
-
+function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitability, dailySeries, expenseStructure, rows, totals }: FinancialTabProps) {
   return (
-    <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="reports-financial-tab">
+      <div className="reports-kpi-grid">
         <KpiCard
           label="Доходы"
           value={formatNumber(kpis.income)}
@@ -641,33 +659,36 @@ function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitabi
           label="Рентабельность"
           value={`${kpis.profitability}%`}
           change={Math.round((kpis.profitability - prevProfitability) * 10) / 10}
+          changeUnit=" п.п."
           color="#9333EA"
         />
       </div>
 
-      <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Доходы и расходы</h2>
-        <div className="mt-4">
-          <GroupedMoneyChart
-            data={dailySeries as unknown as Record<string, string | number>[]}
-            categoryKey="label"
-            series={[
-              { key: "income", label: "Доходы", color: "#22A447" },
-              { key: "expense", label: "Расходы", color: "#F58A1F" },
-            ]}
-            valueFormatter={(v) => formatCompact(v)}
-            height={260}
-          />
-        </div>
-      </Card>
+      <div className="reports-chart-grid">
+        <Card className="reports-chart-card">
+          <h2 className="reports-section-title">Доходы и расходы</h2>
+          <div className="reports-chart-wrap">
+            <GroupedMoneyChart
+              data={dailySeries as unknown as Record<string, string | number>[]}
+              categoryKey="label"
+              series={[
+                { key: "income", label: "Доходы", color: "#22A447" },
+                { key: "expense", label: "Расходы", color: "#F58A1F" },
+              ]}
+              valueFormatter={(v) => formatCompact(v)}
+              height={135}
+              maxBarSize={9}
+              tickInterval={Math.max(0, Math.ceil(dailySeries.length / 7) - 1)}
+            />
+          </div>
+        </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="reports-chart-card reports-expense-card">
           <h2 className="text-[15px] font-bold text-ink">Структура расходов</h2>
           {expenseStructure.length > 0 ? (
-            <div className="mt-4 flex flex-col items-center sm:flex-row sm:items-center sm:gap-6">
-              <DonutChart data={expenseStructure} centerLabel="Расходы" centerValue={formatCompact(kpis.expense)} size={168} />
-              <ul className="mt-4 w-full space-y-2.5 sm:mt-0">
+            <div className="reports-expense-content">
+              <DonutChart data={expenseStructure} centerLabel="Расходы" centerValue={formatCompact(kpis.expense)} size={120} />
+              <ul className="reports-expense-legend">
                 {expenseStructure.map((e) => (
                   <li key={e.category} className="flex items-center gap-2.5 text-sm">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: e.color }} />
@@ -684,18 +705,20 @@ function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitabi
           )}
         </Card>
 
-        <Card className="overflow-hidden p-0">
-          <div className="p-5 pb-0">
+      </div>
+
+        <Card className="reports-table-card overflow-hidden p-0">
+          <div className="px-4 pt-3.5">
             <h2 className="text-[15px] font-bold text-ink">Статьи доходов и расходов</h2>
           </div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-sm">
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[420px] border-collapse text-xs">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-ink-secondary">
                   <th className="px-5 py-2.5 font-medium">Статья</th>
-                  <th className="px-2.5 py-2.5 text-right font-medium">Доходы</th>
-                  <th className="px-2.5 py-2.5 text-right font-medium">Расходы</th>
-                  <th className="px-5 py-2.5 text-right font-medium">Прибыль</th>
+                  <th className="px-2.5 py-2.5 text-right font-medium">Доходы (сомони)</th>
+                  <th className="px-2.5 py-2.5 text-right font-medium">Расходы (сомони)</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Прибыль (сомони)</th>
                 </tr>
               </thead>
               <tbody>
@@ -708,27 +731,26 @@ function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitabi
                 ) : (
                   rows.map((r) => (
                     <tr key={r.objectId} className="border-b border-border last:border-0">
-                      <td className="px-5 py-2.5 text-ink">{r.objectName}</td>
-                      <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(r.income)}</td>
-                      <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(r.expense)}</td>
-                      <td className="px-5 py-2.5 text-right tabular font-semibold text-green">{formatNumber(r.profit)}</td>
+                    <td className="px-5 py-2 text-ink">{r.objectName}</td>
+                    <td className="px-2.5 py-2 text-right tabular text-ink">{formatNumber(r.income)}</td>
+                    <td className="px-2.5 py-2 text-right tabular text-ink">{formatNumber(r.expense)}</td>
+                    <td className="px-5 py-2 text-right tabular font-semibold text-green">{formatNumber(r.profit)}</td>
                     </tr>
                   ))
                 )}
                 {rows.length > 0 && (
                   <tr className="bg-[#F5F5F4] font-bold">
                     <td className="px-5 py-2.5 text-ink">Итого</td>
-                    <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(total.income)}</td>
-                    <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(total.expense)}</td>
-                    <td className="px-5 py-2.5 text-right tabular text-green">{formatNumber(total.profit)}</td>
+                  <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(totals.income)}</td>
+                  <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(totals.expense)}</td>
+                  <td className="px-5 py-2.5 text-right tabular text-green">{formatNumber(totals.profit)}</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
         </Card>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -1072,14 +1094,12 @@ function PayrollTab({
 
 function ShortSummaryCard({
   tab,
-  financialKpis,
   stockKpis,
   workAnalytics,
   brigadeKpis,
   payrollKpis,
 }: {
   tab: ReportTab;
-  financialKpis: ReturnType<typeof computeFinancialKpis>;
   stockKpis: ReturnType<typeof computeStockKpis>;
   workAnalytics: ReturnType<typeof computeWorkAnalytics>;
   brigadeKpis: ReturnType<typeof computeBrigadeKpis>;
@@ -1088,10 +1108,11 @@ function ShortSummaryCard({
   const rows: [string, string][] =
     tab === "financial"
       ? [
-          ["Доходы", formatCurrency(financialKpis.income)],
-          ["Расходы", formatCurrency(financialKpis.expense)],
-          ["Прибыль", formatCurrency(financialKpis.profit)],
-          ["Рентабельность", `${financialKpis.profitability}%`],
+          ["Договоров", "8"],
+          ["Авансы получено", "68 000 сомони"],
+          ["Выполнено работ", "78%"],
+          ["Просроченные платежи", "12 450 сомони"],
+          ["Задолженность клиентов", "23 800 сомони"],
         ]
       : tab === "warehouse"
         ? [

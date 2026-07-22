@@ -23,6 +23,8 @@ interface WorkDetailsDrawerProps {
   onChangeStatus: (workId: string, status: WorkStatus) => void;
   onComplete: (workId: string) => void;
   onAddComment: (workId: string, text: string) => void;
+  /** Hides edit / status-change / complete controls for roles without Prorab/Admin-level management rights (e.g. Brigadir). Progress updates and comments stay available either way. Defaults to true (existing behavior). */
+  allowManagement?: boolean;
 }
 
 export function WorkDetailsDrawer({
@@ -35,6 +37,7 @@ export function WorkDetailsDrawer({
   onChangeStatus,
   onComplete,
   onAddComment,
+  allowManagement = true,
 }: WorkDetailsDrawerProps) {
   const [commentDraft, setCommentDraft] = useState("");
 
@@ -60,13 +63,15 @@ export function WorkDetailsDrawer({
       title={`${work.code} — ${work.title}`}
       footer={
         <div className="grid w-full grid-cols-2 gap-2.5">
-          <Button variant="secondary" onClick={() => onEdit(work)}>
-            <Pencil size={14} /> Редактировать
-          </Button>
-          <Button variant="outline" onClick={() => onUpdateProgress(work)}>
+          {allowManagement && (
+            <Button variant="secondary" onClick={() => onEdit(work)}>
+              <Pencil size={14} /> Редактировать
+            </Button>
+          )}
+          <Button variant="outline" className={!allowManagement ? "col-span-2" : undefined} onClick={() => onUpdateProgress(work)}>
             <TrendingUp size={14} /> Обновить прогресс
           </Button>
-          {!isClosed && (
+          {!isClosed && allowManagement && (
             <Button className="col-span-2" onClick={() => onComplete(work.id)}>
               <CheckCircle2 size={14} /> Завершить работу
             </Button>
@@ -89,18 +94,20 @@ export function WorkDetailsDrawer({
           <WorkStatusBadge status={work.status} />
         </div>
 
-        <label className="mt-2 block text-xs text-ink-secondary">
-          Изменить статус
-          <CustomSelect
-            className="mt-1"
-            value={work.status}
-            onValueChange={(v) => onChangeStatus(work.id, v as WorkStatus)}
-            options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => ({
-              value: s,
-              label: WORK_STATUS_CONFIG[s].label,
-            }))}
-          />
-        </label>
+        {allowManagement && (
+          <label className="mt-2 block text-xs text-ink-secondary">
+            Изменить статус
+            <CustomSelect
+              className="mt-1"
+              value={work.status}
+              onValueChange={(v) => onChangeStatus(work.id, v as WorkStatus)}
+              options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => ({
+                value: s,
+                label: WORK_STATUS_CONFIG[s].label,
+              }))}
+            />
+          </label>
+        )}
 
         <div className="mt-4 flex items-center gap-2.5">
           <Avatar name={work.responsible.name} size="sm" />

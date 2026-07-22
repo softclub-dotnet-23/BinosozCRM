@@ -26,8 +26,16 @@ import {
 } from "../utils/brigadeAnalytics";
 import { useToast } from "../hooks/useToast";
 import type { Brigade } from "../types";
+import { useAuth } from "../context/AuthContext";
+import BrigadirTeamPage from "./BrigadirTeamPage";
 
 export default function BrigadesPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirTeamPage />;
+  return <CompanyBrigadesPage />;
+}
+
+function CompanyBrigadesPage() {
   const { showToast } = useToast();
 
   const [brigades, setBrigades] = useRepositoryState(brigadesRepository);

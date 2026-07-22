@@ -31,6 +31,11 @@ const FEATURED_RAW: RawEmployee[] = [
   { firstName: "Мухиддин", lastName: "Холов", phone: "+992 904 55 66 77", specialty: "Электромонтажник", qualificationGrade: 5, brigadeId: "brigade-4", memberRole: "foreman", shift: "evening", status: "on_shift", assignedDate: "2026-01-20" },
   { firstName: "Далер", lastName: "Юсупов", phone: "+992 905 66 77 88", specialty: "Сантехник", qualificationGrade: 4, brigadeId: "brigade-5", memberRole: "foreman", shift: "day", status: "available", assignedDate: "2026-02-10" },
   { firstName: "Нозим", lastName: "Икромов", phone: "+992 906 77 88 99", specialty: "Разнорабочий", qualificationGrade: 3, brigadeId: "brigade-6", memberRole: "foreman", shift: "day", status: "on_trip", assignedDate: "2026-04-01" },
+  // Team lead of brigade-1's own crew, reporting to that brigade's Прораб (Фируз Рахмонов,
+  // brigade.foremanName) — distinct person, distinct memberRole. This is the only "brigadir"
+  // employee record in the seed data; it's the real link the demo "brigadir" auth account
+  // (shakhrom.mirzoev / Мирзоев Шахром) resolves its own brigade through.
+  { firstName: "Мирзоев", lastName: "Шахром", phone: "+992 90 111 22 33", specialty: "Мастер", qualificationGrade: 5, brigadeId: "brigade-1", memberRole: "brigadir", shift: "day", status: "on_shift", assignedDate: "2026-01-15" },
 ];
 
 type SpecialtyBucket = "monolithic" | "masonry" | "finishing" | "electrical" | "plumbing" | "other";

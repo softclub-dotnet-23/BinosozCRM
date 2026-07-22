@@ -1,13 +1,17 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from "lucide-react";
 import { SearchInput } from "../ui/SearchInput";
-import { OwnerAvatar } from "../ui/OwnerAvatar";
+import { SessionAvatar } from "./SessionAvatar";
+import { ProfileModal } from "./ProfileModal";
 import { useOnClickOutside } from "../../hooks/useOnClickOutside";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
 import { materialsRepository } from "../../data/repositories";
 import { getMaterialStatus } from "../../utils/materialAnalytics";
 import { pluralizeRu } from "../../utils/pluralize";
 import { cn } from "../../utils/cn";
+import { useAuth } from "../../context/AuthContext";
+import { ROLE_LABEL } from "../../lib/auth/roleAccess";
 
 interface HeaderProps {
   title: string;
@@ -29,15 +33,23 @@ const STATIC_NOTIFICATIONS = [
 const DATE_RANGES = ["1 – 30 июль 2026", "1 – 30 июнь 2026", "1 – 31 май 2026", "Текущий квартал"];
 
 export function Header({ title, subtitle, onOpenMobileSidebar, search, action }: HeaderProps) {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [selectedRange, setSelectedRange] = useState(DATE_RANGES[0]);
   const [localSearch, setLocalSearch] = useState("");
 
   const notifRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
 
   const materials = useRepositorySnapshot(materialsRepository);
   const criticalCount = useMemo(() => materials.filter((m) => getMaterialStatus(m) === "critical").length, [materials]);
@@ -147,37 +159,59 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
           )}
         </div>
 
-        <div className="relative" ref={profileRef}>
-          <button
-            type="button"
-            onClick={() => setProfileOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 hover:bg-[#F5F5F4]"
-          >
-            <OwnerAvatar className="h-9 w-9" />
-            <ChevronDown size={14} className="text-ink-muted" />
-          </button>
-          {profileOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]">
-              <div className="px-3 py-2">
-                <p className="text-sm font-semibold text-ink">Садди Имомов</p>
-                <p className="text-xs text-ink-muted">Владелец</p>
+        {user && (
+          <div className="relative" ref={profileRef}>
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 hover:bg-[#F5F5F4]"
+            >
+              <SessionAvatar user={user} className="h-9 w-9" />
+              <ChevronDown size={14} className="text-ink-muted" />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]">
+                <div className="px-3 py-2">
+                  <p className="text-sm font-semibold text-ink">{user.fullName}</p>
+                  <p className="text-xs text-ink-muted">{ROLE_LABEL[user.role]}</p>
+                </div>
+                <div className="my-1 border-t border-border" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    setProfileModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink hover:bg-[#F7F7F6]"
+                >
+                  <UserIcon size={15} /> Профиль
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    navigate("/settings");
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink hover:bg-[#F7F7F6]"
+                >
+                  <Settings size={15} /> Настройки
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red hover:bg-red-soft"
+                >
+                  <LogOut size={15} /> Выйти
+                </button>
               </div>
-              <div className="my-1 border-t border-border" />
-              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink hover:bg-[#F7F7F6]">
-                <UserIcon size={15} /> Профиль
-              </button>
-              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink hover:bg-[#F7F7F6]">
-                <Settings size={15} /> Настройки
-              </button>
-              <button type="button" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red hover:bg-red-soft">
-                <LogOut size={15} /> Выйти
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {action}
       </div>
+
+      {user && <ProfileModal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} user={user} />}
     </header>
   );
 }

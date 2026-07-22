@@ -138,6 +138,7 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
             options={[
               { value: "worker", label: "Рабочий" },
               { value: "helper", label: "Разнорабочий" },
+              { value: "brigadir", label: "Бригадир" },
               { value: "foreman", label: "Прораб" },
             ]}
           />

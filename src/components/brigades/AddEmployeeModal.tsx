@@ -245,6 +245,7 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
             options={[
               { value: "worker", label: "Рабочий" },
               { value: "helper", label: "Разнорабочий" },
+              { value: "brigadir", label: "Бригадир" },
               { value: "foreman", label: "Прораб" },
             ]}
           />

@@ -205,7 +205,7 @@ export type EmployeeStatus = "on_shift" | "on_site" | "available" | "on_trip" | 
 
 export type WorkShift = "day" | "evening" | "night" | "day_off";
 
-export type BrigadeMemberRole = "foreman" | "worker" | "helper";
+export type BrigadeMemberRole = "foreman" | "brigadir" | "worker" | "helper";
 
 export interface Employee {
   id: string;
@@ -650,6 +650,33 @@ export interface PayrollFilters {
   position: string;
   dateFrom: string;
   dateTo: string;
+}
+
+// ---------------------------------------------------------------------------
+// Auth / accounts
+// ---------------------------------------------------------------------------
+
+export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "accountant" | "storekeeper";
+
+export type UserAccountStatus = "active" | "inactive" | "blocked";
+
+export interface UserAccount {
+  id: string;
+  login: string;
+  fullName: string;
+  role: UserRole;
+  status: UserAccountStatus;
+  phone: string;
+  email: string;
+  registeredAt: string;
+}
+
+/** Safe, non-sensitive subset of UserAccount persisted in the session (no status, no password). */
+export interface SessionUser {
+  id: string;
+  login: string;
+  fullName: string;
+  role: UserRole;
 }
 
 export type PayrollRole = "accountant" | "owner" | "prorab";

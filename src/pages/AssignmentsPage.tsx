@@ -241,7 +241,7 @@ export default function AssignmentsPage() {
               { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setDrawerTarget(row) },
               {
                 label: "Редактировать",
-                icon: <Pencil size={14} />,
+                icon: <Pencil size={14} />,  
                 onClick: () => {
                   setEditTarget(row);
                   setFormOpen(true);

@@ -15,6 +15,7 @@ import type {
   StaffMember,
   StockAdjustment,
   StockReservation,
+  UserAccount,
   Work,
 } from "../types";
 import { mockObjects } from "./mockObjects";
@@ -33,6 +34,7 @@ import { mockMaterialTransfers } from "./mockMaterialTransfers";
 import { mockStockReservations } from "./mockStockReservations";
 import { mockStockAdjustments } from "./mockStockAdjustments";
 import { mockPayroll } from "./mockPayroll";
+import { mockUsers } from "./mockUsers";
 
 /**
  * Single source of truth for every persisted entity collection in the app.
@@ -88,3 +90,4 @@ export const stockAdjustmentsRepository = createCollectionRepository<StockAdjust
   mockStockAdjustments,
 );
 export const payrollRepository = createCollectionRepository<PayrollRecord>("payroll.v1", mockPayroll);
+export const usersRepository = createCollectionRepository<UserAccount>("users.v1", mockUsers);
