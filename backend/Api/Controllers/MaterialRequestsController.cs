@@ -67,4 +67,25 @@ public sealed class MaterialRequestsController(ISender sender) : ControllerBase
         var result = await sender.Send(new MarkMaterialRequestOrderedCommand(materialRequestId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpGet("{materialRequestId:guid}")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> Get(Guid materialRequestId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMaterialRequestQuery(materialRequestId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    // MASTER §7.3/§9.4: "недопоставка, комментарий обязателен" — the
+    // Comment/ForceDeliver(comment) gap this codebase's own history flagged
+    // as unresolved (see Domain/Entities/MaterialRequest.cs) is closed as of
+    // this merge, so this endpoint can finally exist.
+    [HttpPost("{materialRequestId:guid}/force-close")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> ForceClose(
+        Guid materialRequestId, ForceCloseMaterialRequestRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ForceCloseMaterialRequestCommand(materialRequestId, request.Comment), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

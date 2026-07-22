@@ -575,6 +575,10 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("BrigadeId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 

@@ -38,4 +38,11 @@ public sealed class MaterialDeliveriesController(ISender sender) : ControllerBas
         var result = await sender.Send(new ListMaterialDeliveriesQuery(clampedPage, clampedPageSize), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpGet("{materialDeliveryId:guid}")]
+    public async Task<IActionResult> Get(Guid materialDeliveryId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMaterialDeliveryQuery(materialDeliveryId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

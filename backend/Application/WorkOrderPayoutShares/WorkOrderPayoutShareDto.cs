@@ -1,6 +1,6 @@
 using Domain.Entities;
 
-namespace Application.WorkOrders;
+namespace Application.WorkOrderPayoutShares;
 
 public sealed record WorkOrderPayoutShareDto(
     Guid Id,
@@ -9,7 +9,8 @@ public sealed record WorkOrderPayoutShareDto(
     decimal SharePercent,
     decimal? Amount,
     Guid SetByUserId,
-    Guid? ApprovedByUserId)
+    Guid? ApprovedByUserId,
+    DateTimeOffset CreatedAt)
 {
     public static WorkOrderPayoutShareDto FromEntity(WorkOrderPayoutShare share) => new(
         share.Id,
@@ -18,5 +19,6 @@ public sealed record WorkOrderPayoutShareDto(
         share.SharePercent,
         share.Amount,
         share.SetByUserId,
-        share.ApprovedByUserId);
+        share.ApprovedByUserId,
+        share.CreatedAt);
 }

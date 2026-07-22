@@ -38,6 +38,14 @@ public sealed class IndividualTasksController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    [HttpGet("{taskId:guid}")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> Get(Guid taskId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetIndividualTaskQuery(taskId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpPost("{taskId:guid}/start")]
     [Authorize(Roles = "Brigadir")]
     public async Task<IActionResult> Start(Guid taskId, CancellationToken cancellationToken)
