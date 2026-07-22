@@ -58,7 +58,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         }
 
         await using var context = fixture.CreateDbContext(prorab);
-        var result = await new CreateAbsenceRecordCommandHandler(context, prorab).Handle(
+        var result = await new CreateAbsenceRecordCommandHandler(context, prorab, new NotUsedFileStorageService()).Handle(
             new CreateAbsenceRecordCommand(workerId, today, today, AbsenceType.SickLeave, true, null, null),
             CancellationToken.None);
 
@@ -76,7 +76,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
 
         await using (var absenceContext = fixture.CreateDbContext(prorab))
         {
-            var absence = await new CreateAbsenceRecordCommandHandler(absenceContext, prorab).Handle(
+            var absence = await new CreateAbsenceRecordCommandHandler(absenceContext, prorab, new NotUsedFileStorageService()).Handle(
                 new CreateAbsenceRecordCommand(workerId, today, today, AbsenceType.Vacation, true, null, null),
                 CancellationToken.None);
             absence.IsSuccess.Should().BeTrue();
@@ -100,7 +100,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         var future = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
         await using (var absenceContext = fixture.CreateDbContext(prorab))
         {
-            var absence = await new CreateAbsenceRecordCommandHandler(absenceContext, prorab).Handle(
+            var absence = await new CreateAbsenceRecordCommandHandler(absenceContext, prorab, new NotUsedFileStorageService()).Handle(
                 new CreateAbsenceRecordCommand(workerId, future, future.AddDays(3), AbsenceType.Vacation, true, null, null),
                 CancellationToken.None);
             absence.IsSuccess.Should().BeTrue();
@@ -122,10 +122,10 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         var from = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(20);
 
         await using var context = fixture.CreateDbContext(prorab);
-        var paid = await new CreateAbsenceRecordCommandHandler(context, prorab).Handle(
+        var paid = await new CreateAbsenceRecordCommandHandler(context, prorab, new NotUsedFileStorageService()).Handle(
             new CreateAbsenceRecordCommand(workerId, from, from, AbsenceType.SickLeave, true, "flu", null),
             CancellationToken.None);
-        var unpaid = await new CreateAbsenceRecordCommandHandler(context, prorab).Handle(
+        var unpaid = await new CreateAbsenceRecordCommandHandler(context, prorab, new NotUsedFileStorageService()).Handle(
             new CreateAbsenceRecordCommand(workerId, from.AddDays(1), from.AddDays(1), AbsenceType.Unpaid, false, null, null),
             CancellationToken.None);
 

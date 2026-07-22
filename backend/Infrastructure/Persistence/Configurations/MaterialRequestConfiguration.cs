@@ -19,6 +19,7 @@ public sealed class MaterialRequestConfiguration : IEntityTypeConfiguration<Mate
         builder.Property(x => x.RequestedAt).HasColumnType("timestamptz");
         builder.Property(x => x.ApprovedAt).HasColumnType("timestamptz");
         builder.Property(x => x.DeliveredAt).HasColumnType("timestamptz");
+        builder.Property(x => x.Comment).HasMaxLength(1000);
         builder.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
