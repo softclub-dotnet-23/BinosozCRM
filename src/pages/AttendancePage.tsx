@@ -84,7 +84,7 @@ function CompanyAttendancePage() {
       if (filters.dateTo && r.date > filters.dateTo) return false;
       return true;
     });
-  }, [records, filters]);
+  }, [records, filters, search]);
 
   const filteredKpis = useMemo(() => computeAttendanceKpis(filteredRecords), [filteredRecords]);
   const statusSlices = useMemo(() => computeAttendanceStatusSlices(filteredKpis), [filteredKpis]);

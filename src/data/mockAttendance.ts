@@ -103,6 +103,7 @@ export const mockAttendance: AttendanceRecord[] = ATTENDANCE_ROSTER.flatMap((emp
     return {
       id: nextId(),
       date,
+      employeeId: employee.id,
       employeeName: employee.fullName,
       position: employee.specialty,
       brigadeName: employee.brigadeName,

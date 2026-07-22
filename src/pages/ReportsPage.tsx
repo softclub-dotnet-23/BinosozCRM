@@ -352,12 +352,14 @@ export default function ReportsPage() {
     showToast("Отчёт экспортирован");
   }
 
+  const totalStockQuantity = stockRows.reduce((sum, r) => sum + r.quantity, 0);
+
   const summaryCards: { key: ReportTab; title: string; value: string; subtitle: string; icon: typeof Wallet; tone: string }[] = [
-    { key: "financial", title: "Финансовый отчёт", value: "185 630", subtitle: "сомони", icon: Wallet, tone: "text-primary bg-primary-soft" },
-    { key: "warehouse", title: "Складской отчёт", value: "2 456.8", subtitle: "ед. материалов", icon: Boxes, tone: "text-green bg-green-soft" },
-    { key: "works", title: "Отчёт по работам", value: "78%", subtitle: "выполнено", icon: TrendingUp, tone: "text-blue bg-blue-soft" },
-    { key: "payroll", title: "Отчёт по зарплатам", value: "114 500", subtitle: "сомони", icon: Banknote, tone: "text-purple bg-purple-soft" },
-    { key: "brigades", title: "Отчёт по бригадам", value: "12", subtitle: "активных", icon: Users2, tone: "text-warning bg-warning-soft" },
+    { key: "financial", title: "Финансовый отчёт", value: formatNumber(financialKpis.expense), subtitle: "сомони", icon: Wallet, tone: "text-primary bg-primary-soft" },
+    { key: "warehouse", title: "Складской отчёт", value: formatNumber(totalStockQuantity), subtitle: "ед. материалов", icon: Boxes, tone: "text-green bg-green-soft" },
+    { key: "works", title: "Отчёт по работам", value: `${workAnalytics.completedPercent}%`, subtitle: "выполнено", icon: TrendingUp, tone: "text-blue bg-blue-soft" },
+    { key: "payroll", title: "Отчёт по зарплатам", value: formatNumber(payrollKpis.totalPayable), subtitle: "сомони", icon: Banknote, tone: "text-purple bg-purple-soft" },
+    { key: "brigades", title: "Отчёт по бригадам", value: String(brigadeKpis.activeBrigades), subtitle: "активных", icon: Users2, tone: "text-warning bg-warning-soft" },
   ];
 
   return (

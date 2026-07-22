@@ -330,6 +330,10 @@ export type StaffStatus = "active" | "vacation" | "dismissed";
 
 export interface StaffMember {
   id: string;
+  /** The real Employee (data/mockEmployees.ts) this payroll/HR profile belongs to — the stable
+   * identity used to match attendance and cross-module data. Every StaffMember maps to exactly
+   * one real Employee; there is no independent fictional payroll roster. */
+  employeeId: string;
   fullName: string;
   position: string;
   category: StaffCategory;
@@ -360,6 +364,7 @@ export type AttendanceStatus = "present" | "late" | "absent";
 export interface AttendanceRecord {
   id: string;
   date: string;
+  employeeId: string;
   employeeName: string;
   position: string;
   brigadeName: string | null;
@@ -603,6 +608,10 @@ export interface PayrollRecord {
   id: string;
   number: number;
   staffId: string;
+  /** Stable Employee identity (data/mockEmployees.ts) — the primary relationship used for
+   * attendance matching and cross-module checks. staffId/employeeName remain for the HR
+   * profile and display, but must never be used to match records across modules. */
+  employeeId: string;
   employeeName: string;
   position: string;
   category: StaffCategory;
@@ -639,6 +648,11 @@ export interface PayrollRecord {
   returnReason: string | null;
   paidAt: string | null;
   note: string;
+  /** True when this record's attendance-based figures (workedDays/absenceDeduction) could not
+   * be computed because no attendance history exists for this employeeId within the period —
+   * e.g. an unassigned free-pool employee. Never silently treated as full attendance; the
+   * record is generated with status "needs_review" instead so it's explicitly flagged. */
+  attendanceDataMissing: boolean;
   createdAt: string;
   updatedAt: string;
   statusHistory: PayrollStatusHistoryEntry[];
