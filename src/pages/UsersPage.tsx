@@ -48,6 +48,7 @@ const EMPTY_FORM: Omit<UserAccount, "id" | "registeredAt"> = {
   phone: "",
   email: "",
   status: "active",
+  employeeId: null,
 };
 
 const TAJIK_PHONE_RE = /^\+992 \d{2} \d{3} ?\d{2} ?\d{2}$|^\+992 9\d{2} \d{2} \d{2} \d{2}$/;
@@ -118,7 +119,7 @@ export default function UsersPage() {
 
   function openUser(user: UserAccount, mode: "view" | "edit") {
     setSelected(user);
-    setForm({ fullName: user.fullName, login: user.login, role: user.role, phone: user.phone, email: user.email, status: user.status });
+    setForm({ fullName: user.fullName, login: user.login, role: user.role, phone: user.phone, email: user.email, status: user.status, employeeId: user.employeeId });
     setFormError("");
     setModalMode(mode);
   }

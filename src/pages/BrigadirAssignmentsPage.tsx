@@ -49,7 +49,7 @@ export default function BrigadirAssignmentsPage() {
   const [progressTarget, setProgressTarget] = useState<Work | null>(null);
   const [drawerTarget, setDrawerTarget] = useState<Work | null>(null);
 
-  const scope = user ? findBrigadirScope(employees, brigades, user.fullName) : null;
+  const scope = user ? findBrigadirScope(employees, brigades, user.employeeId ?? null) : null;
 
   if (!scope) {
     return (

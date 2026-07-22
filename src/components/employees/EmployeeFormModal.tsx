@@ -123,6 +123,9 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
     const brigade = BRIGADE_OPTIONS.find((b) => b.name === form.brigadeName);
     const saved: StaffMember = {
       id: employee?.id ?? `EMP-${String(9000 + Math.floor(Math.random() * 999)).padStart(4, "0")}`,
+      // This legacy free-text form has no real Employee picker, so a brand-new entry created
+      // here has nothing real to link — known gap, see EmployeeFormModal in the audit report.
+      employeeId: employee?.employeeId ?? "",
       fullName: form.fullName.trim(),
       position: form.position.trim(),
       category: form.category,

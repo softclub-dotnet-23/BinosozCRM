@@ -26,7 +26,7 @@ export default function BrigadirTeamPage() {
   const works = useRepositorySnapshot(worksRepository);
   const attendance = useRepositorySnapshot(attendanceRepository);
 
-  const scope = user ? findBrigadirScope(employees, brigades, user.fullName) : null;
+  const scope = user ? findBrigadirScope(employees, brigades, user.employeeId ?? null) : null;
 
   if (!scope) {
     return (

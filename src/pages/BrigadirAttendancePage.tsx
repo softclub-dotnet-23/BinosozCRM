@@ -40,7 +40,7 @@ export default function BrigadirAttendancePage() {
   const [formRecord, setFormRecord] = useState<AttendanceRecord | null | undefined>(undefined);
   const [viewRecord, setViewRecord] = useState<AttendanceRecord | null>(null);
 
-  const scope = user ? findBrigadirScope(employees, brigades, user.fullName) : null;
+  const scope = user ? findBrigadirScope(employees, brigades, user.employeeId ?? null) : null;
 
   if (!scope) {
     return (

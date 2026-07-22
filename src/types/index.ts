@@ -683,6 +683,11 @@ export interface UserAccount {
   phone: string;
   email: string;
   registeredAt: string;
+  /** Real Employee (data/mockEmployees.ts) this account's field identity resolves through —
+   * the stable, ID-based link for Brigadir/Prorab-style accounts whose own brigade/crew scope
+   * depends on knowing who they are in the Employees/Brigades data. Null for accounts with no
+   * field-employee counterpart (e.g. Owner, Accountant, admin-only roles). */
+  employeeId: string | null;
 }
 
 /** Safe, non-sensitive subset of UserAccount persisted in the session (no status, no password). */
@@ -691,6 +696,7 @@ export interface SessionUser {
   login: string;
   fullName: string;
   role: UserRole;
+  employeeId: string | null;
 }
 
 export type PayrollRole = "accountant" | "owner" | "prorab";

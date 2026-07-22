@@ -109,6 +109,7 @@ export function AttendanceFormModal({ open, record, onClose, onSave }: Attendanc
     const saved: AttendanceRecord = {
       id: record?.id ?? `att-new-${Date.now()}`,
       date: form.date,
+      employeeId: roster?.employeeId ?? record?.employeeId ?? "",
       employeeName: form.employeeName,
       position: roster?.position ?? "",
       brigadeName: form.brigadeName || null,

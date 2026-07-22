@@ -1,4 +1,5 @@
 import { mockStaff } from "./mockStaff";
+import { mockAttendance } from "./mockAttendance";
 import { calculatePayrollRecord } from "../utils/payrollAnalytics";
 import type { PayrollRecord, PayrollStatus, PayrollStatusHistoryEntry } from "../types";
 
@@ -97,18 +98,22 @@ export const mockPayroll: PayrollRecord[] = activeStaff.map((staff, i) => {
     periodStart: PERIOD_START,
     periodEnd: PERIOD_END,
     periodLabel: PERIOD_LABEL,
-    attendance: [],
+    attendance: mockAttendance,
     options: {},
     preparedBy: PREPARED_BY,
     number: i + 1,
   });
+  const id = `pay-${String(i + 1).padStart(4, "0")}`;
   const seeded: PayrollRecord = {
     ...base,
-    id: `pay-${String(i + 1).padStart(4, "0")}`,
+    id,
     preparedAt: PREPARED_AT,
     createdAt: PREPARED_AT,
     updatedAt: PREPARED_AT,
-    statusHistory: [{ id: `pay-${String(i + 1).padStart(4, "0")}-h0`, status: "prepared", date: PREPARED_AT, actor: PREPARED_BY, comment: "Расчёт сформирован" }],
+    statusHistory: [{ id: `${id}-h0`, status: base.status, date: PREPARED_AT, actor: PREPARED_BY, comment: base.statusHistory[0].comment }],
   };
+  // A record already flagged for missing attendance stays "needs_review" — the demo status
+  // cycle (paid/pending/prepared/...) never overrides that real, explicit flag.
+  if (base.attendanceDataMissing) return seeded;
   return applyStatus(seeded, STATUS_CYCLE[i % STATUS_CYCLE.length], i);
 });

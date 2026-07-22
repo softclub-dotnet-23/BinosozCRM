@@ -1,4 +1,4 @@
-import { Banknote, Calendar, Download, FileText, Pencil, Printer, Users2, Wallet, XCircle } from "lucide-react";
+import { AlertTriangle, Banknote, Calendar, Download, FileText, Pencil, Printer, Users2, Wallet, XCircle } from "lucide-react";
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
@@ -110,10 +110,25 @@ export function PayrollDetailDrawer({
             <Row icon={Calendar} label="Период">
               {record.periodLabel}
             </Row>
-            <Row icon={Wallet} label="Отработано">
-              {record.workedDays} из {record.totalDays} дней
-            </Row>
+            {!record.attendanceDataMissing && (
+              <Row icon={Wallet} label="Отработано">
+                {record.workedDays} из {record.totalDays} дней
+              </Row>
+            )}
           </dl>
+
+          {record.attendanceDataMissing && (
+            <div className="flex items-start gap-2.5 rounded-lg bg-warning-soft px-3.5 py-2.5">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" />
+              <div>
+                <p className="text-xs font-semibold text-warning">Нет данных посещаемости</p>
+                <p className="mt-1 text-sm text-ink">
+                  За этот период не найдено ни одной отметки посещаемости для этого сотрудника — удержание за неявки не
+                  применялось. Проверьте вручную перед утверждением.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-[10px] border border-border-strong px-4 py-3 text-sm">
             <RowValue label="Оклад" value={formatCurrency(record.baseSalary)} />

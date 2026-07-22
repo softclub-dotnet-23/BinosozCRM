@@ -83,7 +83,7 @@ export function PayrollGenerateModal({ open, existingRecords, onClose, onGenerat
   });
 
   const alreadyGenerated = eligibleStaff.filter((s) =>
-    existingRecords.some((r) => r.staffId === s.id && r.periodStart === form.periodStart && r.periodEnd === form.periodEnd),
+    existingRecords.some((r) => r.employeeId === s.employeeId && r.periodStart === form.periodStart && r.periodEnd === form.periodEnd),
   );
   const toGenerate = eligibleStaff.filter((s) => !alreadyGenerated.includes(s));
 

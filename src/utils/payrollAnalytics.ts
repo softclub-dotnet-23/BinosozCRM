@@ -12,18 +12,21 @@ export function countWorkingDays(startISO: string, endISO: string): number {
   return Math.max(count, 1);
 }
 
-/** Days actually attended in the period, or null if no attendance is tracked for this person. */
+/**
+ * Days actually attended in the period, matched by the stable `employeeId` (never by name —
+ * names collide/reorder across modules), or null if no attendance is tracked for this person
+ * within the period at all (e.g. an unassigned free-pool employee, or a period predating their
+ * attendance history). Callers must treat null as "unknown," never as "zero absences."
+ */
 export function countAttendedDays(
-  employeeName: string,
+  employeeId: string,
   periodStart: string,
   periodEnd: string,
   attendance: AttendanceRecord[],
 ): number | null {
-  const records = attendance.filter(
-    (a) => a.employeeName === employeeName && a.date >= periodStart && a.date <= periodEnd && a.status !== "absent",
-  );
-  const anyTrackedInPeriod = attendance.some((a) => a.employeeName === employeeName && a.date >= periodStart && a.date <= periodEnd);
-  return anyTrackedInPeriod ? records.length : null;
+  const inPeriod = attendance.filter((a) => a.employeeId === employeeId && a.date >= periodStart && a.date <= periodEnd);
+  if (inPeriod.length === 0) return null;
+  return inPeriod.filter((a) => a.status !== "absent").length;
 }
 
 const DEFAULT_TAX_RATE = 0.08;
@@ -67,10 +70,15 @@ export function calculatePayrollRecord(params: {
   const options = { ...DEFAULT_GENERATION_OPTIONS, ...params.options };
 
   const totalDays = countWorkingDays(periodStart, periodEnd);
-  const attended = countAttendedDays(staff.fullName, periodStart, periodEnd, attendance);
-  const workedDays = attended ?? totalDays;
+  const attended = countAttendedDays(staff.employeeId, periodStart, periodEnd, attendance);
+  // No attendance tracked for this employee in this period (e.g. an unassigned free-pool
+  // worker) — never silently assume full attendance. workedDays still needs a number for
+  // display, but no absence deduction is applied against an unverified assumption, and the
+  // record is generated already flagged for review instead of "prepared".
+  const attendanceDataMissing = attended === null;
+  const workedDays = attendanceDataMissing ? totalDays : attended;
   const dailyRate = staff.salary / totalDays;
-  const absenceDeduction = round2(dailyRate * Math.max(0, totalDays - workedDays));
+  const absenceDeduction = attendanceDataMissing ? 0 : round2(dailyRate * Math.max(0, totalDays - workedDays));
   const overtimeAmount = round2(options.overtimeHours * options.overtimeRate);
 
   const totalAccrued = round2(staff.salary + overtimeAmount + options.bonuses + options.allowances);
@@ -78,11 +86,17 @@ export function calculatePayrollRecord(params: {
   const totalDeductions = round2(absenceDeduction + taxDeduction + options.advanceDeduction + options.otherDeductions);
   const netPayable = round2(totalAccrued - totalDeductions);
 
+  const initialStatus: PayrollStatus = attendanceDataMissing ? "needs_review" : "prepared";
+  const initialComment = attendanceDataMissing
+    ? "Расчёт сформирован — нет данных о посещаемости за период, требуется проверка"
+    : "Расчёт сформирован";
+
   const now = new Date().toISOString();
   return {
     id: `pay-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
     number,
     staffId: staff.id,
+    employeeId: staff.employeeId,
     employeeName: staff.fullName,
     position: staff.position,
     category: staff.category,
@@ -105,7 +119,8 @@ export function calculatePayrollRecord(params: {
     totalAccrued,
     totalDeductions,
     netPayable,
-    status: "prepared",
+    status: initialStatus,
+    attendanceDataMissing,
     paymentDate: null,
     paymentMethod: null,
     paymentReference: null,
@@ -121,7 +136,7 @@ export function calculatePayrollRecord(params: {
     note: "",
     createdAt: now,
     updatedAt: now,
-    statusHistory: [{ id: `${now}-created`, status: "prepared", date: now, actor: preparedBy, comment: "Расчёт сформирован" }],
+    statusHistory: [{ id: `${now}-created`, status: initialStatus, date: now, actor: preparedBy, comment: initialComment }],
   };
 }
 
@@ -135,7 +150,7 @@ export interface PayrollKpis {
 export function computePayrollKpis(records: PayrollRecord[]): PayrollKpis {
   return {
     totalPayable: records.reduce((sum, r) => sum + r.netPayable, 0),
-    employeeCount: new Set(records.map((r) => r.staffId)).size,
+    employeeCount: new Set(records.map((r) => r.employeeId)).size,
     totalAccrued: records.reduce((sum, r) => sum + r.totalAccrued, 0),
     totalDeductions: records.reduce((sum, r) => sum + r.totalDeductions, 0),
   };

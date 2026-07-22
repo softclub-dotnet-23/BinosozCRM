@@ -16,8 +16,8 @@ export type AuthResult = AuthSuccess | AuthFailure;
 
 const INVALID_CREDENTIALS_ERROR = "Неверный логин или пароль";
 
-function toSessionUser(id: string, login: string, fullName: string, role: SessionUser["role"]): SessionUser {
-  return { id, login, fullName, role };
+function toSessionUser(id: string, login: string, fullName: string, role: SessionUser["role"], employeeId: string | null): SessionUser {
+  return { id, login, fullName, role, employeeId };
 }
 
 /**
@@ -50,5 +50,5 @@ export async function authenticate(loginInput: string, password: string): Promis
     return { ok: false, error: "Доступ к системе ограничен" };
   }
 
-  return { ok: true, user: toSessionUser(account.id, account.login, account.fullName, account.role) };
+  return { ok: true, user: toSessionUser(account.id, account.login, account.fullName, account.role, account.employeeId) };
 }

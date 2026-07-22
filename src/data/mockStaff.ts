@@ -2,6 +2,25 @@ import { mockEmployees } from "./mockEmployees";
 import { mockBrigades } from "./mockBrigades";
 import type { Employee, StaffCategory, StaffMember, StaffStatus } from "../types";
 
+/** Real brigades, for the "add/transfer staff" forms' brigade picker (components/employees/*). */
+interface BrigadeInfo {
+  name: string;
+  specialization: string;
+}
+
+export const BRIGADE_OPTIONS: BrigadeInfo[] = mockBrigades.map((b) => ({ name: b.name, specialization: b.specialization }));
+
+/**
+ * Office/ITR department options for staff not tied to a brigade. `mockEmployees` only models
+ * field crew (brigade-assigned or unassigned bench workers) — it has no admin/office employee
+ * concept — so unlike brigades, there's no real source to derive this list from; it stays a
+ * fixed, independent list for the manual "add staff" flow.
+ */
+const ITR_DEPARTMENTS = ["Отдел ПТО", "Отдел смет", "Отдел технадзора"];
+const ADMIN_DEPARTMENTS = ["Бухгалтерия", "Отдел кадров", "Юридический отдел", "Секретариат", "Отдел снабжения", "Дирекция"];
+export const DEPARTMENT_OPTIONS: string[] = [...ITR_DEPARTMENTS, ...ADMIN_DEPARTMENTS];
+export type { BrigadeInfo };
+
 /**
  * Payroll's HR profile roster is derived 1:1 from the real Employees (data/mockEmployees.ts) —
  * every StaffMember.employeeId points at a real, currently-existing Employee, so name/position/
