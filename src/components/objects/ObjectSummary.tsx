@@ -11,14 +11,17 @@ import { Avatar } from "../ui/Avatar";
 import { formatCurrency } from "../../utils/format";
 import { formatDateRu } from "../../utils/date";
 import { getProgressTone } from "../../utils/progress";
+import { useLanguage } from "../../context/LanguageContext";
 
 export function ObjectSummary({ object }: { object: ConstructionObject }) {
   const navigate = useNavigate();
+  const { strings } = useLanguage();
+  const s = strings.objects;
   const remaining = object.budget - object.spent;
 
   return (
     <Card className="overflow-hidden">
-      <PageHeader title="Сводка по выбранному объекту" />
+      <PageHeader title={s.summaryTitle} />
       <div className="h-40 w-full overflow-hidden">
         <ObjectImage src={object.imageUrl} type={object.objectType} alt={object.name} />
       </div>
@@ -33,29 +36,29 @@ export function ObjectSummary({ object }: { object: ConstructionObject }) {
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <StatusBadge status={object.status} />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F5F5F4] px-2.5 py-1 text-xs font-medium text-ink-secondary">
-            <CalendarDays size={12} /> Срок: {formatDateRu(object.deadline)}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-3 px-2.5 py-1 text-xs font-medium text-ink-secondary">
+            <CalendarDays size={12} /> {s.summaryDeadlineChip(formatDateRu(object.deadline))}
           </span>
         </div>
 
         <dl className="mt-4 space-y-2.5 text-sm">
-          <SummaryRow label="Дата начала" value={formatDateRu(object.startDate)} />
-          <SummaryRow label="Крайний срок" value={formatDateRu(object.deadline)} />
-          <SummaryRow label="Бюджет" value={formatCurrency(object.budget)} />
-          <SummaryRow label="Потрачено" value={formatCurrency(object.spent)} />
-          <SummaryRow label="Остаток бюджета" value={formatCurrency(remaining)} />
+          <SummaryRow label={s.summaryStartDate} value={formatDateRu(object.startDate)} />
+          <SummaryRow label={s.summaryDeadline} value={formatDateRu(object.deadline)} />
+          <SummaryRow label={s.summaryBudget} value={formatCurrency(object.budget)} />
+          <SummaryRow label={s.summarySpent} value={formatCurrency(object.spent)} />
+          <SummaryRow label={s.summaryRemaining} value={formatCurrency(remaining)} />
         </dl>
 
         <div className="mt-4">
           <div className="flex items-center justify-between text-xs text-ink-secondary">
-            <span>Прогресс выполнения</span>
+            <span>{s.summaryProgress}</span>
             <span className="font-semibold text-ink">{object.progress}%</span>
           </div>
           <ProgressBar value={object.progress} tone={getProgressTone(object.status, object.progress)} className="mt-2" />
         </div>
 
         <Button variant="secondary" className="mt-5 w-full" onClick={() => navigate(`/objects/${object.id}`)}>
-          Открыть детальную страницу
+          {s.summaryOpenDetail}
         </Button>
       </div>
     </Card>

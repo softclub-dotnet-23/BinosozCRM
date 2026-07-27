@@ -5,6 +5,7 @@ import { EmployeeRoleBadge } from "./EmployeeRoleBadge";
 import { ShiftBadge } from "./ShiftBadge";
 import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
 import { EmployeeActionMenu, type EmployeeActionKind } from "./EmployeeActionMenu";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Employee } from "../../types";
 
 const COLUMN_COUNT = 6;
@@ -17,63 +18,70 @@ interface BrigadeCompositionTableProps {
 }
 
 export function BrigadeCompositionTable({ employees, loading, onRowClick, onAction }: BrigadeCompositionTableProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
   const columns: DataTableColumn<Employee>[] = [
     {
       key: "employee",
-      header: "Сотрудник",
+      header: s.colEmployee,
+      sticky: "left",
+      width: "182px",
       className: "sm:!pl-3",
       headerClassName: "sm:!pl-3",
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <Avatar name={row.fullName} size="sm" />
           <div className="min-w-0 max-w-[130px]">
-            <p className="truncate text-[13px] font-semibold text-ink">{row.fullName}</p>
-            <p className="truncate text-xs text-ink-secondary">{row.qualificationGrade} разряд</p>
+            <p className="truncate text-sm font-semibold text-ink">{row.fullName}</p>
+            <p className="truncate text-xs text-ink-secondary">{s.gradeSuffix(row.qualificationGrade)}</p>
           </div>
         </div>
       ),
     },
     {
       key: "brigade",
-      header: "Бригада / Роль",
+      header: s.colBrigadeRole,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
         <div className="min-w-0 max-w-[130px] space-y-1">
-          <p className="truncate text-[13px] text-ink">{row.brigadeName ?? "—"}</p>
+          <p className="truncate text-sm text-ink">{row.brigadeName ?? "—"}</p>
           <EmployeeRoleBadge specialty={row.specialty} />
         </div>
       ),
     },
     {
       key: "object",
-      header: "Объект / Смена",
+      header: s.colObjectShift,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
         <div className="min-w-0 max-w-[120px] space-y-1">
-          <p className="truncate text-[13px] text-ink">{row.objectName ?? "—"}</p>
+          <p className="truncate text-sm text-ink">{row.objectName ?? "—"}</p>
           <ShiftBadge shift={row.shift} />
         </div>
       ),
     },
     {
       key: "status",
-      header: "Статус",
+      header: c.colStatus,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => <EmployeeStatusBadge status={row.status} />,
     },
     {
       key: "phone",
-      header: "Телефон",
+      header: c.colPhone,
       className: "px-1.5 whitespace-nowrap",
       headerClassName: "px-1.5",
       render: (row) => <span className="whitespace-nowrap tabular text-ink-secondary">{row.phone}</span>,
     },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
+      sticky: "right",
+      width: "56px",
       headerClassName: "text-right sm:!pr-3",
       className: "text-right sm:!pr-3",
       render: (row) => (

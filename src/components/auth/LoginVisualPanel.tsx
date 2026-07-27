@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Building2, ChartNoAxesCombined, UsersRound } from "lucide-react";
+import { AppLogo } from "../common/AppLogo";
 import type { LoginStrings } from "./loginTranslations";
 
 const FEATURE_ICONS = [Building2, UsersRound, ChartNoAxesCombined];
@@ -111,11 +112,7 @@ export function LoginVisualPanel({ strings }: LoginVisualPanelProps) {
 
       <div className="login-visual__content">
         <div className="login-visual__brand">
-          <img src="/images/binosoz-mark.svg" alt="" className="login-visual__logo" />
-          <div>
-            <p className="login-visual__brand-name">BINOSOZ</p>
-            <p className="login-visual__brand-tag">Construction Management CRM</p>
-          </div>
+          <AppLogo className="app-logo" />
         </div>
 
         <div className="login-visual__heading">

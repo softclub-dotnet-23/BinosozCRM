@@ -3,6 +3,7 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { mockBrigades } from "../../data/mockAssignments";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
 import type { AssignmentStatus } from "../../types";
 
 export interface AssignmentFiltersState {
@@ -34,13 +35,17 @@ interface AssignmentFiltersProps {
 }
 
 export function AssignmentFiltersCard({ filters, onChange, onApply, onReset }: AssignmentFiltersProps) {
+  const { strings } = useLanguage();
+  const a = strings.assignments;
+  const w = strings.works;
+  const c = strings.common;
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold text-ink">Фильтры</h2>
+      <h2 className="text-lg font-bold text-ink">{c.filtersButton}</h2>
 
       <div className="mt-4 space-y-4">
         <div>
-          <p className="text-sm font-medium text-ink">Период</p>
+          <p className="text-sm font-medium text-ink">{w.periodLabel}</p>
           <div className="mt-1.5 space-y-2">
             <input
               type="date"
@@ -58,36 +63,36 @@ export function AssignmentFiltersCard({ filters, onChange, onApply, onReset }: A
         </div>
 
         <label className="block text-sm font-medium text-ink">
-          Прораб
+          {c.roleLabels.prorab}
           <CustomSelect
             className="mt-1.5"
             value={filters.foremanName}
             onValueChange={(v) => onChange({ ...filters, foremanName: v })}
             options={[
-              { value: "all", label: "Все прорабы" },
+              { value: "all", label: a.allForemenOption },
               ...mockBrigades.map((b) => ({ value: b.foremanName, label: b.foremanName })),
             ]}
           />
         </label>
 
         <label className="block text-sm font-medium text-ink">
-          Бригада
+          {c.colBrigade}
           <CustomSelect
             searchable
             className="mt-1.5"
             value={filters.brigadeId}
             onValueChange={(v) => onChange({ ...filters, brigadeId: v })}
-            options={[{ value: "all", label: "Все бригады" }, ...mockBrigades.map((b) => ({ value: b.id, label: b.name }))]}
+            options={[{ value: "all", label: w.allBrigadesOption }, ...mockBrigades.map((b) => ({ value: b.id, label: b.name }))]}
           />
         </label>
       </div>
 
       <div className="mt-5 flex items-center gap-2.5">
         <Button onClick={onApply} className="flex-1">
-          Применить
+          {c.applyButton}
         </Button>
         <Button variant="outline" onClick={onReset} className="flex-1">
-          Сбросить
+          {c.resetButton}
         </Button>
       </div>
     </Card>

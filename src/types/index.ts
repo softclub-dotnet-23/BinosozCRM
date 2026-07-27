@@ -520,6 +520,30 @@ export interface TransferFilters {
   dateTo: string;
 }
 
+export type MaterialRequestStatus = "new" | "approved" | "in_transit" | "issued" | "rejected";
+
+export interface MaterialRequest {
+  id: string;
+  number: number;
+  documentNumber: string;
+  date: string;
+  materialName: string;
+  quantity: number;
+  unit: string;
+  objectName: string;
+  brigadeName: string;
+  requestedBy: string;
+  status: MaterialRequestStatus;
+  note: string;
+  createdDate: string;
+  createdBy: string;
+}
+
+export interface MaterialRequestFilters {
+  search: string;
+  status: MaterialRequestStatus | "all";
+}
+
 export interface MaterialStockRow {
   id: string;
   materialName: string;

@@ -17,28 +17,20 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { FilterDrawer } from "../components/objects/FilterDrawer";
 import { AddObjectModal } from "../components/objects/AddObjectModal";
 import { ObjectSummary } from "../components/objects/ObjectSummary";
-import { TaskList } from "../components/objects/TaskList";
 import { ProgressChart } from "../components/charts/ProgressChart";
 import { ObjectBudgetChart } from "../components/charts/ObjectBudgetChart";
-import { mockUpcomingTasks } from "../data/mockTasks";
 import { objectProgressSeries } from "../data/mockDashboard";
 import { objectsRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../context/LanguageContext";
 import { formatCurrency } from "../utils/format";
 import { formatDateRu } from "../utils/date";
 import { getProgressTone } from "../utils/progress";
 import type { ConstructionObject, ObjectFilters, ObjectStatus } from "../types";
 
 type TabKey = "all" | "active" | "at_risk" | "completed";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "active", label: "Активные" },
-  { key: "at_risk", label: "С риском" },
-  { key: "completed", label: "Завершённые" },
-];
 
 const DEFAULT_FILTERS: ObjectFilters = {
   statuses: [],
@@ -61,6 +53,16 @@ function matchesTab(status: ObjectStatus, tab: TabKey): boolean {
 
 export default function ObjectsPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.objects;
+  const c = strings.common;
+
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: "all", label: s.tabAll },
+    { key: "active", label: s.tabActive },
+    { key: "at_risk", label: s.tabAtRisk },
+    { key: "completed", label: s.tabCompleted },
+  ];
 
   const [objects, setObjects] = useRepositoryState(objectsRepository);
   const [selectedId, setSelectedId] = useState<string>(() => objectsRepository.getSnapshot()[0]?.id ?? "");
@@ -130,7 +132,7 @@ export default function ObjectsPage() {
     setObjects((prev) => [object, ...prev]);
     setSelectedId(object.id);
     setAddModalOpen(false);
-    showToast("Объект успешно добавлен");
+    showToast(s.toastCreated);
   }
 
   function handleDeleteConfirmed() {
@@ -139,27 +141,29 @@ export default function ObjectsPage() {
     if (selectedId === deleteTarget.id) {
       setSelectedId((prev) => objects.find((o) => o.id !== prev)?.id ?? "");
     }
-    showToast("Объект удалён", "info");
+    showToast(s.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
   const columns: DataTableColumn<ConstructionObject>[] = [
     {
       key: "object",
-      header: "Объект",
+      header: c.colObject,
+      sticky: "left",
+      width: "232px",
       render: (row) => (
         <div className="flex items-center gap-3">
           <div className="h-11 w-14 shrink-0 overflow-hidden rounded-lg border border-border">
             <ObjectImage src={row.imageUrl} type={row.objectType} alt={row.name} />
           </div>
-          <span className="font-semibold text-ink">{row.name}</span>
+          <span className="truncate font-semibold text-ink">{row.name}</span>
         </div>
       ),
     },
-    { key: "city", header: "Локация", render: (row) => <span className="text-ink-secondary">{row.city}</span> },
+    { key: "city", header: s.colCity, render: (row) => <span className="text-ink-secondary">{row.city}</span> },
     {
       key: "foreman",
-      header: "Прораб",
+      header: s.colForeman,
       render: (row) => (
         <div className="flex items-center gap-2">
           <Avatar name={row.foreman} size="sm" />
@@ -169,7 +173,7 @@ export default function ObjectsPage() {
     },
     {
       key: "progress",
-      header: "Прогресс",
+      header: s.colProgress,
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <ProgressBar value={row.progress} tone={getProgressTone(row.status, row.progress)} className="w-20" />
@@ -179,32 +183,34 @@ export default function ObjectsPage() {
     },
     {
       key: "budget",
-      header: "Бюджет",
+      header: s.colBudget,
       render: (row) => <span className="tabular text-ink">{formatCurrency(row.budget).replace(" сомони", " с.")}</span>,
     },
-    { key: "deadline", header: "Срок", render: (row) => <span className="text-ink-secondary">{formatDateRu(row.deadline)}</span> },
-    { key: "status", header: "Статус", render: (row) => <StatusBadge status={row.status} /> },
+    { key: "deadline", header: s.colDeadline, render: (row) => <span className="text-ink-secondary">{formatDateRu(row.deadline)}</span> },
+    { key: "status", header: c.colStatus, render: (row) => <StatusBadge status={row.status} /> },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
+      sticky: "right",
+      width: "84px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            aria-label="Просмотреть объект"
+            aria-label={s.actionViewObject}
             onClick={() => setSelectedId(row.id)}
-            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink"
+            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
           >
             <Eye size={16} />
           </button>
           <DropdownMenu
             trigger={<span className="text-lg leading-none">⋯</span>}
             items={[
-              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
-              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => showToast("Редактирование пока недоступно в демо", "info") },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+              { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
+              { label: c.edit, icon: <Pencil size={14} />, onClick: () => showToast(c.editUnavailableInDemo, "info") },
+              { label: c.delete, icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
             ]}
           />
         </div>
@@ -214,46 +220,46 @@ export default function ObjectsPage() {
 
   return (
     <AppLayout
-      title="Объекты"
-      subtitle="Управление строительными объектами и их статусами"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск объектов, локаций, прораба..." }}
+      title={s.pageTitle}
+      subtitle={s.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Всего объектов" value={String(kpis.total)} icon={Building2} tone="orange" footer="Все проекты компании" />
+        <MetricCard label={s.kpiTotal} value={String(kpis.total)} icon={Building2} tone="orange" footer={s.kpiTotalFooter} />
         <MetricCard
-          label="В работе"
+          label={s.kpiInWork}
           value={String(kpis.inWork)}
           icon={CheckCircle2}
           tone="green"
-          footer={`${Math.round((kpis.inWork / kpis.total) * 100)}% от общего количества`}
+          footer={s.kpiPercentOfTotal(Math.round((kpis.inWork / kpis.total) * 100))}
         />
         <MetricCard
-          label="Завершены"
+          label={s.kpiCompleted}
           value={String(kpis.completed)}
           icon={Flag}
           tone="blue"
-          footer={`${Math.round((kpis.completed / kpis.total) * 100)}% от общего количества`}
+          footer={s.kpiPercentOfTotal(Math.round((kpis.completed / kpis.total) * 100))}
         />
         <MetricCard
-          label="Есть риск"
+          label={s.kpiAtRisk}
           value={String(kpis.atRisk)}
           icon={AlertTriangle}
           tone="red"
-          footer={`${Math.round((kpis.atRisk / kpis.total) * 100)}% от общего количества`}
+          footer={s.kpiPercentOfTotal(Math.round((kpis.atRisk / kpis.total) * 100))}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card>
+          <Card className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-              <h2 className="text-[17px] font-bold text-ink">Список объектов</h2>
+              <h2 className="text-lg font-bold text-ink">{s.listTitle}</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
-                  <Filter size={14} /> Фильтры
+                  <Filter size={14} /> {c.filtersButton}
                 </Button>
                 <Button size="sm" onClick={() => setAddModalOpen(true)}>
-                  <Plus size={14} /> Добавить объект
+                  <Plus size={14} /> {s.addObject}
                 </Button>
               </div>
             </div>
@@ -265,7 +271,7 @@ export default function ObjectsPage() {
                   type="button"
                   onClick={() => handleTabChange(t.key)}
                   className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                    tab === t.key ? "bg-primary text-white" : "bg-[#F5F5F4] text-ink-secondary hover:bg-[#ECECEB]"
+                    tab === t.key ? "bg-primary text-white" : "bg-surface-3 text-ink-secondary hover:bg-surface-5"
                   }`}
                 >
                   {t.label}
@@ -285,8 +291,8 @@ export default function ObjectsPage() {
               ) : (
                 <EmptyState
                   icon={Building2}
-                  title="Объекты не найдены"
-                  description="Измените параметры поиска или сбросьте фильтры"
+                  title={s.emptyTitle}
+                  description={c.emptyStateHint}
                   action={
                     <Button
                       variant="outline"
@@ -297,7 +303,7 @@ export default function ObjectsPage() {
                         setTab("all");
                       }}
                     >
-                      Сбросить фильтры
+                      {c.resetFiltersButton}
                     </Button>
                   }
                 />
@@ -318,15 +324,15 @@ export default function ObjectsPage() {
             />
           </Card>
 
-          <Card className="p-5 sm:p-6">
+          <Card className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[17px] font-bold text-ink">Динамика по объектам</h2>
+              <h2 className="text-lg font-bold text-ink">{s.chartTitle}</h2>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 rounded-lg bg-[#F5F5F4] p-1">
+                <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
                   {(
                     [
-                      { key: "progress", label: "Прогресс" },
-                      { key: "budget", label: "Бюджет" },
+                      { key: "progress", label: s.chartModeProgress },
+                      { key: "budget", label: s.chartModeBudget },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -343,13 +349,13 @@ export default function ObjectsPage() {
                 </div>
                 <CustomSelect
                   size="sm"
-                  aria-label="Период"
+                  aria-label={s.chartPeriodAriaLabel}
                   value={chartPeriod}
                   onValueChange={setChartPeriod}
                   options={[
-                    { value: "month", label: "Месяц" },
-                    { value: "quarter", label: "Квартал" },
-                    { value: "year", label: "Год" },
+                    { value: "month", label: c.periodMonth },
+                    { value: "quarter", label: c.periodQuarter },
+                    { value: "year", label: c.periodYear },
                   ]}
                 />
               </div>
@@ -365,10 +371,7 @@ export default function ObjectsPage() {
           </Card>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {selectedObject && <ObjectSummary object={selectedObject} />}
-          <TaskList tasks={mockUpcomingTasks} />
-        </div>
+        <div className="min-w-0 sticky top-6">{selectedObject && <ObjectSummary object={selectedObject} />}</div>
       </div>
 
       <FilterDrawer
@@ -388,9 +391,9 @@ export default function ObjectsPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить объект?"
-        description={deleteTarget ? `«${deleteTarget.name}» будет удалён из списка объектов.` : undefined}
-        confirmLabel="Удалить"
+        title={s.deleteConfirmTitle}
+        description={deleteTarget ? s.deleteConfirmDescription(deleteTarget.name) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

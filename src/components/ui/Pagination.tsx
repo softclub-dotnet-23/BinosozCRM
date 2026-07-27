@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { CustomSelect } from "./CustomSelect";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface PaginationProps {
   page: number;
@@ -38,9 +39,11 @@ export function Pagination({
   total,
   onPageChange,
   onPageSizeChange,
-  itemLabel = "объектов",
+  itemLabel,
   pageSizeOptions = [10, 20, 50],
 }: PaginationProps) {
+  const { strings } = useLanguage();
+  const c = strings.common;
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
   const pageList = getPageList(page, pageCount);
@@ -48,15 +51,15 @@ export function Pagination({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6">
       <p className="text-xs text-ink-secondary">
-        Показано {from}–{to} из {total} {itemLabel}
+        {c.paginationShown(from, to, total, itemLabel ?? "")}
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-xs text-ink-secondary">
-          <span>Показывать по:</span>
+          <span>{c.showPerPage}</span>
           <CustomSelect
             size="sm"
-            aria-label="Показывать по"
+            aria-label={c.showPerPage}
             value={String(pageSize)}
             onValueChange={(v) => onPageSizeChange(Number(v))}
             options={pageSizeOptions.map((size) => ({ value: String(size), label: String(size) }))}
@@ -66,10 +69,10 @@ export function Pagination({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            aria-label="Предыдущая страница"
+            aria-label={c.prevPage}
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeft size={15} />
           </button>
@@ -87,7 +90,7 @@ export function Pagination({
                   "flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-semibold transition-colors",
                   p === page
                     ? "border-primary bg-primary-soft text-primary"
-                    : "border-border-strong text-ink-secondary hover:bg-[#F5F5F4]",
+                    : "border-border-strong text-ink-secondary hover:bg-surface-3",
                 )}
               >
                 {p}
@@ -96,10 +99,10 @@ export function Pagination({
           )}
           <button
             type="button"
-            aria-label="Следующая страница"
+            aria-label={c.nextPage}
             disabled={page >= pageCount}
             onClick={() => onPageChange(page + 1)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronRight size={15} />
           </button>

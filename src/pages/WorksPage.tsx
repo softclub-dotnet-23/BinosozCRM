@@ -26,21 +26,26 @@ import { worksRepository, objectsRepository } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { computeCriticalWorks, computeSectionBreakdown, computeWorkAnalytics } from "../utils/workAnalytics";
+import { workSectionLabel, workStatusLabel } from "../utils/workStatus";
 import { useToast } from "../hooks/useToast";
 import type { Work, WorkStatus } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import type { AppStrings } from "../lib/i18n/appStrings";
 import BrigadirAssignmentsPage from "./BrigadirAssignmentsPage";
 
 const TODAY_ISO = "2026-07-17";
 
 type TabKey = "all" | "in_progress" | "completed" | "overdue";
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "all", label: "Все работы" },
-  { key: "in_progress", label: "В процессе" },
-  { key: "completed", label: "Завершенные" },
-  { key: "overdue", label: "Просроченные" },
-];
+function buildTabs(s: AppStrings["works"]): { key: TabKey; label: string }[] {
+  return [
+    { key: "all", label: s.tabAll },
+    { key: "in_progress", label: s.tabInProgress },
+    { key: "completed", label: s.tabCompleted },
+    { key: "overdue", label: s.tabOverdue },
+  ];
+}
 
 function matchesTab(status: WorkStatus, tab: TabKey): boolean {
   if (tab === "all") return true;
@@ -57,6 +62,10 @@ export default function WorksPage() {
 
 function CompanyWorksPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.works;
+  const c = strings.common;
+  const TABS = useMemo(() => buildTabs(s), [s]);
 
   const [works, setWorks] = useRepositoryState(worksRepository);
   const mockObjects = useRepositorySnapshot(objectsRepository);
@@ -170,13 +179,13 @@ function CompanyWorksPage() {
       ),
     );
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "completed", progress: 100 } : prev));
-    showToast("Работа завершена");
+    showToast(s.toastCompleted);
   }
 
   function handlePause(id: string) {
     setWorks((prev) => prev.map((w) => (w.id === id ? { ...w, status: "paused" } : w)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "paused" } : prev));
-    showToast("Работа приостановлена", "info");
+    showToast(s.toastPaused, "info");
   }
 
   function handleChangeStatus(id: string, status: WorkStatus) {
@@ -193,7 +202,7 @@ function CompanyWorksPage() {
       ),
     );
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status, progress: status === "completed" ? 100 : prev.progress } : prev));
-    showToast("Статус обновлён");
+    showToast(s.toastStatusUpdated);
   }
 
   function handleUpdateProgress(id: string, progress: number, note: string) {
@@ -221,7 +230,7 @@ function CompanyWorksPage() {
       }),
     );
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, progress } : prev));
-    showToast("Прогресс обновлён");
+    showToast(s.toastProgressUpdated);
   }
 
   function handleAddComment(id: string, text: string) {
@@ -248,7 +257,7 @@ function CompanyWorksPage() {
       ...work,
       id: `work-copy-${suffix}`,
       code: `${work.code}-к${suffix.slice(-2)}`,
-      title: `${work.title} (копия)`,
+      title: s.copyTitle(work.title),
       status: "planned",
       progress: 0,
       actualStart: null,
@@ -258,7 +267,7 @@ function CompanyWorksPage() {
       progressHistory: [{ id: `work-copy-${suffix}-hist-1`, date: TODAY_ISO, progress: 0, note: "Работа дублирована", author: "Садди Имомов" }],
     };
     setWorks((prev) => [duplicated, ...prev]);
-    showToast("Работа дублирована");
+    showToast(s.toastDuplicated);
   }
 
   function handleSaveWork(work: Work) {
@@ -269,7 +278,7 @@ function CompanyWorksPage() {
     });
     setFormOpen(false);
     setEditTarget(null);
-    showToast(isEdit ? "Работа обновлена" : "Работа добавлена");
+    showToast(isEdit ? s.toastUpdated : s.toastCreated);
   }
 
   function handleDeleteConfirmed() {
@@ -281,19 +290,19 @@ function CompanyWorksPage() {
       return next;
     });
     if (drawerTarget?.id === deleteTarget.id) setDrawerTarget(null);
-    showToast("Работа удалена", "info");
+    showToast(s.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
   function handleBulkComplete() {
     setWorks((prev) => prev.map((w) => (selectedIds.has(w.id) ? { ...w, status: "completed", progress: 100 } : w)));
-    showToast(`Завершено работ: ${selectedIds.size}`);
+    showToast(s.toastBulkCompleted(selectedIds.size));
     setSelectedIds(new Set());
   }
 
   function handleBulkDelete() {
     setWorks((prev) => prev.filter((w) => !selectedIds.has(w.id)));
-    showToast(`Удалено работ: ${selectedIds.size}`, "info");
+    showToast(s.toastBulkDeleted(selectedIds.size), "info");
     setSelectedIds(new Set());
   }
 
@@ -328,9 +337,9 @@ function CompanyWorksPage() {
 
   return (
     <AppLayout
-      title="Работы"
-      subtitle="Планирование, контроль и отслеживание выполнения работ"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск по работам..." }}
+      title={s.pageTitle}
+      subtitle={s.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
       action={
         <div className="flex items-center gap-2">
           <Button
@@ -339,34 +348,34 @@ function CompanyWorksPage() {
               setFormOpen(true);
             }}
           >
-            <Plus size={15} /> Добавить работу
+            <Plus size={15} /> {s.addWork}
           </Button>
           <ExportDropdown />
         </div>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Всего работ" value={String(analytics.total)} icon={ClipboardList} tone="blue" footer="Включая подзадачи" />
+        <MetricCard label={s.kpiTotal} value={String(analytics.total)} icon={ClipboardList} tone="blue" footer={s.kpiTotalFooter} />
         <MetricCard
-          label="Завершено"
+          label={s.kpiCompleted}
           value={String(analytics.completed)}
           icon={CheckCircle2}
           tone="green"
-          footer={`${analytics.completedPercent}% от общего объёма`}
+          footer={s.kpiPercentOfTotal(analytics.completedPercent)}
         />
         <MetricCard
-          label="В процессе"
+          label={s.kpiInProgress}
           value={String(analytics.inProgress)}
           icon={Clock}
           tone="orange"
-          footer={`${analytics.inProgressPercent}% от общего объёма`}
+          footer={s.kpiPercentOfTotal(analytics.inProgressPercent)}
         />
         <MetricCard
-          label="Просрочено"
+          label={s.kpiOverdue}
           value={String(analytics.overdue)}
           icon={AlertTriangle}
           tone="red"
-          footer={`${analytics.overduePercent}% от общего объёма`}
+          footer={s.kpiPercentOfTotal(analytics.overduePercent)}
         />
       </div>
 
@@ -381,7 +390,7 @@ function CompanyWorksPage() {
                     type="button"
                     onClick={() => handleTabChange(t.key)}
                     className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                      tab === t.key ? "bg-primary text-white" : "bg-[#F5F5F4] text-ink-secondary hover:bg-[#ECECEB]"
+                      tab === t.key ? "bg-primary text-white" : "bg-surface-3 text-ink-secondary hover:bg-surface-5"
                     }`}
                   >
                     {t.label}
@@ -393,29 +402,32 @@ function CompanyWorksPage() {
                 <CustomSelect
                   size="sm"
                   searchable
-                  aria-label="Объект"
+                  aria-label={s.filterObjectAriaLabel}
                   value={filters.objectId}
                   onValueChange={(v) => updateFilters({ ...filters, objectId: v })}
-                  options={[{ value: "all", label: "Все объекты" }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
+                  options={[{ value: "all", label: s.allObjectsOption }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
                 />
                 <CustomSelect
                   size="sm"
-                  aria-label="Раздел"
+                  aria-label={s.filterSectionAriaLabel}
                   value={filters.sectionId}
                   onValueChange={(v) => updateFilters({ ...filters, sectionId: v as WorkFiltersState["sectionId"] })}
-                  options={[{ value: "all", label: "Все разделы" }, ...WORK_SECTIONS.map((s) => ({ value: s.id, label: s.name }))]}
+                  options={[
+                    { value: "all", label: s.allSectionsOption },
+                    ...WORK_SECTIONS.map((section) => ({ value: section.id, label: workSectionLabel(s, section.id) })),
+                  ]}
                 />
                 <CustomSelect
                   size="sm"
-                  aria-label="Статус"
+                  aria-label={s.filterStatusAriaLabel}
                   value={filters.status}
                   onValueChange={(v) => updateFilters({ ...filters, status: v as WorkFiltersState["status"] })}
                   options={[
-                    { value: "all", label: "Статус: Все" },
-                    { value: "completed", label: "Завершено" },
-                    { value: "in_progress", label: "В процессе" },
-                    { value: "overdue", label: "Просрочено" },
-                    { value: "planned", label: "Запланировано" },
+                    { value: "all", label: s.statusAllLabel },
+                    { value: "completed", label: workStatusLabel(s, "completed") },
+                    { value: "in_progress", label: workStatusLabel(s, "in_progress") },
+                    { value: "overdue", label: workStatusLabel(s, "overdue") },
+                    { value: "planned", label: workStatusLabel(s, "planned") },
                   ]}
                 />
               </div>
@@ -423,13 +435,13 @@ function CompanyWorksPage() {
 
             {selectedIds.size > 0 && (
               <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-xl bg-primary-soft px-4 py-2.5 sm:mx-6">
-                <p className="text-sm font-medium text-primary">Выбрано работ: {selectedIds.size}</p>
+                <p className="text-sm font-medium text-primary">{s.selectedCount(selectedIds.size)}</p>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="secondary" onClick={handleBulkComplete}>
-                    Завершить
+                    {c.completeLabel}
                   </Button>
                   <Button size="sm" variant="danger" onClick={handleBulkDelete}>
-                    Удалить
+                    {c.delete}
                   </Button>
                 </div>
               </div>
@@ -451,11 +463,11 @@ function CompanyWorksPage() {
               ) : (
                 <EmptyState
                   icon={ClipboardList}
-                  title="Работы не найдены"
-                  description="Измените параметры поиска или сбросьте фильтры"
+                  title={s.emptyTitle}
+                  description={c.emptyStateHint}
                   action={
                     <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                      Сбросить фильтры
+                      {c.resetFiltersButton}
                     </Button>
                   }
                 />
@@ -467,7 +479,7 @@ function CompanyWorksPage() {
               pageCount={pageCount}
               pageSize={pageSize}
               total={filteredWorks.length}
-              itemLabel="работ"
+              itemLabel={s.paginationItemLabel}
               onPageChange={setPage}
               onPageSizeChange={(size) => {
                 setPageSize(size);
@@ -478,7 +490,7 @@ function CompanyWorksPage() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card className="flex min-w-0 flex-col p-5 sm:p-6">
-              <h2 className="text-[17px] font-bold text-ink">Динамика выполнения работ</h2>
+              <h2 className="text-lg font-bold text-ink">{s.dynamicsTitle}</h2>
               <div className="mt-4 flex-1">
                 <WorkDynamicsChart data={mockWorkDynamics} />
               </div>
@@ -490,7 +502,7 @@ function CompanyWorksPage() {
 
         <div className="flex flex-col gap-4">
           <Card className="p-5 sm:p-6">
-            <h2 className="text-[17px] font-bold text-ink">Сводка по работам</h2>
+            <h2 className="text-lg font-bold text-ink">{s.summaryTitle}</h2>
             <div className="mt-4 flex flex-col items-center gap-5">
               <WorkSummaryDonut analytics={analytics} />
               <WorkSummaryLegend analytics={analytics} />
@@ -555,9 +567,9 @@ function CompanyWorksPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить работу?"
-        description={deleteTarget ? `Работа «${deleteTarget.title}» (${deleteTarget.code}) будет удалена.` : undefined}
-        confirmLabel="Удалить"
+        title={s.deleteConfirmTitle}
+        description={deleteTarget ? s.deleteConfirmDescription(deleteTarget.title, deleteTarget.code) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

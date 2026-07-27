@@ -3,6 +3,7 @@ import { Search, X } from "lucide-react";
 import { Avatar } from "../ui/Avatar";
 import { CustomSelect } from "../ui/CustomSelect";
 import { mockEmployees } from "../../data/mockEmployees";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface TeamBuilderProps {
   selectedIds: string[];
@@ -11,6 +12,8 @@ interface TeamBuilderProps {
 }
 
 export function TeamBuilder({ selectedIds, onToggle, foremanName }: TeamBuilderProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
   const [query, setQuery] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
 
@@ -28,7 +31,7 @@ export function TeamBuilder({ selectedIds, onToggle, foremanName }: TeamBuilderP
 
   return (
     <div>
-      <p className="text-sm font-medium text-ink">Состав бригады</p>
+      <p className="text-sm font-medium text-ink">{s.teamBuilderTitle}</p>
       <div className="mt-1.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-[10px] border border-border-strong">
           <div className="space-y-1.5 border-b border-border p-2">
@@ -38,27 +41,27 @@ export function TeamBuilder({ selectedIds, onToggle, foremanName }: TeamBuilderP
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Поиск сотрудника..."
+                placeholder={s.searchEmployeePlaceholder}
                 className="w-full rounded-lg border border-border-strong py-1.5 pl-7 pr-2 text-xs focus:border-primary focus:outline-none"
               />
             </div>
             <CustomSelect
               size="sm"
               fullWidth
-              aria-label="Специальность"
+              aria-label={s.fieldSpecialty}
               value={specialtyFilter}
               onValueChange={setSpecialtyFilter}
-              options={[{ value: "all", label: "Все специальности" }, ...specialties.map((s) => ({ value: s, label: s }))]}
+              options={[{ value: "all", label: s.allSpecialtiesOption }, ...specialties.map((specialty) => ({ value: specialty, label: specialty }))]}
             />
           </div>
           <div className="max-h-40 space-y-0.5 overflow-y-auto p-1.5">
-            {available.length === 0 && <p className="px-2 py-3 text-center text-xs text-ink-muted">Никого не найдено</p>}
+            {available.length === 0 && <p className="px-2 py-3 text-center text-xs text-ink-muted">{s.nobodyFound}</p>}
             {available.map((e) => (
               <button
                 key={e.id}
                 type="button"
                 onClick={() => onToggle(e.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-[#FAFAF9]"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition-colors hover:bg-surface-1"
               >
                 <Avatar name={e.fullName} size="sm" />
                 <span className="min-w-0 flex-1 truncate text-ink">{e.fullName}</span>
@@ -70,11 +73,11 @@ export function TeamBuilder({ selectedIds, onToggle, foremanName }: TeamBuilderP
 
         <div className="rounded-[10px] border border-border-strong">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
-            <p className="text-xs font-semibold text-ink">Выбрано: {selected.length}</p>
+            <p className="text-xs font-semibold text-ink">{s.selectedCountLabel(selected.length)}</p>
           </div>
           <div className="max-h-52 space-y-0.5 overflow-y-auto p-1.5">
             {selected.length === 0 && (
-              <p className="px-2 py-3 text-center text-xs text-ink-muted">Добавьте участников слева</p>
+              <p className="px-2 py-3 text-center text-xs text-ink-muted">{s.addMembersHint}</p>
             )}
             {selected.map((e) => (
               <div key={e.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs">
@@ -85,7 +88,7 @@ export function TeamBuilder({ selectedIds, onToggle, foremanName }: TeamBuilderP
                 </div>
                 <button
                   type="button"
-                  aria-label={`Убрать ${e.fullName}`}
+                  aria-label={s.removeMemberAriaLabel(e.fullName)}
                   onClick={() => onToggle(e.id)}
                   className="shrink-0 text-ink-muted hover:text-red"
                 >

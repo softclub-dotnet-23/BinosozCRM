@@ -217,7 +217,7 @@ export function PayrollGenerateModal({ open, existingRecords, onClose, onGenerat
         </Field>
       </div>
 
-      <div className="mt-4 rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
+      <div className="mt-4 rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-ink-secondary">Будет начислено сотрудникам</span>
           <span className="font-bold text-ink tabular">{toGenerate.length}</span>

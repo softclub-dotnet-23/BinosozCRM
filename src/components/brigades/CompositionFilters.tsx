@@ -3,6 +3,9 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockBrigades";
+import { EMPLOYEE_STATUS_CONFIG, employeeStatusLabel } from "../../utils/brigadeStatus";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { EmployeeStatus } from "../../types";
 
 export interface CompositionFiltersState {
@@ -19,15 +22,9 @@ export const DEFAULT_COMPOSITION_FILTERS: CompositionFiltersState = {
   status: "all",
 };
 
-const STATUS_OPTIONS: { value: EmployeeStatus; label: string }[] = [
-  { value: "on_shift", label: "На смене" },
-  { value: "on_site", label: "На объекте" },
-  { value: "available", label: "Свободен" },
-  { value: "on_trip", label: "На выезде" },
-  { value: "absent", label: "Отсутствует" },
-  { value: "on_leave", label: "В отпуске" },
-  { value: "sick_leave", label: "На больничном" },
-];
+function buildStatusOptions(s: AppStrings["brigades"]): { value: EmployeeStatus; label: string }[] {
+  return (Object.keys(EMPLOYEE_STATUS_CONFIG) as EmployeeStatus[]).map((value) => ({ value, label: employeeStatusLabel(s, value) }));
+}
 
 interface CompositionFiltersProps {
   filters: CompositionFiltersState;
@@ -37,45 +34,49 @@ interface CompositionFiltersProps {
 }
 
 export function CompositionFilters({ filters, onChange, onReset, specialties }: CompositionFiltersProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
+  const a = strings.assignments;
   return (
     <div className="flex flex-wrap items-center gap-2">
       <CustomSelect
         size="sm"
         searchable
-        aria-label="Бригада"
+        aria-label={c.colBrigade}
         value={filters.brigadeId}
         onValueChange={(v) => onChange({ ...filters, brigadeId: v })}
-        options={[{ value: "all", label: "Бригада: Все" }, ...mockBrigades.map((b) => ({ value: b.id, label: b.name }))]}
+        options={[{ value: "all", label: a.brigadeAllLabel }, ...mockBrigades.map((b) => ({ value: b.id, label: b.name }))]}
       />
 
       <CustomSelect
         size="sm"
         searchable
-        aria-label="Роль"
+        aria-label={s.roleFilterAriaLabel}
         value={filters.specialty}
         onValueChange={(v) => onChange({ ...filters, specialty: v })}
-        options={[{ value: "all", label: "Роль: Все" }, ...specialties.map((s) => ({ value: s, label: s }))]}
+        options={[{ value: "all", label: s.roleAllLabel }, ...specialties.map((specialty) => ({ value: specialty, label: specialty }))]}
       />
 
       <CustomSelect
         size="sm"
         searchable
-        aria-label="Объект"
+        aria-label={c.colObject}
         value={filters.objectId}
         onValueChange={(v) => onChange({ ...filters, objectId: v })}
-        options={[{ value: "all", label: "Объект: Все" }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
+        options={[{ value: "all", label: a.objectAllLabel }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
       />
 
       <CustomSelect
         size="sm"
-        aria-label="Статус"
+        aria-label={c.colStatus}
         value={filters.status}
         onValueChange={(v) => onChange({ ...filters, status: v as EmployeeStatus | "all" })}
-        options={[{ value: "all", label: "Статус: Все" }, ...STATUS_OPTIONS]}
+        options={[{ value: "all", label: a.statusAllLabel }, ...buildStatusOptions(s)]}
       />
 
       <Button variant="ghost" size="sm" onClick={onReset}>
-        <RotateCcw size={13} /> Сбросить фильтры
+        <RotateCcw size={13} /> {c.resetFiltersButton}
       </Button>
     </div>
   );

@@ -11,6 +11,7 @@ import { EmployeeRoleBadge } from "./EmployeeRoleBadge";
 import { mockEmployees } from "../../data/mockEmployees";
 import { formatCurrency } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Brigade } from "../../types";
 
 interface BrigadeDetailsDrawerProps {
@@ -38,9 +39,13 @@ export function BrigadeDetailsDrawer({
   onPause,
   onActivate,
 }: BrigadeDetailsDrawerProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
+
   if (!brigade) {
     return (
-      <Drawer open={open} onClose={onClose} title="Бригада">
+      <Drawer open={open} onClose={onClose} title={s.detailsDefaultTitle}>
         {null}
       </Drawer>
     );
@@ -64,24 +69,24 @@ export function BrigadeDetailsDrawer({
       footer={
         <div className="grid w-full grid-cols-2 gap-2.5">
           <Button variant="secondary" onClick={() => onEdit(brigade)}>
-            <Pencil size={14} /> Редактировать
+            <Pencil size={14} /> {c.edit}
           </Button>
           <Button variant="outline" onClick={() => onChangeComposition(brigade)}>
-            <Users size={14} /> Изменить состав
+            <Users size={14} /> {s.actionChangeComposition}
           </Button>
           <Button variant="outline" onClick={() => onAssignWork(brigade)}>
-            <UserCog size={14} /> Назначить на работу
+            <UserCog size={14} /> {s.actionAssignWork}
           </Button>
           <Button variant="outline" onClick={() => onChangeForeman(brigade)}>
-            <UserCog size={14} /> Изменить прораба
+            <UserCog size={14} /> {s.actionChangeForeman}
           </Button>
           {brigade.status === "paused" ? (
             <Button className="col-span-2" onClick={() => onActivate(brigade.id)}>
-              <CheckCircle2 size={14} /> Активировать
+              <CheckCircle2 size={14} /> {s.actionActivate}
             </Button>
           ) : (
             <Button className="col-span-2" variant="danger" onClick={() => onPause(brigade.id)}>
-              <PauseCircle size={14} /> Поставить на паузу
+              <PauseCircle size={14} /> {s.actionPauseBrigade}
             </Button>
           )}
         </div>
@@ -103,20 +108,24 @@ export function BrigadeDetailsDrawer({
         <div className="mt-4 flex items-center gap-2.5">
           <Avatar name={brigade.foremanName} size="sm" />
           <div>
-            <p className="text-xs text-ink-secondary">Прораб</p>
+            <p className="text-xs text-ink-secondary">{c.roleLabels.prorab}</p>
             <p className="text-sm font-semibold text-ink">{brigade.foremanName}</p>
           </div>
         </div>
 
         <div className="mt-4 space-y-2.5">
-          <IconSummaryRow icon={Calendar} label="Дата создания" value={formatDateShort(brigade.createdDate)} />
-          <IconSummaryRow icon={Users} label="Состав" value={`${brigade.membersCount} чел. (${brigade.workersCount} раб. / ${brigade.helpersCount} разнораб.)`} />
+          <IconSummaryRow icon={Calendar} label={s.fieldCreatedDate} value={formatDateShort(brigade.createdDate)} />
+          <IconSummaryRow
+            icon={Users}
+            label={s.colComposition}
+            value={s.compositionLabel(brigade.membersCount, brigade.workersCount, brigade.helpersCount)}
+          />
         </div>
 
         <div className="my-4 border-t border-border" />
 
         <div>
-          <p className="text-sm font-semibold text-ink">Текущая работа</p>
+          <p className="text-sm font-semibold text-ink">{s.fieldCurrentWork}</p>
           <p className="mt-1 text-sm text-ink">{brigade.currentWork}</p>
           <p className="text-xs text-ink-secondary">
             {brigade.objectName} • {brigade.sectionName}
@@ -124,15 +133,15 @@ export function BrigadeDetailsDrawer({
           <div className="mt-2 flex items-center gap-3">
             <BrigadeProgressBar progress={brigade.workProgress} status={brigade.status} barClassName="flex-1" />
           </div>
-          <p className="mt-1 text-xs text-ink-muted">Осталось {brigade.remainingDays} дней</p>
+          <p className="mt-1 text-xs text-ink-muted">{s.remainingDaysPlain(brigade.remainingDays)}</p>
         </div>
 
         <div className="my-4 border-t border-border" />
 
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-ink">Эффективность</p>
-            <p className="text-xs text-ink-secondary">За текущий период</p>
+            <p className="text-sm font-semibold text-ink">{s.efficiencyLabel}</p>
+            <p className="text-xs text-ink-secondary">{s.kpiCurrentPeriodFooter}</p>
           </div>
           <EfficiencyCircle value={brigade.efficiency} size={52} strokeWidth={5} />
         </div>
@@ -140,15 +149,15 @@ export function BrigadeDetailsDrawer({
         <div className="my-4 border-t border-border" />
 
         <div className="space-y-2.5">
-          <IconSummaryRow icon={Clock} label="Отработано часов" value={`${totalHours} ч.`} />
-          <IconSummaryRow icon={CheckCircle2} label="Посещаемость" value={`${attendancePercent}%`} />
-          <IconSummaryRow icon={Wallet} label="Фонд оплаты труда (30 дней)" value={formatCurrency(payrollCost)} />
+          <IconSummaryRow icon={Clock} label={s.hoursWorkedTitle} value={s.hoursWorkedLabel(totalHours)} />
+          <IconSummaryRow icon={CheckCircle2} label={s.attendanceTitle} value={`${attendancePercent}%`} />
+          <IconSummaryRow icon={Wallet} label={s.payrollFundTitle} value={formatCurrency(payrollCost)} />
         </div>
 
         <div className="my-4 border-t border-border" />
 
         <div>
-          <p className="text-sm font-semibold text-ink">Состав бригады ({members.length})</p>
+          <p className="text-sm font-semibold text-ink">{s.compositionCountTitle(members.length)}</p>
           <ul className="mt-2 max-h-56 space-y-2 overflow-y-auto">
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-2.5">
@@ -156,8 +165,8 @@ export function BrigadeDetailsDrawer({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">
                     {m.fullName}{" "}
-                    {m.memberRole === "foreman" && <span className="text-xs text-ink-muted">(прораб)</span>}
-                    {m.memberRole === "brigadir" && <span className="text-xs text-ink-muted">(бригадир)</span>}
+                    {m.memberRole === "foreman" && <span className="text-xs text-ink-muted">{s.foremanTag}</span>}
+                    {m.memberRole === "brigadir" && <span className="text-xs text-ink-muted">{s.brigadirTag}</span>}
                   </p>
                 </div>
                 <EmployeeRoleBadge specialty={m.specialty} />
@@ -170,9 +179,9 @@ export function BrigadeDetailsDrawer({
 
         <div>
           <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
-            <FileText size={14} className="text-ink-muted" /> Документы
+            <FileText size={14} className="text-ink-muted" /> {s.documentsTitle}
           </p>
-          <p className="text-xs text-ink-muted">Нет прикреплённых документов</p>
+          <p className="text-xs text-ink-muted">{s.noDocuments}</p>
         </div>
       </div>
     </Drawer>

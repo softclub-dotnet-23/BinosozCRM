@@ -6,9 +6,12 @@ import { formatCurrency, formatNumber } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
 import { materialReceiptsRepository, materialWriteOffsRepository, materialTransfersRepository } from "../../data/repositories";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Material } from "../../types";
 
 export function MaterialDetailDrawer({ material, onClose }: { material: Material | null; onClose: () => void }) {
+  const { strings } = useLanguage();
+  const s = strings.brigadirMaterials;
   const receipts = useRepositorySnapshot(materialReceiptsRepository);
   const writeOffs = useRepositorySnapshot(materialWriteOffsRepository);
   const transfers = useRepositorySnapshot(materialTransfersRepository);
@@ -29,8 +32,14 @@ export function MaterialDetailDrawer({ material, onClose }: { material: Material
         .slice(0, 3)
     : [];
 
+  const statusLabel: Record<ReturnType<typeof getMaterialStatus>, string> = {
+    normal: s.statusNormal,
+    low: s.statusLow,
+    critical: s.statusCritical,
+  };
+
   return (
-    <Drawer open={Boolean(material)} onClose={onClose} title="Материал">
+    <Drawer open={Boolean(material)} onClose={onClose} title={s.drawerTitle}>
       {material && (
         <div className="space-y-5">
           <div className="flex items-center gap-3">
@@ -42,53 +51,53 @@ export function MaterialDetailDrawer({ material, onClose }: { material: Material
           </div>
 
           <div>
-            <MaterialStatusBadge status={getMaterialStatus(material)} />
+            <MaterialStatusBadge status={getMaterialStatus(material)} label={statusLabel[getMaterialStatus(material)]} />
           </div>
 
           <dl className="space-y-2.5 text-sm">
-            <Row label="Категория" value={material.category} />
-            <Row label="Склад" value={material.warehouse} />
-            <Row label="Единица измерения" value={material.unitDetail ? `${material.unit} (${material.unitDetail})` : material.unit} />
-            <Row label="Текущий остаток" value={`${formatNumber(material.stock)} ${material.unit}`} />
-            <Row label="Минимальный остаток" value={`${formatNumber(material.minStock)} ${material.unit}`} />
-            <Row label="Цена за единицу" value={formatCurrency(material.price)} />
-            <Row label="Общая стоимость" value={formatCurrency(getMaterialTotalValue(material))} />
+            <Row label={s.colCategory} value={material.category} />
+            <Row label={s.warehouseLabel} value={material.warehouse} />
+            <Row label={s.unitLabel} value={material.unitDetail ? `${material.unit} (${material.unitDetail})` : material.unit} />
+            <Row label={s.currentStockLabel} value={`${formatNumber(material.stock)} ${material.unit}`} />
+            <Row label={s.minStockLabel} value={`${formatNumber(material.minStock)} ${material.unit}`} />
+            <Row label={s.priceLabel} value={formatCurrency(material.price)} />
+            <Row label={s.totalValueLabel} value={formatCurrency(getMaterialTotalValue(material))} />
           </dl>
 
           {material.note && (
-            <div className="rounded-lg bg-[#F5F5F4] px-3.5 py-2.5">
-              <p className="text-xs font-semibold text-ink-secondary">Примечание</p>
+            <div className="rounded-lg bg-surface-3 px-3.5 py-2.5">
+              <p className="text-xs font-semibold text-ink-secondary">{s.noteLabel}</p>
               <p className="mt-1 text-sm text-ink">{material.note}</p>
             </div>
           )}
 
-          <Section title="Последние поступления">
+          <Section title={s.recentReceiptsTitle}>
             {receiptLines.length > 0 ? (
               receiptLines.map(({ id, date, line }) => (
                 <HistoryRow key={id} left={`+${formatNumber(line.quantity)} ${line.unit}`} right={formatDateShort(date)} tone="green" />
               ))
             ) : (
-              <EmptyRow />
+              <EmptyRow label={s.noDataLabel} />
             )}
           </Section>
 
-          <Section title="Последние списания">
+          <Section title={s.recentWriteOffsTitle}>
             {writeOffLines.length > 0 ? (
               writeOffLines.map(({ id, date, line }) => (
                 <HistoryRow key={id} left={`-${formatNumber(line.quantity)} ${line.unit}`} right={formatDateShort(date)} tone="red" />
               ))
             ) : (
-              <EmptyRow />
+              <EmptyRow label={s.noDataLabel} />
             )}
           </Section>
 
-          <Section title="История перемещений">
+          <Section title={s.transferHistoryTitle}>
             {transferLines.length > 0 ? (
               transferLines.map((t) => (
                 <HistoryRow key={t.id} left={`${t.fromWarehouse} → ${t.toWarehouse}`} right={formatDateShort(t.date)} tone="blue" />
               ))
             ) : (
-              <EmptyRow />
+              <EmptyRow label={s.noDataLabel} />
             )}
           </Section>
         </div>
@@ -125,6 +134,6 @@ function HistoryRow({ left, right, tone }: { left: string; right: string; tone: 
   );
 }
 
-function EmptyRow() {
-  return <p className="text-xs text-ink-muted">Нет данных</p>;
+function EmptyRow({ label }: { label: string }) {
+  return <p className="text-xs text-ink-muted">{label}</p>;
 }

@@ -8,6 +8,7 @@ import type {
   Estimate,
   Material,
   MaterialReceipt,
+  MaterialRequest,
   MaterialTransfer,
   MaterialWriteOff,
   ConstructionObject,
@@ -31,6 +32,7 @@ import { mockMaterials } from "./mockMaterials";
 import { mockMaterialReceipts } from "./mockMaterialReceipts";
 import { mockMaterialWriteOffs } from "./mockMaterialWriteOffs";
 import { mockMaterialTransfers } from "./mockMaterialTransfers";
+import { mockMaterialRequests } from "./mockMaterialRequests";
 import { mockStockReservations } from "./mockStockReservations";
 import { mockStockAdjustments } from "./mockStockAdjustments";
 import { mockPayroll } from "./mockPayroll";
@@ -81,6 +83,10 @@ export const materialTransfersRepository = createCollectionRepository<MaterialTr
   "material-transfers.v1",
   mockMaterialTransfers,
 );
+export const materialRequestsRepository = createCollectionRepository<MaterialRequest>(
+  "material-requests.v1",
+  mockMaterialRequests,
+);
 export const stockReservationsRepository = createCollectionRepository<StockReservation>(
   "stock-reservations.v1",
   mockStockReservations,
@@ -90,4 +96,6 @@ export const stockAdjustmentsRepository = createCollectionRepository<StockAdjust
   mockStockAdjustments,
 );
 export const payrollRepository = createCollectionRepository<PayrollRecord>("payroll.v1", mockPayroll);
-export const usersRepository = createCollectionRepository<UserAccount>("users.v1", mockUsers);
+// v2: seed data gained phone/email fields after some browsers had already cached the v1
+// shape, which rendered as permanently-blank Phone/Email columns on the Users page.
+export const usersRepository = createCollectionRepository<UserAccount>("users.v2", mockUsers);

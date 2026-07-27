@@ -3,13 +3,24 @@ import { Card } from "../ui/Card";
 import { Badge } from "../ui/StatusBadge";
 import { Avatar } from "../ui/Avatar";
 import { formatDateShort } from "../../utils/date";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { CompositionChange } from "../../types";
 
-const CHANGE_TYPE_CONFIG: Record<CompositionChange["changeType"], { label: string; tone: "orange" | "green" | "blue" }> = {
-  transfer: { label: "Перевод", tone: "blue" },
-  assignment: { label: "Назначение", tone: "green" },
-  replacement: { label: "Замена", tone: "orange" },
+const CHANGE_TYPE_TONE: Record<CompositionChange["changeType"], "orange" | "green" | "blue"> = {
+  transfer: "blue",
+  assignment: "green",
+  replacement: "orange",
 };
+
+function changeTypeLabel(s: AppStrings["brigades"], type: CompositionChange["changeType"]): string {
+  const map: Record<CompositionChange["changeType"], string> = {
+    transfer: s.changeTypeTransfer,
+    assignment: s.changeTypeAssignment,
+    replacement: s.changeTypeReplacement,
+  };
+  return map[type];
+}
 
 export function UpcomingCompositionChanges({
   changes,
@@ -18,12 +29,14 @@ export function UpcomingCompositionChanges({
   changes: CompositionChange[];
   onSeeAll?: () => void;
 }) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold text-ink">Ближайшие изменения состава</h2>
+      <h2 className="text-lg font-bold text-ink">{s.upcomingChangesTitle}</h2>
       <ul className="mt-3 space-y-3">
         {changes.map((change) => {
-          const config = CHANGE_TYPE_CONFIG[change.changeType];
+          const tone = CHANGE_TYPE_TONE[change.changeType];
           return (
             <li key={change.id} className="flex items-start gap-3">
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-soft text-blue">
@@ -39,7 +52,7 @@ export function UpcomingCompositionChanges({
                   {change.fromBrigadeName} → {change.toBrigadeName}
                 </p>
                 <div className="mt-1">
-                  <Badge tone={config.tone}>{config.label}</Badge>
+                  <Badge tone={tone}>{changeTypeLabel(s, change.changeType)}</Badge>
                 </div>
               </div>
             </li>
@@ -51,7 +64,7 @@ export function UpcomingCompositionChanges({
         onClick={onSeeAll}
         className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
       >
-        Все изменения состава →
+        {s.allChangesLink}
       </button>
     </Card>
   );

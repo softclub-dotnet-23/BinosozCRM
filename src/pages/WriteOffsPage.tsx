@@ -42,7 +42,7 @@ const DEFAULT_FILTERS: WriteOffFilters = {
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function formatCompactAmount(value: number): string {
   if (value < 100000) return formatNumber(Math.round(value * 10) / 10);
@@ -155,9 +155,15 @@ export default function WriteOffsPage() {
   }
 
   const columns: DataTableColumn<MaterialWriteOff>[] = [
-    { key: "number", header: "№", render: (row) => <span className="text-ink-muted">{row.number}</span> },
+    { key: "number", header: "№", sticky: "left", width: "44px", render: (row) => <span className="text-ink-muted">{row.number}</span> },
+    {
+      key: "doc",
+      header: "Номер",
+      sticky: "left",
+      width: "100px",
+      render: (row) => <span className="whitespace-nowrap font-semibold text-ink">{row.documentNumber}</span>,
+    },
     { key: "date", header: "Дата", render: (row) => <span className="whitespace-nowrap text-ink">{formatDateShort(row.date)}</span> },
-    { key: "doc", header: "Номер", render: (row) => <span className="whitespace-nowrap font-semibold text-ink">{row.documentNumber}</span> },
     { key: "object", header: "Объект", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.objectName}</span> },
     { key: "brigade", header: "Бригада", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.brigadeName ?? "—"}</span> },
     { key: "materials", header: "Материалов", render: (row) => <span className="tabular text-ink-secondary">{row.lines.length}</span> },
@@ -188,6 +194,8 @@ export default function WriteOffsPage() {
     {
       key: "actions",
       header: "Действия",
+      sticky: "right",
+      width: "116px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
@@ -224,15 +232,15 @@ export default function WriteOffsPage() {
         placeholder: "Поиск по списаниям...",
       }}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего списаний" value={String(kpis.count)} icon={PackageMinus} tone="green" footer="Документов" />
-            <MetricCard label="Списано материалов" value={formatCompactAmount(kpis.totalQuantity)} icon={Layers} tone="blue" footer="Ед. измерения" />
-            <MetricCard label="Общая стоимость" value={formatCompactAmount(kpis.totalCost)} icon={Banknote} tone="orange" footer="сомони" />
-            <MetricCard label="Критичных списаний" value={String(kpis.criticalCount)} icon={AlertTriangle} tone="red" footer="Требуют проверки" />
-          </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <MetricCard label="Всего списаний" value={String(kpis.count)} icon={PackageMinus} tone="green" footer="Документов" />
+        <MetricCard label="Списано материалов" value={formatCompactAmount(kpis.totalQuantity)} icon={Layers} tone="blue" footer="Ед. измерения" />
+        <MetricCard label="Общая стоимость" value={formatCompactAmount(kpis.totalCost)} icon={Banknote} tone="orange" footer="сомони" />
+        <MetricCard label="Критичных списаний" value={String(kpis.criticalCount)} icon={AlertTriangle} tone="red" footer="Требуют проверки" />
+      </div>
 
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-2.5">
               <input
@@ -334,7 +342,7 @@ export default function WriteOffsPage() {
           </div>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
               <div>
                 <p className="text-xs font-medium text-ink-secondary">Период</p>
@@ -392,7 +400,7 @@ export default function WriteOffsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Итоги за период</h2>
+            <h2 className="text-lg font-bold text-ink">Итоги за период</h2>
             <dl className="mt-3.5 space-y-2.5 text-sm">
               <div className="flex items-center justify-between">
                 <dt className="text-ink-secondary">Документов</dt>
@@ -410,7 +418,7 @@ export default function WriteOffsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Частые причины</h2>
+            <h2 className="text-lg font-bold text-ink">Частые причины</h2>
             <div className="mt-3.5 space-y-2.5 text-sm">
               {frequentReasons.map(({ reason, count }) => (
                 <button
@@ -420,7 +428,7 @@ export default function WriteOffsPage() {
                     setFilters((f) => ({ ...f, reason }));
                     setPage(1);
                   }}
-                  className="flex w-full items-center justify-between rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-[#F5F5F4]"
+                  className="flex w-full items-center justify-between rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-surface-3"
                 >
                   <span className="text-ink-secondary">{writeOffReasonLabel(reason)}</span>
                   <span className="font-bold text-ink tabular">{count}</span>

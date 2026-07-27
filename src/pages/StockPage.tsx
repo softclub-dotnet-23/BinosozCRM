@@ -48,7 +48,7 @@ const DEFAULT_FILTERS: StockFilters = {
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 export default function StockPage() {
   const { showToast } = useToast();
@@ -178,18 +178,26 @@ export default function StockPage() {
   }
 
   const columns: DataTableColumn<MaterialStockRow>[] = [
-    { key: "number", header: "№", render: (row) => <span className="text-ink-muted">{materials.find((m) => m.id === row.id)?.number ?? ""}</span> },
+    {
+      key: "number",
+      header: "№",
+      sticky: "left",
+      width: "44px",
+      render: (row) => <span className="text-ink-muted">{materials.find((m) => m.id === row.id)?.number ?? ""}</span>,
+    },
     {
       key: "material",
       header: "Материал",
+      sticky: "left",
+      width: "208px",
       render: (row) => {
         const material = materials.find((m) => m.id === row.id);
         return (
           <div className="flex items-center gap-3">
             <MaterialThumbnail src={material?.imageUrl ?? ""} alt={row.materialName} className="h-9 w-9 shrink-0" />
             <div className="min-w-0">
-              <p className="whitespace-nowrap font-semibold text-ink">{row.materialName}</p>
-              <p className="whitespace-nowrap text-xs text-ink-muted">{material?.supplier}</p>
+              <p className="truncate font-semibold text-ink">{row.materialName}</p>
+              <p className="truncate text-xs text-ink-muted">{material?.supplier}</p>
             </div>
           </div>
         );
@@ -242,6 +250,8 @@ export default function StockPage() {
     {
       key: "actions",
       header: "Действия",
+      sticky: "right",
+      width: "116px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
@@ -278,15 +288,15 @@ export default function StockPage() {
         placeholder: "Поиск по материалам...",
       }}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего позиций" value={String(kpis.totalPositions)} icon={LayoutGrid} tone="blue" footer="наименований" />
-            <MetricCard label="В наличии" value={String(kpis.inStock)} icon={Boxes} tone="green" footer="позиций" />
-            <MetricCard label="Низкий остаток" value={String(kpis.lowStock)} icon={TrendingDown} tone="orange" footer="позиций" />
-            <MetricCard label="Критический остаток" value={String(kpis.critical)} icon={AlertTriangle} tone="red" footer="позиций" />
-          </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <MetricCard label="Всего позиций" value={String(kpis.totalPositions)} icon={LayoutGrid} tone="blue" footer="наименований" />
+        <MetricCard label="В наличии" value={String(kpis.inStock)} icon={Boxes} tone="green" footer="позиций" />
+        <MetricCard label="Низкий остаток" value={String(kpis.lowStock)} icon={TrendingDown} tone="orange" footer="позиций" />
+        <MetricCard label="Критический остаток" value={String(kpis.critical)} icon={AlertTriangle} tone="red" footer="позиций" />
+      </div>
 
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-3 text-xs text-ink-secondary">
               <input
@@ -386,7 +396,7 @@ export default function StockPage() {
           </Button>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
               <FilterField label="Поиск">
                 <input
@@ -439,7 +449,7 @@ export default function StockPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Статистика остатков</h2>
+            <h2 className="text-lg font-bold text-ink">Статистика остатков</h2>
             {statusBuckets.length > 0 ? (
               <>
                 <DonutChart
@@ -471,9 +481,9 @@ export default function StockPage() {
 
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-ink">Критические остатки</h2>
+              <h2 className="text-lg font-bold text-ink">Критические остатки</h2>
               {criticalRows.length > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red px-1.5 text-[11px] font-bold text-white">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red px-1.5 text-xs font-bold text-white">
                   {criticalRows.length}
                 </span>
               )}

@@ -235,7 +235,7 @@ export function MaterialFormModal({ open, material, onClose, onSave }: MaterialF
 
         <div className="sm:col-span-2">
           <p className="text-sm font-medium text-ink">Изображение материала</p>
-          <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-border-strong text-center transition-colors hover:bg-[#FAFAF9]">
+          <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-border-strong text-center transition-colors hover:bg-surface-1">
             {imagePreview ? (
               <img src={imagePreview} alt="Предпросмотр материала" className="h-28 w-28 object-cover" />
             ) : (

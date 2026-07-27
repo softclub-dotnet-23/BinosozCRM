@@ -37,6 +37,8 @@ import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
 import { formatDateShort } from "../utils/date";
+import { useLanguage } from "../context/LanguageContext";
+import type { AppStrings } from "../lib/i18n/appStrings";
 import type { StaffFilters, StaffMember, StaffStatus } from "../types";
 
 const DEFAULT_FILTERS: StaffFilters = {
@@ -45,18 +47,24 @@ const DEFAULT_FILTERS: StaffFilters = {
   hireDateTo: "",
 };
 
-const STATUS_FILTER_OPTIONS: { value: StaffStatus | "all"; label: string }[] = [
-  { value: "all", label: "Все" },
-  { value: "active", label: "Активен" },
-  { value: "vacation", label: "Отпуск" },
-  { value: "dismissed", label: "Уволен" },
-];
+function buildStatusFilterOptions(e: AppStrings["employees"]): { value: StaffStatus | "all"; label: string }[] {
+  return [
+    { value: "all", label: e.statusAll },
+    { value: "active", label: e.statusActive },
+    { value: "vacation", label: e.statusVacation },
+    { value: "dismissed", label: e.statusDismissed },
+  ];
+}
 
 const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 export default function EmployeesPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const e = strings.employees;
+  const c = strings.common;
+  const STATUS_FILTER_OPTIONS = buildStatusFilterOptions(e);
 
   const [staff, setStaff] = useRepositoryState(staffRepository);
   const [selectedId, setSelectedId] = useState<string>(() => staffRepository.getSnapshot()[0]?.id ?? "");
@@ -151,13 +159,13 @@ export default function EmployeesPage() {
     });
     setSelectedId(employee.id);
     setFormEmployee(undefined);
-    showToast(formEmployee ? "Данные сотрудника обновлены" : "Сотрудник добавлен");
+    showToast(formEmployee ? e.toastUpdated : e.toastCreated);
   }
 
   function handleTransfer(result: { brigadeName: string | null; brigadeSpecialization: string | null; department: string | null }) {
     if (!transferEmployee) return;
     setStaff((prev) => prev.map((s) => (s.id === transferEmployee.id ? { ...s, ...result } : s)));
-    showToast(`${transferEmployee.fullName} переведён(а) в новое подразделение`);
+    showToast(e.toastTransferred(transferEmployee.fullName));
     setTransferEmployee(null);
   }
 
@@ -167,12 +175,12 @@ export default function EmployeesPage() {
     if (selectedId === deleteTarget.id) {
       setSelectedId((prev) => staff.find((s) => s.id !== prev)?.id ?? "");
     }
-    showToast("Сотрудник удалён", "info");
+    showToast(e.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
   function handleExport() {
-    const header = ["ID", "ФИО", "Должность", "Бригада/Отдел", "Телефон", "Статус", "Дата принятия"];
+    const header = [e.csvId, e.csvFullName, e.csvPosition, e.csvUnit, e.csvPhone, e.csvStatus, e.csvHireDate];
     const rows = filteredStaff.map((s) => [
       s.id,
       s.fullName,
@@ -190,7 +198,7 @@ export default function EmployeesPage() {
     link.download = "sotrudniki.csv";
     link.click();
     URL.revokeObjectURL(url);
-    showToast("Список сотрудников экспортирован");
+    showToast(e.toastExported);
   }
 
   const columns: DataTableColumn<StaffMember>[] = [
@@ -201,44 +209,47 @@ export default function EmployeesPage() {
           type="checkbox"
           checked={allPageSelected}
           onChange={toggleAllOnPage}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(ev) => ev.stopPropagation()}
           className="h-4 w-4 rounded border-border-strong accent-primary"
-          aria-label="Выбрать все строки"
+          aria-label={e.selectAllRowsAriaLabel}
         />
       ),
       width: "36px",
+      sticky: "left",
       render: (row) => (
         <input
           type="checkbox"
           checked={selectedRowIds.has(row.id)}
           onChange={() => toggleRowSelected(row.id)}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(ev) => ev.stopPropagation()}
           className="h-4 w-4 rounded border-border-strong accent-primary"
-          aria-label={`Выбрать ${row.fullName}`}
+          aria-label={e.selectRowAriaLabel(row.fullName)}
         />
       ),
     },
     {
       key: "employee",
-      header: "Сотрудник",
+      header: e.colEmployee,
+      sticky: "left",
+      width: "196px",
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <Avatar name={row.fullName} size="sm" />
           <div className="min-w-0">
-            <p className="whitespace-nowrap font-semibold text-ink">{row.fullName}</p>
-            <p className="whitespace-nowrap text-xs text-ink-muted">ID: {row.id}</p>
+            <p className="truncate font-semibold text-ink">{row.fullName}</p>
+            <p className="truncate text-xs text-ink-muted">{e.idPrefixLabel(row.id)}</p>
           </div>
         </div>
       ),
     },
     {
       key: "position",
-      header: "Должность",
+      header: e.colPosition,
       render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.position}</span>,
     },
     {
       key: "unit",
-      header: "Бригада / Отдел",
+      header: e.colUnit,
       render: (row) => (
         <div className="min-w-0">
           <p className="whitespace-nowrap text-ink">{row.brigadeName ?? row.department ?? "—"}</p>
@@ -248,31 +259,32 @@ export default function EmployeesPage() {
     },
     {
       key: "phone",
-      header: "Телефон",
+      header: c.colPhone,
       render: (row) => <span className="tabular whitespace-nowrap text-ink-secondary">{row.phone}</span>,
     },
     {
       key: "status",
-      header: "Статус",
+      header: c.colStatus,
       render: (row) => <StaffStatusBadge status={row.status} />,
     },
     {
       key: "hireDate",
-      header: "Дата принятия",
+      header: e.colHireDate,
       render: (row) => <span className="whitespace-nowrap text-ink-secondary">{formatDateShort(row.hireDate)}</span>,
     },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
       width: "112px",
+      sticky: "right",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть сотрудника" onClick={() => setSelectedId(row.id)} className={iconButtonClass}>
+        <div className="flex items-center justify-end gap-1.5" onClick={(ev) => ev.stopPropagation()}>
+          <button type="button" aria-label={e.viewEmployeeAriaLabel} onClick={() => setSelectedId(row.id)} className={iconButtonClass}>
             <Eye size={14} />
           </button>
-          <button type="button" aria-label="Редактировать сотрудника" onClick={() => setFormEmployee(row)} className={iconButtonClass}>
+          <button type="button" aria-label={e.editEmployeeAriaLabel} onClick={() => setFormEmployee(row)} className={iconButtonClass}>
             <Pencil size={14} />
           </button>
           <DropdownMenu
@@ -282,10 +294,10 @@ export default function EmployeesPage() {
               </span>
             }
             items={[
-              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
-              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormEmployee(row) },
-              { label: "Перевести", icon: <UserCog size={14} />, onClick: () => setTransferEmployee(row) },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+              { label: strings.assignments.actionView, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
+              { label: c.edit, icon: <Pencil size={14} />, onClick: () => setFormEmployee(row) },
+              { label: e.transferButton, icon: <UserCog size={14} />, onClick: () => setTransferEmployee(row) },
+              { label: c.delete, icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
             ]}
           />
         </div>
@@ -295,86 +307,86 @@ export default function EmployeesPage() {
 
   return (
     <AppLayout
-      title="Сотрудники"
-      subtitle="Управление сотрудниками компании"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск по ФИО, должности, телефону..." }}
+      title={e.pageTitle}
+      subtitle={e.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: e.searchPlaceholder }}
     >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <MetricCard
-              label="Всего сотрудников"
+              label={e.kpiTotal}
               value={String(kpis.total)}
               icon={Users}
               tone="orange"
               footer={
                 <>
-                  Активные: <span className="font-semibold text-green">{kpis.active}</span>
+                  {e.kpiActiveFooterPrefix} <span className="font-semibold text-green">{kpis.active}</span>
                 </>
               }
             />
             <MetricCard
-              label="Рабочие"
+              label={e.kpiWorkers}
               value={String(kpis.workers)}
               icon={User}
               tone="blue"
-              footer={`${Math.round((kpis.workers / kpis.total) * 100)}% от общего числа`}
+              footer={e.kpiPercentOfTotal(Math.round((kpis.workers / kpis.total) * 100))}
             />
             <MetricCard
-              label="Инженеры и ИТР"
+              label={e.kpiEngineers}
               value={String(kpis.engineers)}
               icon={HardHat}
               tone="orange"
-              footer={`${Math.round((kpis.engineers / kpis.total) * 100)}% от общего числа`}
+              footer={e.kpiPercentOfTotal(Math.round((kpis.engineers / kpis.total) * 100))}
             />
             <MetricCard
-              label="Администрация"
+              label={e.kpiAdmins}
               value={String(kpis.admins)}
               icon={Briefcase}
               tone="purple"
-              footer={`${Math.round((kpis.admins / kpis.total) * 100)}% от общего числа`}
+              footer={e.kpiPercentOfTotal(Math.round((kpis.admins / kpis.total) * 100))}
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <SearchInput
               value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Поиск по ФИО, должности..."
+              onChange={(ev) => handleSearchChange(ev.target.value)}
+              placeholder={e.searchPlaceholderShort}
               containerClassName="min-w-[220px] flex-1"
               className="h-9"
             />
             <CustomSelect
               size="sm"
               searchable
-              aria-label="Должность"
+              aria-label={e.filterPositionAriaLabel}
               value={positionFilter}
               onValueChange={(v) => {
                 setPositionFilter(v);
                 setPage(1);
               }}
               options={[
-                { value: "all", label: "Должность: Все" },
+                { value: "all", label: e.allPositionsOption },
                 ...STAFF_POSITIONS.map((p) => ({ value: p, label: p })),
               ]}
             />
             <CustomSelect
               size="sm"
               searchable
-              aria-label="Бригада"
+              aria-label={c.colBrigade}
               value={brigadeFilter}
               onValueChange={(v) => {
                 setBrigadeFilter(v);
                 setPage(1);
               }}
               options={[
-                { value: "all", label: "Бригада: Все" },
+                { value: "all", label: e.allBrigadesOption },
                 ...STAFF_BRIGADES.map((b) => ({ value: b, label: b })),
               ]}
             />
             <CustomSelect
               size="sm"
-              aria-label="Статус"
+              aria-label={c.colStatus}
               value={statusFilter}
               onValueChange={(v) => {
                 setStatusFilter(v as StaffStatus | "all");
@@ -382,17 +394,17 @@ export default function EmployeesPage() {
               }}
               options={STATUS_FILTER_OPTIONS.map((opt) => ({
                 value: opt.value,
-                label: opt.value === "all" ? "Статус: Все" : opt.label,
+                label: opt.value === "all" ? e.allStatusesOption : opt.label,
               }))}
             />
             <Button variant="outline" size="sm" className="h-9" onClick={() => setDrawerOpen(true)}>
-              <Filter size={14} /> Фильтры
+              <Filter size={14} /> {c.filtersButton}
             </Button>
             <button
               type="button"
-              aria-label="Сбросить фильтры"
+              aria-label={e.resetFiltersAriaLabel}
               onClick={resetAll}
-              className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4]"
+              className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3"
             >
               <RefreshCw size={15} />
             </button>
@@ -408,9 +420,9 @@ export default function EmployeesPage() {
                 onRowClick={(row) => setSelectedId(row.id)}
               />
             ) : (
-              <EmptyState icon={Users} title="Сотрудники не найдены" description="Измените параметры поиска или сбросьте фильтры" action={
+              <EmptyState icon={Users} title={e.emptyTitle} description={c.emptyStateHint} action={
                 <Button variant="outline" size="sm" onClick={resetAll}>
-                  Сбросить фильтры
+                  {c.resetFiltersButton}
                 </Button>
               } />
             )}
@@ -424,7 +436,7 @@ export default function EmployeesPage() {
                 setPageSize(size);
                 setPage(1);
               }}
-              itemLabel="сотрудников"
+              itemLabel={e.paginationItemLabel}
             />
           </Card>
         </div>
@@ -432,10 +444,10 @@ export default function EmployeesPage() {
         <div className="flex w-full flex-col gap-3 xl:w-70 xl:shrink-0">
           <div className="flex flex-col gap-2">
             <Button className="w-full" onClick={() => setFormEmployee(null)}>
-              <Plus size={16} /> Добавить сотрудника
+              <Plus size={16} /> {e.addEmployeeButton}
             </Button>
             <Button variant="outline" className="w-full" onClick={handleExport}>
-              <Download size={16} /> Экспорт
+              <Download size={16} /> {c.exportButton}
             </Button>
           </div>
 
@@ -478,9 +490,9 @@ export default function EmployeesPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить сотрудника?"
-        description={deleteTarget ? `«${deleteTarget.fullName}» будет удалён из списка сотрудников.` : undefined}
-        confirmLabel="Удалить"
+        title={e.deleteConfirmTitle}
+        description={deleteTarget ? e.deleteConfirmDescription(deleteTarget.fullName) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

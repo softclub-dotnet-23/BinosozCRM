@@ -7,8 +7,9 @@ import { CustomSelect } from "../ui/CustomSelect";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockBrigades";
 import { mockEmployees } from "../../data/mockEmployees";
-import { SHIFT_CONFIG } from "../../utils/brigadeStatus";
+import { EMPLOYEE_STATUS_CONFIG, SHIFT_CONFIG, employeeStatusLabel, shiftLabel } from "../../utils/brigadeStatus";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
 import type { BrigadeMemberRole, Employee, EmployeeStatus, WorkShift } from "../../types";
 
 interface FormState {
@@ -55,6 +56,9 @@ interface AddEmployeeModalProps {
 }
 
 export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
   const [form, setForm] = useState<FormState>(emptyForm());
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -77,11 +81,11 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
   function handlePhotoChange(file: File | null) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setPhotoError("Выберите файл изображения (JPG, PNG)");
+      setPhotoError(s.errorPhotoType);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setPhotoError("Размер файла не должен превышать 5 МБ");
+      setPhotoError(s.errorPhotoSize);
       return;
     }
     setPhotoError(null);
@@ -92,14 +96,14 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.firstName.trim()) nextErrors.firstName = "Укажите имя";
-    if (!form.lastName.trim()) nextErrors.lastName = "Укажите фамилию";
-    if (!TAJIK_PHONE_RE.test(form.phone.trim())) nextErrors.phone = "Формат: +992 XX XXX XX XX";
-    else if (mockEmployees.some((e) => e.phone === form.phone.trim())) nextErrors.phone = "Этот номер уже используется";
-    if (!form.specialty.trim()) nextErrors.specialty = "Укажите специальность";
-    if (!form.brigadeId) nextErrors.brigadeId = "Выберите бригаду";
+    if (!form.firstName.trim()) nextErrors.firstName = s.errorFirstNameRequired;
+    if (!form.lastName.trim()) nextErrors.lastName = s.errorLastNameRequired;
+    if (!TAJIK_PHONE_RE.test(form.phone.trim())) nextErrors.phone = s.errorPhoneFormat;
+    else if (mockEmployees.some((e) => e.phone === form.phone.trim())) nextErrors.phone = s.errorPhoneTaken;
+    if (!form.specialty.trim()) nextErrors.specialty = s.errorSpecialtyRequired;
+    if (!form.brigadeId) nextErrors.brigadeId = s.errorBrigadeRequired;
     const grade = Number(form.qualificationGrade);
-    if (Number.isNaN(grade) || grade < 1 || grade > 6) nextErrors.qualificationGrade = "Разряд от 1 до 6";
+    if (Number.isNaN(grade) || grade < 1 || grade > 6) nextErrors.qualificationGrade = s.errorGradeRange;
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -132,37 +136,37 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
     <Modal
       open={open}
       onClose={onClose}
-      title="Добавить сотрудника"
-      description="Заполните данные сотрудника и назначьте в бригаду"
+      title={s.addEmployeeModalTitle}
+      description={s.addEmployeeModalDescription}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
           <Button variant="outline" onClick={() => handleSubmit(true)}>
-            Сохранить как черновик
+            {s.saveDraftButton}
           </Button>
-          <Button onClick={() => handleSubmit(false)}>Добавить сотрудника</Button>
+          <Button onClick={() => handleSubmit(false)}>{s.addEmployeeButton}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <p className="text-sm font-medium text-ink">Фото сотрудника</p>
+          <p className="text-sm font-medium text-ink">{s.photoLabel}</p>
           <div className="mt-1.5 flex items-center gap-4">
             {photoPreview ? (
-              <img src={photoPreview} alt="Предпросмотр фото" className="h-16 w-16 shrink-0 rounded-full object-cover" />
+              <img src={photoPreview} alt={s.photoPreviewAlt} className="h-16 w-16 shrink-0 rounded-full object-cover" />
             ) : (
               <Avatar name={`${form.firstName || "?"} ${form.lastName || "?"}`} size="md" className="h-16 w-16 text-base" />
             )}
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                <Camera size={13} /> {photoPreview ? "Заменить" : "Загрузить фото"}
+                <Camera size={13} /> {photoPreview ? s.replacePhotoButton : s.uploadPhotoButton}
               </Button>
               {photoPreview && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setPhotoPreview(null)}>
-                  <X size={13} /> Убрать
+                  <X size={13} /> {s.removePhotoButton}
                 </Button>
               )}
               <input
@@ -177,7 +181,7 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           {photoError && <p className="mt-1.5 text-xs text-red">{photoError}</p>}
         </div>
 
-        <Field label="Имя" error={errors.firstName}>
+        <Field label={s.fieldFirstName} error={errors.firstName}>
           <input
             type="text"
             value={form.firstName}
@@ -186,7 +190,7 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           />
         </Field>
 
-        <Field label="Фамилия" error={errors.lastName}>
+        <Field label={s.fieldLastName} error={errors.lastName}>
           <input
             type="text"
             value={form.lastName}
@@ -195,7 +199,7 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           />
         </Field>
 
-        <Field label="Телефон" error={errors.phone}>
+        <Field label={c.colPhone} error={errors.phone}>
           <input
             type="text"
             value={form.phone}
@@ -205,17 +209,17 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           />
         </Field>
 
-        <Field label="Специальность" error={errors.specialty}>
+        <Field label={s.fieldSpecialty} error={errors.specialty}>
           <input
             type="text"
             value={form.specialty}
             onChange={(e) => update("specialty", e.target.value)}
-            placeholder="Например, Бетонщик"
+            placeholder={s.fieldSpecialtyPlaceholder}
             className={cn(inputClass, errors.specialty && errorInputClass)}
           />
         </Field>
 
-        <Field label="Квалификационный разряд" error={errors.qualificationGrade}>
+        <Field label={s.fieldGrade} error={errors.qualificationGrade}>
           <input
             type="number"
             min={1}
@@ -226,7 +230,7 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           />
         </Field>
 
-        <Field label="Бригада" error={errors.brigadeId}>
+        <Field label={c.colBrigade} error={errors.brigadeId}>
           <CustomSelect
             searchable
             error={Boolean(errors.brigadeId)}
@@ -237,21 +241,21 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           />
         </Field>
 
-        <Field label="Роль в бригаде">
+        <Field label={s.fieldMemberRole}>
           <CustomSelect
             className="mt-1.5"
             value={form.memberRole}
             onValueChange={(v) => update("memberRole", v as BrigadeMemberRole)}
             options={[
-              { value: "worker", label: "Рабочий" },
-              { value: "helper", label: "Разнорабочий" },
-              { value: "brigadir", label: "Бригадир" },
-              { value: "foreman", label: "Прораб" },
+              { value: "worker", label: s.roleWorker },
+              { value: "helper", label: s.roleHelper },
+              { value: "brigadir", label: s.roleBrigadir },
+              { value: "foreman", label: s.roleForeman },
             ]}
           />
         </Field>
 
-        <Field label="Объект">
+        <Field label={c.colObject}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -261,38 +265,33 @@ export function AddEmployeeModal({ open, onClose, onSave }: AddEmployeeModalProp
           />
         </Field>
 
-        <Field label="Смена">
+        <Field label={s.fieldShift}>
           <CustomSelect
             className="mt-1.5"
             value={form.shift}
             onValueChange={(v) => update("shift", v as WorkShift)}
-            options={(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((s) => ({ value: s, label: SHIFT_CONFIG[s].label }))}
+            options={(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((shift) => ({ value: shift, label: shiftLabel(s, shift) }))}
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={c.colStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
             onValueChange={(v) => update("status", v as EmployeeStatus)}
-            options={[
-              { value: "on_shift", label: "На смене" },
-              { value: "on_site", label: "На объекте" },
-              { value: "available", label: "Свободен" },
-              { value: "on_trip", label: "На выезде" },
-              { value: "absent", label: "Отсутствует" },
-              { value: "on_leave", label: "В отпуске" },
-              { value: "sick_leave", label: "На больничном" },
-            ]}
+            options={(Object.keys(EMPLOYEE_STATUS_CONFIG) as EmployeeStatus[]).map((status) => ({
+              value: status,
+              label: employeeStatusLabel(s, status),
+            }))}
           />
         </Field>
 
-        <Field label="Дата назначения">
+        <Field label={s.fieldAssignedDate}>
           <input type="date" value={form.assignedDate} onChange={(e) => update("assignedDate", e.target.value)} className={inputClass} />
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Комментарий">
+          <Field label={c.commentLabel}>
             <textarea value={form.comment} onChange={(e) => update("comment", e.target.value)} rows={2} className={inputClass} />
           </Field>
         </div>

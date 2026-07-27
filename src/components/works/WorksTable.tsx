@@ -5,7 +5,9 @@ import { WorkStatusBadge } from "./WorkStatusBadge";
 import { WorkProgressBar } from "./WorkProgressBar";
 import { WorkActionMenu, type WorkActionKind } from "./WorkActionMenu";
 import { computeActualDays } from "../../utils/workAnalytics";
+import { workSectionLabel } from "../../utils/workStatus";
 import { formatDateShort } from "../../utils/date";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Work } from "../../types";
 
 const COLUMN_COUNT = 7;
@@ -36,9 +38,14 @@ export function WorksTable({
   todayIso,
   actions,
 }: WorksTableProps) {
+  const { strings } = useLanguage();
+  const s = strings.works;
+  const c = strings.common;
   const columns: DataTableColumn<Work>[] = [
     {
       key: "select",
+      sticky: "left",
+      width: "40px",
       className: "sm:!pl-3",
       headerClassName: "sm:!pl-3",
       header: (
@@ -47,7 +54,7 @@ export function WorksTable({
           checked={allSelected}
           onChange={onToggleAll}
           className="h-4 w-4 rounded border-border-strong accent-primary"
-          aria-label="Выбрать все работы на странице"
+          aria-label={s.selectAllAriaLabel}
         />
       ),
       render: (row) => (
@@ -57,37 +64,39 @@ export function WorksTable({
           onChange={() => onToggleRow(row.id)}
           onClick={(e) => e.stopPropagation()}
           className="h-4 w-4 rounded border-border-strong accent-primary"
-          aria-label={`Выбрать работу ${row.title}`}
+          aria-label={s.selectRowAriaLabel(row.title)}
         />
       ),
     },
     {
       key: "work",
-      header: "Работа",
+      header: s.colWork,
+      sticky: "left",
+      width: "188px",
       render: (row) => (
         <div className="min-w-0 max-w-[168px]">
-          <p className="truncate text-[13px] font-semibold text-ink">
+          <p className="truncate text-sm font-semibold text-ink">
             <span className="text-ink-muted">{row.code}</span> {row.title}
           </p>
-          <p className="truncate text-xs text-ink-secondary">{row.sectionName}</p>
+          <p className="truncate text-xs text-ink-secondary">{workSectionLabel(s, row.sectionId)}</p>
         </div>
       ),
     },
     {
       key: "object",
-      header: "Объект / Раздел",
+      header: s.colObjectSection,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
         <div className="min-w-0 max-w-[132px]">
           <p className="truncate text-sm text-ink">{row.objectName}</p>
-          <p className="truncate text-xs text-ink-secondary">{row.sectionName}</p>
+          <p className="truncate text-xs text-ink-secondary">{workSectionLabel(s, row.sectionId)}</p>
         </div>
       ),
     },
     {
       key: "responsible",
-      header: "Ответственный",
+      header: s.colResponsible,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
@@ -95,14 +104,16 @@ export function WorksTable({
           <Avatar name={row.responsible.name} size="sm" />
           <div className="min-w-0 max-w-[104px]">
             <p className="truncate text-ink">{row.responsible.name}</p>
-            <p className="truncate text-xs text-ink-secondary">{row.responsible.role}</p>
+            <p className="truncate text-xs text-ink-secondary">
+              {row.responsible.role === "Прораб" ? c.roleLabels.prorab : row.responsible.role}
+            </p>
           </div>
         </div>
       ),
     },
     {
       key: "plan",
-      header: "План / Факт",
+      header: s.colPlanFact,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
@@ -111,14 +122,14 @@ export function WorksTable({
             {formatDateShort(row.plannedStart).slice(0, 5)} – {formatDateShort(row.plannedEnd).slice(0, 5)}
           </p>
           <p className="text-ink-muted">
-            {computeActualDays(row, todayIso)} / {row.plannedDurationDays} дн.
+            {computeActualDays(row, todayIso)} / {row.plannedDurationDays} {s.daysShort}
           </p>
         </div>
       ),
     },
     {
       key: "status",
-      header: "Статус / Прогресс",
+      header: s.colStatusProgress,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
@@ -130,7 +141,9 @@ export function WorksTable({
     },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
+      sticky: "right",
+      width: "56px",
       headerClassName: "text-right sm:!pr-3",
       className: "text-right sm:!pr-3",
       render: (row) => (

@@ -50,7 +50,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
   return (
     <Modal open={open} onClose={onClose} title="Восстановление пароля" description="Демо-режим восстановления доступа" size="sm">
       {submitted ? (
-        <div className="flex items-start gap-3 rounded-[10px] bg-[#F5F5F4] p-4">
+        <div className="flex items-start gap-3 rounded-[10px] bg-surface-3 p-4">
           <Info size={18} className="mt-0.5 shrink-0 text-ink-secondary" />
           <p className="text-sm text-ink-secondary">
             Если учётная запись с указанными данными существует, на неё будет отправлена инструкция по

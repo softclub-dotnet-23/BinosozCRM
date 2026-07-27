@@ -28,10 +28,14 @@ import { computeSpecializationDistribution } from "../utils/brigadeAnalytics";
 import { computeCompositionKpis } from "../utils/compositionAnalytics";
 import { completenessPercent } from "../utils/brigadeAnalytics";
 import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../context/LanguageContext";
 import type { BrigadeMemberRole, Employee, EmployeeStatus, WorkShift } from "../types";
 
 export default function BrigadeCompositionPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
 
   const [employees, setEmployees] = useRepositoryState(employeesRepository);
   const brigades = useRepositorySnapshot(brigadesRepository);
@@ -96,19 +100,19 @@ export default function BrigadeCompositionPage() {
   function handleAddEmployee(employee: Employee) {
     setEmployees((prev) => [employee, ...prev]);
     setAddOpen(false);
-    showToast("Сотрудник добавлен");
+    showToast(s.toastEmployeeAdded);
   }
 
   function handleChangeShift(id: string, shift: WorkShift) {
     setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, shift } : e)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, shift } : prev));
-    showToast("Смена обновлена");
+    showToast(s.toastShiftUpdated);
   }
 
   function handleChangeStatus(id: string, status: EmployeeStatus) {
     setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
-    showToast("Статус обновлён");
+    showToast(s.toastStatusUpdated);
   }
 
   function handleTransferConfirmed(employeeId: string, toBrigadeId: string, newRole: BrigadeMemberRole) {
@@ -122,7 +126,7 @@ export default function BrigadeCompositionPage() {
       ),
     );
     setTransferTarget(null);
-    showToast("Сотрудник переведён");
+    showToast(s.toastEmployeeTransferred);
   }
 
   function handleRemoveConfirmed() {
@@ -131,7 +135,7 @@ export default function BrigadeCompositionPage() {
       prev.map((e) => (e.id === removeTarget.id ? { ...e, brigadeId: null, brigadeName: null, objectId: null, objectName: null, status: "available" } : e)),
     );
     if (drawerTarget?.id === removeTarget.id) setDrawerTarget(null);
-    showToast("Сотрудник удалён из бригады", "info");
+    showToast(s.toastEmployeeRemoved, "info");
     setRemoveTarget(null);
   }
 
@@ -142,7 +146,7 @@ export default function BrigadeCompositionPage() {
         setDrawerTarget(employee);
         break;
       case "edit":
-        showToast("Редактирование пока недоступно в демо", "info");
+        showToast(c.editUnavailableInDemo, "info");
         break;
       case "transfer":
         setTransferTarget(employee);
@@ -161,51 +165,51 @@ export default function BrigadeCompositionPage() {
 
   return (
     <AppLayout
-      title="Состав бригад"
-      subtitle="Управление участниками бригад, ролями и распределением по объектам"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск по сотрудникам..." }}
+      title={s.compositionPageTitle}
+      subtitle={s.compositionPageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.compositionSearchPlaceholder }}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Всего сотрудников в бригадах"
+          label={s.kpiTotalInBrigades}
           value={String(kpis.totalEmployees)}
           icon={UsersRound}
           tone="blue"
-          footer={`Из них рабочих: ${employees.filter((e) => e.brigadeId !== null && e.memberRole !== "helper").length}`}
+          footer={s.kpiWorkersFooter(employees.filter((e) => e.brigadeId !== null && e.memberRole !== "helper").length)}
         />
         <MetricCard
-          label="Активны на смене"
+          label={s.kpiActiveOnShift}
           value={String(kpis.activeOnShift)}
           icon={UserRoundCheck}
           tone="green"
-          footer={`${kpis.activeOnShiftPercent}% от общего состава`}
+          footer={s.kpiActiveOnShiftFooter(kpis.activeOnShiftPercent)}
         />
         <MetricCard
-          label="Свободные специалисты"
+          label={s.kpiFreeSpecialists}
           value={String(kpis.freeSpecialists)}
           icon={UserRoundIcon}
           tone="orange"
-          footer="Готовы к назначению"
+          footer={s.kpiReadyToAssign}
         />
         <MetricCard
-          label="Средняя укомплектованность"
+          label={s.kpiAverageCompleteness}
           value={`${kpis.averageCompleteness}%`}
           icon={Gauge}
           tone="purple"
-          footer="По всем бригадам"
+          footer={s.kpiAllBrigadesFooter}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_260px]">
         <Card className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Состав бригад</h2>
+            <h2 className="text-lg font-bold text-ink">{s.compositionPageTitle}</h2>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-5 sm:px-6">
             <CompositionFilters filters={filters} onChange={updateFilters} onReset={handleResetFilters} specialties={specialties} />
             <Button onClick={() => setAddOpen(true)}>
-              <Plus size={15} /> Добавить сотрудника
+              <Plus size={15} /> {s.addEmployeeButton}
             </Button>
           </div>
 
@@ -220,11 +224,11 @@ export default function BrigadeCompositionPage() {
             ) : (
               <EmptyState
                 icon={UsersRound}
-                title="Сотрудники не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
+                title={s.compositionEmptyTitle}
+                description={c.emptyStateHint}
                 action={
                   <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                    Сбросить фильтры
+                    {c.resetFiltersButton}
                   </Button>
                 }
               />
@@ -236,7 +240,7 @@ export default function BrigadeCompositionPage() {
             pageCount={pageCount}
             pageSize={pageSize}
             total={filteredEmployees.length}
-            itemLabel="сотрудников"
+            itemLabel={s.compositionPaginationItemLabel}
             onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
@@ -247,7 +251,7 @@ export default function BrigadeCompositionPage() {
 
         <div className="flex flex-col gap-4">
           <Card className="p-5 sm:p-6">
-            <h2 className="text-[17px] font-bold text-ink">Распределение по ролям</h2>
+            <h2 className="text-lg font-bold text-ink">{s.distributionByRoleTitle}</h2>
             <div className="mt-4 flex flex-col items-center gap-5">
               <SpecializationDonut slices={specialization} total={kpis.totalEmployees} />
               <SpecializationLegend slices={specialization} />
@@ -256,7 +260,7 @@ export default function BrigadeCompositionPage() {
 
           <UpcomingCompositionChanges
             changes={mockCompositionChanges}
-            onSeeAll={() => showToast("Полный список изменений пока недоступен в демо", "info")}
+            onSeeAll={() => showToast(s.toastFullChangesListUnavailable, "info")}
           />
         </div>
       </div>
@@ -279,7 +283,7 @@ export default function BrigadeCompositionPage() {
         open={Boolean(drawerTarget)}
         onClose={() => setDrawerTarget(null)}
         employee={drawerTarget}
-        onEdit={() => showToast("Редактирование пока недоступно в демо", "info")}
+        onEdit={() => showToast(c.editUnavailableInDemo, "info")}
         onTransfer={(e) => {
           setDrawerTarget(null);
           setTransferTarget(e);
@@ -292,9 +296,9 @@ export default function BrigadeCompositionPage() {
       <ConfirmDialog
         open={Boolean(removeTarget)}
         onClose={() => setRemoveTarget(null)}
-        title="Удалить сотрудника из бригады?"
-        description={removeTarget ? `«${removeTarget.fullName}» будет удалён из «${removeTarget.brigadeName}» и переведён в свободные специалисты.` : undefined}
-        confirmLabel="Удалить"
+        title={s.removeConfirmTitle}
+        description={removeTarget ? s.removeConfirmDescription(removeTarget.fullName, removeTarget.brigadeName ?? "") : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleRemoveConfirmed}
       />

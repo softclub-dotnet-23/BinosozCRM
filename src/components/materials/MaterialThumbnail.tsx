@@ -13,7 +13,7 @@ export function MaterialThumbnail({ src, alt, className }: MaterialThumbnailProp
 
   if (failed) {
     return (
-      <div className={cn("flex items-center justify-center rounded-lg bg-[#F5F5F4] text-ink-muted", className)}>
+      <div className={cn("flex items-center justify-center rounded-lg bg-surface-3 text-ink-muted", className)}>
         <Package size={18} />
       </div>
     );

@@ -13,13 +13,25 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import { ru } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "../ui/Card";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { Assignment } from "../../types";
 
-const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+function weekdayLabels(s: AppStrings["brigades"]): string[] {
+  return [s.weekdayMon, s.weekdayTue, s.weekdayWed, s.weekdayThu, s.weekdayFri, s.weekdaySat, s.weekdaySun];
+}
+
+const MONTH_KEYS = [
+  "monthJan", "monthFeb", "monthMar", "monthApr", "monthMay", "monthJun",
+  "monthJul", "monthAug", "monthSep", "monthOct", "monthNov", "monthDec",
+] as const;
+
+function monthYearLabel(s: AppStrings["brigades"], date: Date): string {
+  return `${s[MONTH_KEYS[date.getMonth()]]} ${date.getFullYear()}`;
+}
 
 interface AssignmentCalendarProps {
   assignments: Assignment[];
@@ -28,6 +40,8 @@ interface AssignmentCalendarProps {
 }
 
 export function AssignmentCalendar({ assignments, selectedDate, onSelectDate }: AssignmentCalendarProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
   const [cursor, setCursor] = useState(() => (selectedDate ? parseISO(selectedDate) : new Date(2026, 6, 1)));
 
   const days = useMemo(() => {
@@ -50,31 +64,31 @@ export function AssignmentCalendar({ assignments, selectedDate, onSelectDate }: 
   return (
     <Card className="p-5 sm:p-6">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold text-ink">Календарь назначений</h2>
+        <h2 className="text-lg font-bold text-ink">{s.calendarTitle}</h2>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            aria-label="Предыдущий месяц"
+            aria-label={s.prevMonthAriaLabel}
             onClick={() => setCursor((c) => subMonths(c, 1))}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
           >
             <ChevronLeft size={15} />
           </button>
           <button
             type="button"
-            aria-label="Следующий месяц"
+            aria-label={s.nextMonthAriaLabel}
             onClick={() => setCursor((c) => addMonths(c, 1))}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
           >
             <ChevronRight size={15} />
           </button>
         </div>
       </div>
-      <p className="mt-1 text-sm font-semibold capitalize text-ink-secondary">{format(cursor, "LLLL yyyy", { locale: ru })}</p>
+      <p className="mt-1 text-sm font-semibold capitalize text-ink-secondary">{monthYearLabel(s, cursor)}</p>
 
       <div className="mt-3 grid grid-cols-7 gap-y-1 text-center">
-        {WEEKDAY_LABELS.map((label) => (
-          <span key={label} className="text-[11px] font-semibold text-ink-muted">
+        {weekdayLabels(s).map((label) => (
+          <span key={label} className="text-xs font-semibold text-ink-muted">
             {label}
           </span>
         ))}
@@ -93,7 +107,7 @@ export function AssignmentCalendar({ assignments, selectedDate, onSelectDate }: 
               className={cn(
                 "relative mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium transition-colors",
                 !inMonth && "text-ink-muted/50",
-                inMonth && !isSelected && "text-ink hover:bg-[#F5F5F4]",
+                inMonth && !isSelected && "text-ink hover:bg-surface-3",
                 isSelected && "bg-primary text-white",
                 !isSelected && isToday && "ring-1 ring-primary text-primary font-bold",
               )}
@@ -113,7 +127,7 @@ export function AssignmentCalendar({ assignments, selectedDate, onSelectDate }: 
           onClick={() => onSelectDate(null)}
           className="mt-3 text-xs font-semibold text-primary hover:text-primary-hover"
         >
-          Сбросить выбор даты ×
+          {s.clearDateSelection}
         </button>
       )}
     </Card>

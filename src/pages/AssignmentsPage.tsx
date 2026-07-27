@@ -29,7 +29,8 @@ import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency } from "../utils/format";
 import { formatDateShort } from "../utils/date";
-import { ASSIGNMENT_STATUS_CONFIG } from "../utils/financeStatus";
+import { ASSIGNMENT_STATUS_CONFIG, assignmentStatusLabel } from "../utils/financeStatus";
+import { useLanguage } from "../context/LanguageContext";
 import type { Assignment, AssignmentStatus } from "../types";
 
 const TODAY_ISO = "2026-07-17";
@@ -42,6 +43,11 @@ function progressTone(status: AssignmentStatus): "green" | "orange" | "red" {
 
 export default function AssignmentsPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const a = strings.assignments;
+  const w = strings.works;
+  const br = strings.brigades;
+  const c = strings.common;
 
   const [assignments, setAssignments] = useRepositoryState(assignmentsRepository);
   const mockBrigades = useRepositorySnapshot(brigadesRepository);
@@ -120,37 +126,37 @@ export default function AssignmentsPage() {
     const status: AssignmentStatus | undefined = progress >= 100 ? "completed" : undefined;
     setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, progress, status: status ?? a.status } : a)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, progress, status: status ?? prev.status } : prev));
-    showToast("Прогресс обновлён");
+    showToast(w.toastProgressUpdated);
   }
 
   function handleComplete(id: string) {
     setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "completed", progress: 100 } : a)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "completed", progress: 100 } : prev));
-    showToast("Назначение завершено");
+    showToast(a.toastCompleted);
   }
 
   function handleCancel(id: string) {
     setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "cancelled" } : prev));
-    showToast("Назначение отменено", "info");
+    showToast(a.toastCancelled, "info");
   }
 
   function handleSaveAssignment(assignment: Assignment) {
     const isEdit = Boolean(editTarget);
     setAssignments((prev) => {
-      const exists = prev.some((a) => a.id === assignment.id);
-      return exists ? prev.map((a) => (a.id === assignment.id ? assignment : a)) : [assignment, ...prev];
+      const exists = prev.some((item) => item.id === assignment.id);
+      return exists ? prev.map((item) => (item.id === assignment.id ? assignment : item)) : [assignment, ...prev];
     });
     setFormOpen(false);
     setEditTarget(null);
-    showToast(isEdit ? "Назначение обновлено" : "Назначение создано");
+    showToast(isEdit ? a.toastUpdated : a.toastCreated);
   }
 
   function handleDeleteConfirmed() {
     if (!deleteTarget) return;
-    setAssignments((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+    setAssignments((prev) => prev.filter((item) => item.id !== deleteTarget.id));
     if (drawerTarget?.id === deleteTarget.id) setDrawerTarget(null);
-    showToast("Назначение удалено", "info");
+    showToast(a.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
@@ -158,20 +164,24 @@ export default function AssignmentsPage() {
     {
       key: "number",
       header: "№",
+      sticky: "left",
+      width: "40px",
       className: "sm:!pl-3",
       headerClassName: "sm:!pl-3",
       render: (row) => <span className="text-ink-secondary">{row.number}</span>,
     },
     {
       key: "object",
-      header: "Объект / Работа",
+      header: a.colObjectWork,
+      sticky: "left",
+      width: "203px",
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <div className="h-10 w-11 shrink-0 overflow-hidden rounded-lg border border-border">
             <ObjectImage src={row.imageUrl} type={row.objectType} alt={row.objectName} />
           </div>
           <div className="min-w-0 max-w-[148px]">
-            <p className="truncate text-[13px] font-semibold text-ink">{row.objectName}</p>
+            <p className="truncate text-sm font-semibold text-ink">{row.objectName}</p>
             <p className="truncate text-xs text-ink-secondary">{row.workTitle}</p>
           </div>
         </div>
@@ -179,7 +189,7 @@ export default function AssignmentsPage() {
     },
     {
       key: "brigade",
-      header: "Бригада / Прораб",
+      header: a.colBrigadeForeman,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
@@ -194,7 +204,7 @@ export default function AssignmentsPage() {
     },
     {
       key: "period",
-      header: "Период",
+      header: w.periodLabel,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => (
@@ -205,21 +215,21 @@ export default function AssignmentsPage() {
     },
     {
       key: "amount",
-      header: "Сумма, с.",
+      header: a.colAmountShort,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => <span className="whitespace-nowrap tabular text-ink">{formatCurrency(row.amount).replace(" сомони", " с.")}</span>,
     },
     {
       key: "status",
-      header: "Статус / Прогресс",
+      header: w.colStatusProgress,
       className: "px-1.5",
       headerClassName: "px-1.5",
       render: (row) => {
         const config = ASSIGNMENT_STATUS_CONFIG[row.status];
         return (
           <div className="space-y-1.5">
-            <Badge tone={config.tone}>{config.label}</Badge>
+            <Badge tone={config.tone}>{assignmentStatusLabel(br, row.status)}</Badge>
             <div className="flex items-center gap-1.5">
               <ProgressBar value={row.progress} tone={progressTone(row.status)} className="w-14" />
               <span className="shrink-0 text-xs font-semibold text-ink">{row.progress}%</span>
@@ -230,7 +240,9 @@ export default function AssignmentsPage() {
     },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
+      sticky: "right",
+      width: "56px",
       headerClassName: "text-right sm:!pr-3",
       className: "text-right sm:!pr-3",
       render: (row) => (
@@ -238,10 +250,10 @@ export default function AssignmentsPage() {
           <DropdownMenu
             trigger={<span className="text-lg leading-none">⋯</span>}
             items={[
-              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setDrawerTarget(row) },
+              { label: a.actionView, icon: <Eye size={14} />, onClick: () => setDrawerTarget(row) },
               {
-                label: "Редактировать",
-                icon: <Pencil size={14} />,  
+                label: c.edit,
+                icon: <Pencil size={14} />,
                 onClick: () => {
                   setEditTarget(row);
                   setFormOpen(true);
@@ -249,11 +261,11 @@ export default function AssignmentsPage() {
               },
               ...(row.status === "active" || row.status === "overdue"
                 ? [
-                    { label: "Завершить", icon: <CheckCircle size={14} />, onClick: () => handleComplete(row.id) },
-                    { label: "Отменить", icon: <Ban size={14} />, onClick: () => handleCancel(row.id) },
+                    { label: c.completeLabel, icon: <CheckCircle size={14} />, onClick: () => handleComplete(row.id) },
+                    { label: a.actionCancel, icon: <Ban size={14} />, onClick: () => handleCancel(row.id) },
                   ]
                 : []),
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+              { label: c.delete, icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
             ]}
           />
         </div>
@@ -263,9 +275,9 @@ export default function AssignmentsPage() {
 
   return (
     <AppLayout
-      title="Назначения"
-      subtitle="Назначение бригад и прорабов на объекты и работы"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск по назначениям..." }}
+      title={a.pageTitle}
+      subtitle={a.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: a.searchPlaceholder }}
       action={
         <Button
           onClick={() => {
@@ -273,52 +285,52 @@ export default function AssignmentsPage() {
             setFormOpen(true);
           }}
         >
-          <Plus size={15} /> Создать назначение
+          <Plus size={15} /> {a.createAssignment}
         </Button>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Всего назначений" value={String(kpis.total)} icon={ClipboardList} tone="blue" footer="За выбранный период" />
+        <MetricCard label={a.kpiTotal} value={String(kpis.total)} icon={ClipboardList} tone="blue" footer={a.kpiTotalFooter} />
         <MetricCard
-          label="Активные назначения"
+          label={a.kpiActive}
           value={String(kpis.active)}
           icon={Users}
           tone="orange"
-          footer={`${Math.round((kpis.active / kpis.total) * 100) || 0}% от всех назначений`}
+          footer={a.kpiPercentOfTotal(Math.round((kpis.active / kpis.total) * 100) || 0)}
         />
         <MetricCard
-          label="Завершено"
+          label={a.kpiCompleted}
           value={String(kpis.completed)}
           icon={CheckCircle2}
           tone="green"
-          footer={`${Math.round((kpis.completed / kpis.total) * 100) || 0}% от всех назначений`}
+          footer={a.kpiPercentOfTotal(Math.round((kpis.completed / kpis.total) * 100) || 0)}
         />
         <MetricCard
-          label="Отменено / просрочено"
+          label={a.kpiCancelledOrOverdue}
           value={String(kpis.cancelledOrOverdue)}
           icon={XCircle}
           tone="red"
-          footer={`${Math.round((kpis.cancelledOrOverdue / kpis.total) * 100) || 0}% от всех назначений`}
+          footer={a.kpiPercentOfTotal(Math.round((kpis.cancelledOrOverdue / kpis.total) * 100) || 0)}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_260px]">
         <Card className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Список назначений</h2>
+            <h2 className="text-lg font-bold text-ink">{a.listTitle}</h2>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2 px-5 sm:px-6">
             <CustomSelect
               size="sm"
-              aria-label="Статус"
+              aria-label={c.colStatus}
               value={filters.status}
               onValueChange={(v) => updateFilters({ ...filters, status: v as AssignmentStatus | "all" })}
               options={[
-                { value: "all", label: "Статус: Все" },
-                ...(Object.keys(ASSIGNMENT_STATUS_CONFIG) as AssignmentStatus[]).map((s) => ({
-                  value: s,
-                  label: ASSIGNMENT_STATUS_CONFIG[s].label,
+                { value: "all", label: a.statusAllLabel },
+                ...(Object.keys(ASSIGNMENT_STATUS_CONFIG) as AssignmentStatus[]).map((status) => ({
+                  value: status,
+                  label: assignmentStatusLabel(br, status),
                 })),
               ]}
             />
@@ -326,11 +338,11 @@ export default function AssignmentsPage() {
             <CustomSelect
               size="sm"
               searchable
-              aria-label="Объект"
+              aria-label={c.colObject}
               value={filters.objectId}
               onValueChange={(v) => updateFilters({ ...filters, objectId: v })}
               options={[
-                { value: "all", label: "Объект: Все" },
+                { value: "all", label: a.objectAllLabel },
                 ...mockObjects.map((o) => ({ value: o.id, label: o.name })),
               ]}
             />
@@ -338,22 +350,22 @@ export default function AssignmentsPage() {
             <CustomSelect
               size="sm"
               searchable
-              aria-label="Бригада"
+              aria-label={c.colBrigade}
               value={filters.brigadeId}
               onValueChange={(v) => updateFilters({ ...filters, brigadeId: v })}
               options={[
-                { value: "all", label: "Бригада: Все" },
+                { value: "all", label: a.brigadeAllLabel },
                 ...mockBrigades.map((b) => ({ value: b.id, label: b.name })),
               ]}
             />
 
             <CustomSelect
               size="sm"
-              aria-label="Прораб"
+              aria-label={c.roleLabels.prorab}
               value={filters.foremanName}
               onValueChange={(v) => updateFilters({ ...filters, foremanName: v })}
               options={[
-                { value: "all", label: "Прораб: Все" },
+                { value: "all", label: a.foremanAllLabel },
                 ...mockBrigades.map((b) => ({ value: b.foremanName, label: b.foremanName })),
               ]}
             />
@@ -363,7 +375,7 @@ export default function AssignmentsPage() {
             </span>
 
             <Button variant="ghost" size="sm" onClick={handleResetFilters}>
-              Сбросить фильтры
+              {c.resetFiltersButton}
             </Button>
           </div>
 
@@ -373,11 +385,11 @@ export default function AssignmentsPage() {
             ) : (
               <EmptyState
                 icon={ClipboardList}
-                title="Назначения не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
+                title={a.emptyTitle}
+                description={c.emptyStateHint}
                 action={
                   <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                    Сбросить фильтры
+                    {c.resetFiltersButton}
                   </Button>
                 }
               />
@@ -389,7 +401,7 @@ export default function AssignmentsPage() {
             pageCount={pageCount}
             pageSize={pageSize}
             total={filteredAssignments.length}
-            itemLabel="назначений"
+            itemLabel={a.paginationItemLabel}
             onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
@@ -430,20 +442,20 @@ export default function AssignmentsPage() {
         onUpdateProgress={handleUpdateProgress}
         onComplete={handleComplete}
         onCancel={handleCancel}
-        onEdit={(a) => {
-          setEditTarget(a);
+        onEdit={(assignment) => {
+          setEditTarget(assignment);
           setDrawerTarget(null);
           setFormOpen(true);
         }}
-        onDelete={(a) => setDeleteTarget(a)}
+        onDelete={(assignment) => setDeleteTarget(assignment)}
       />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить назначение?"
-        description={deleteTarget ? `Назначение №${deleteTarget.number} (${deleteTarget.objectName}) будет удалено.` : undefined}
-        confirmLabel="Удалить"
+        title={a.deleteConfirmTitle}
+        description={deleteTarget ? a.deleteConfirmDescription(deleteTarget.number, deleteTarget.objectName) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

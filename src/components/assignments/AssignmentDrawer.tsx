@@ -9,7 +9,8 @@ import { Avatar } from "../ui/Avatar";
 import { IconSummaryRow } from "../ui/IconSummaryRow";
 import { formatCurrency } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
-import { ASSIGNMENT_STATUS_CONFIG } from "../../utils/financeStatus";
+import { ASSIGNMENT_STATUS_CONFIG, assignmentStatusLabel } from "../../utils/financeStatus";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Assignment } from "../../types";
 
 interface AssignmentDrawerProps {
@@ -34,6 +35,10 @@ export function AssignmentDrawer({
   onDelete,
 }: AssignmentDrawerProps) {
   const [progressInput, setProgressInput] = useState("0");
+  const { strings } = useLanguage();
+  const a = strings.assignments;
+  const w = strings.works;
+  const c = strings.common;
 
   useEffect(() => {
     if (assignment) setProgressInput(String(assignment.progress));
@@ -41,7 +46,7 @@ export function AssignmentDrawer({
 
   if (!assignment) {
     return (
-      <Drawer open={open} onClose={onClose} title="Назначение">
+      <Drawer open={open} onClose={onClose} title={a.defaultTitle}>
         {null}
       </Drawer>
     );
@@ -54,14 +59,14 @@ export function AssignmentDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      title={`Назначение №${assignment.number}`}
+      title={a.numberTitle(assignment.number)}
       footer={
         <>
           <Button variant="secondary" className="flex-1" onClick={() => onEdit(assignment)}>
-            <Pencil size={14} /> Редактировать
+            <Pencil size={14} /> {c.edit}
           </Button>
           <Button variant="danger" className="flex-1" onClick={() => onDelete(assignment)}>
-            <Trash2 size={14} /> Удалить
+            <Trash2 size={14} /> {c.delete}
           </Button>
         </>
       }
@@ -73,17 +78,17 @@ export function AssignmentDrawer({
       <div className="mt-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-ink-secondary">Объект / Работа</p>
+            <p className="text-xs text-ink-secondary">{a.colObjectWork}</p>
             <p className="text-base font-bold text-ink">{assignment.objectName}</p>
             <p className="text-sm text-ink-secondary">{assignment.workTitle}</p>
           </div>
-          <Badge tone={statusConfig.tone}>{statusConfig.label}</Badge>
+          <Badge tone={statusConfig.tone}>{assignmentStatusLabel(strings.brigades, assignment.status)}</Badge>
         </div>
 
         <div className="mt-4 flex items-center gap-2.5">
           <Avatar name={assignment.foremanName} size="sm" />
           <div>
-            <p className="text-xs text-ink-secondary">Прораб · {assignment.brigadeName}</p>
+            <p className="text-xs text-ink-secondary">{c.roleLabels.prorab} · {assignment.brigadeName}</p>
             <p className="text-sm font-semibold text-ink">{assignment.foremanName}</p>
           </div>
         </div>
@@ -91,18 +96,18 @@ export function AssignmentDrawer({
         <div className="mt-4 space-y-2.5">
           <IconSummaryRow
             icon={Calendar}
-            label="Период работ"
+            label={a.periodWorksLabel}
             value={`${formatDateShort(assignment.periodStart)} – ${formatDateShort(assignment.periodEnd)}`}
           />
-          <IconSummaryRow icon={Wallet} label="Сумма" value={formatCurrency(assignment.amount)} />
-          <IconSummaryRow icon={Building2} label="Бригада" value={assignment.brigadeName} />
+          <IconSummaryRow icon={Wallet} label={a.amountLabel} value={formatCurrency(assignment.amount)} />
+          <IconSummaryRow icon={Building2} label={c.colBrigade} value={assignment.brigadeName} />
         </div>
 
         <div className="my-4 border-t border-border" />
 
         <div>
           <div className="flex items-center justify-between text-xs text-ink-secondary">
-            <span>Прогресс выполнения</span>
+            <span>{w.progressExecutionLabel}</span>
             <span className="font-semibold text-ink">{assignment.progress}%</span>
           </div>
           <ProgressBar
@@ -129,7 +134,7 @@ export function AssignmentDrawer({
                   onUpdateProgress(assignment.id, value);
                 }}
               >
-                Обновить прогресс
+                {w.updateProgressButton}
               </Button>
             </div>
           )}
@@ -138,10 +143,10 @@ export function AssignmentDrawer({
         {!isClosed && (
           <div className="mt-5 flex flex-col gap-2.5">
             <Button onClick={() => onComplete(assignment.id)}>
-              <CheckCircle2 size={14} /> Завершить назначение
+              <CheckCircle2 size={14} /> {a.completeButton}
             </Button>
             <Button variant="outline" onClick={() => onCancel(assignment.id)}>
-              <XCircle size={14} /> Отменить назначение
+              <XCircle size={14} /> {a.cancelButton}
             </Button>
           </div>
         )}

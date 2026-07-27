@@ -3,13 +3,8 @@ import { ChevronDown, Download, FileSpreadsheet, FileText, Printer } from "lucid
 import { Button } from "../ui/Button";
 import { useOnClickOutside } from "../../hooks/useOnClickOutside";
 import { useToast } from "../../hooks/useToast";
+import { useLanguage } from "../../context/LanguageContext";
 import { cn } from "../../utils/cn";
-
-const EXPORT_ACTIONS = [
-  { key: "pdf", label: "Экспорт PDF", icon: FileText, verb: "Экспорт в PDF" },
-  { key: "excel", label: "Экспорт Excel", icon: FileSpreadsheet, verb: "Экспорт в Excel" },
-  { key: "print", label: "Печать отчёта", icon: Printer, verb: "Подготовка отчёта к печати" },
-] as const;
 
 export function ExportDropdown() {
   const [open, setOpen] = useState(false);
@@ -17,13 +12,22 @@ export function ExportDropdown() {
   const ref = useRef<HTMLDivElement>(null);
   useOnClickOutside(ref, () => setOpen(false));
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.works;
+  const c = strings.common;
+
+  const EXPORT_ACTIONS = [
+    { key: "pdf", label: s.exportPdf, icon: FileText, verb: s.exportingPdf },
+    { key: "excel", label: s.exportExcel, icon: FileSpreadsheet, verb: s.exportingExcel },
+    { key: "print", label: s.printReport, icon: Printer, verb: s.preparingPrint },
+  ] as const;
 
   function handleExport(key: string, verb: string, label: string) {
     setPendingKey(key);
     showToast(`${verb}…`, "info");
     window.setTimeout(() => {
       setPendingKey(null);
-      showToast(`${label}: готово`, "success");
+      showToast(s.exportDone(label), "success");
     }, 900);
     setOpen(false);
   }
@@ -31,7 +35,7 @@ export function ExportDropdown() {
   return (
     <div className="relative inline-block" ref={ref}>
       <Button variant="outline" onClick={() => setOpen((v) => !v)}>
-        <Download size={15} /> Экспорт <ChevronDown size={14} />
+        <Download size={15} /> {c.exportButton} <ChevronDown size={14} />
       </Button>
       {open && (
         <div className="absolute right-0 z-20 mt-1.5 w-56 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]">
@@ -44,7 +48,7 @@ export function ExportDropdown() {
                 type="button"
                 disabled={isPending}
                 onClick={() => handleExport(action.key, action.verb, action.label)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-[#F7F7F6] disabled:opacity-60"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-2 disabled:opacity-60"
               >
                 <Icon size={14} className={cn(isPending && "animate-spin")} />
                 {action.label}

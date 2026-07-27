@@ -3,7 +3,7 @@ import { Modal } from "../ui/Modal";
 import { Avatar } from "../ui/Avatar";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
 import { usersRepository } from "../../data/repositories";
-import { ROLE_LABEL } from "../../lib/auth/roleAccess";
+import { useLanguage } from "../../context/LanguageContext";
 import type { SessionUser } from "../../types";
 
 interface ProfileModalProps {
@@ -13,11 +13,13 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ open, onClose, user }: ProfileModalProps) {
+  const { strings } = useLanguage();
+  const c = strings.common;
   const accounts = useRepositorySnapshot(usersRepository);
   const account = accounts.find((a) => a.id === user.id);
 
   return (
-    <Modal open={open} onClose={onClose} title="Профиль" size="sm">
+    <Modal open={open} onClose={onClose} title={c.profileTitle} size="sm">
       <div className="flex items-center gap-3">
         <Avatar name={user.fullName} size="md" />
         <div>
@@ -26,10 +28,10 @@ export function ProfileModal({ open, onClose, user }: ProfileModalProps) {
         </div>
       </div>
       <div className="mt-5 space-y-3 border-t border-border pt-4">
-        <Row icon={ShieldCheck} label="Роль" value={ROLE_LABEL[user.role]} />
-        {account?.phone && <Row icon={Phone} label="Телефон" value={account.phone} />}
-        {account?.email && <Row icon={Mail} label="Email" value={account.email} />}
-        {account?.registeredAt && <Row icon={UserIcon} label="Дата регистрации" value={account.registeredAt} />}
+        <Row icon={ShieldCheck} label={c.profileRole} value={c.roleLabels[user.role]} />
+        {account?.phone && <Row icon={Phone} label={c.profilePhone} value={account.phone} />}
+        {account?.email && <Row icon={Mail} label={c.profileEmail} value={account.email} />}
+        {account?.registeredAt && <Row icon={UserIcon} label={c.profileRegisteredAt} value={account.registeredAt} />}
       </div>
     </Modal>
   );

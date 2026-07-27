@@ -21,14 +21,14 @@ export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuPr
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink"
+        className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
       >
         {trigger}
       </button>
       {open && (
         <div
           className={cn(
-            "absolute z-20 mt-1 w-44 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]",
+            "absolute z-20 mt-1 w-max min-w-44 max-w-64 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]",
             align === "right" ? "right-0" : "left-0",
           )}
         >
@@ -43,7 +43,7 @@ export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuPr
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#F7F7F6]",
+                "flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
                 item.danger ? "text-red" : "text-ink",
                 item.disabled && "cursor-not-allowed opacity-40 hover:bg-transparent",
               )}

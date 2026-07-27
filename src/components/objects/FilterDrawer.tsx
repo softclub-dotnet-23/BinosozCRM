@@ -2,13 +2,7 @@ import type { ObjectFilters, ObjectStatus } from "../../types";
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { cn } from "../../utils/cn";
-
-const STATUS_OPTIONS: { value: ObjectStatus; label: string }[] = [
-  { value: "in_progress", label: "В работе" },
-  { value: "at_risk", label: "Есть риск" },
-  { value: "almost_done", label: "Почти готов" },
-  { value: "completed", label: "Завершён" },
-];
+import { useLanguage } from "../../context/LanguageContext";
 
 const inputClass =
   "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
@@ -23,11 +17,22 @@ interface FilterDrawerProps {
 }
 
 export function FilterDrawer({ open, onClose, filters, onChange, onApply, onReset }: FilterDrawerProps) {
+  const { strings } = useLanguage();
+  const s = strings.objects;
+  const c = strings.common;
+
+  const STATUS_OPTIONS: { value: ObjectStatus; label: string }[] = [
+    { value: "in_progress", label: c.statusInProgress },
+    { value: "at_risk", label: c.statusAtRisk },
+    { value: "almost_done", label: c.statusAlmostDone },
+    { value: "completed", label: c.statusCompleted },
+  ];
+
   function toggleStatus(status: ObjectStatus) {
     const active = filters.statuses.includes(status);
     onChange({
       ...filters,
-      statuses: active ? filters.statuses.filter((s) => s !== status) : [...filters.statuses, status],
+      statuses: active ? filters.statuses.filter((st) => st !== status) : [...filters.statuses, status],
     });
   }
 
@@ -35,11 +40,11 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
     <Drawer
       open={open}
       onClose={onClose}
-      title="Фильтры"
+      title={s.filterDrawerTitle}
       footer={
         <>
           <Button variant="secondary" className="flex-1" onClick={onReset}>
-            Сбросить
+            {c.resetButton}
           </Button>
           <Button
             className="flex-1"
@@ -48,14 +53,14 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
               onClose();
             }}
           >
-            Применить
+            {c.applyButton}
           </Button>
         </>
       }
     >
       <div className="space-y-5">
         <div>
-          <p className="text-sm font-semibold text-ink">Статус</p>
+          <p className="text-sm font-semibold text-ink">{c.colStatus}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {STATUS_OPTIONS.map((opt) => (
               <button
@@ -66,7 +71,7 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                   filters.statuses.includes(opt.value)
                     ? "border-primary bg-primary-soft text-primary"
-                    : "border-border-strong text-ink-secondary hover:bg-[#F5F5F4]",
+                    : "border-border-strong text-ink-secondary hover:bg-surface-3",
                 )}
               >
                 {opt.label}
@@ -75,28 +80,28 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
           </div>
         </div>
 
-        <Field label="Город">
+        <Field label={s.filterCity}>
           <input
             type="text"
             value={filters.city}
             onChange={(e) => onChange({ ...filters, city: e.target.value })}
-            placeholder="Например, Душанбе"
+            placeholder={s.fieldCityPlaceholder}
             className={inputClass}
           />
         </Field>
 
-        <Field label="Прораб">
+        <Field label={s.filterForeman}>
           <input
             type="text"
             value={filters.foreman}
             onChange={(e) => onChange({ ...filters, foreman: e.target.value })}
-            placeholder="Имя прораба"
+            placeholder={s.fieldForemanPlaceholder}
             className={inputClass}
           />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Мин. прогресс, %">
+          <Field label={s.filterMinProgress}>
             <input
               type="number"
               min={0}
@@ -106,7 +111,7 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
               className={inputClass}
             />
           </Field>
-          <Field label="Макс. прогресс, %">
+          <Field label={s.filterMaxProgress}>
             <input
               type="number"
               min={0}
@@ -119,7 +124,7 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Дата начала">
+          <Field label={s.summaryStartDate}>
             <input
               type="date"
               value={filters.startDate}
@@ -127,7 +132,7 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
               className={inputClass}
             />
           </Field>
-          <Field label="Крайний срок">
+          <Field label={s.summaryDeadline}>
             <input
               type="date"
               value={filters.deadline}
@@ -138,7 +143,7 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Мин. бюджет">
+          <Field label={s.filterMinBudget}>
             <input
               type="number"
               min={0}
@@ -147,7 +152,7 @@ export function FilterDrawer({ open, onClose, filters, onChange, onApply, onRese
               className={inputClass}
             />
           </Field>
-          <Field label="Макс. бюджет">
+          <Field label={s.filterMaxBudget}>
             <input
               type="number"
               min={0}

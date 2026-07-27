@@ -1,13 +1,15 @@
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { ObjectProgressPoint } from "../../types";
 import { ChartTooltip } from "./ChartTooltip";
-
-const SERIES = [
-  { key: "planned", label: "Плановый прогресс", color: "#2869C9", unit: "%" },
-  { key: "actual", label: "Фактический прогресс", color: "#FF6B00", unit: "%" },
-];
+import { useLanguage } from "../../context/LanguageContext";
 
 export function ProgressChart({ data }: { data: ObjectProgressPoint[] }) {
+  const { strings } = useLanguage();
+  const s = strings.objects;
+  const SERIES = [
+    { key: "planned", label: s.chartSeriesPlanned, color: "#2869C9", unit: "%" },
+    { key: "actual", label: s.chartSeriesActual, color: "#FF6B00", unit: "%" },
+  ];
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barGap={4} barCategoryGap="24%">
@@ -38,8 +40,8 @@ export function ProgressChart({ data }: { data: ObjectProgressPoint[] }) {
           iconSize={8}
           formatter={(value) => <span className="text-xs text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="planned" name="Плановый прогресс (%)" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} />
-        <Bar dataKey="actual" name="Фактический прогресс (%)" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="planned" name={`${s.chartSeriesPlanned} (%)`} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="actual" name={`${s.chartSeriesActual} (%)`} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} />
       </BarChart>
     </ResponsiveContainer>
   );

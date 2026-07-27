@@ -109,7 +109,7 @@ export function StockReservationModal({ open, row, onClose, onSave }: StockReser
         </>
       }
     >
-      <div className="rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
+      <div className="rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
         <span className="text-ink-secondary">Доступно для резерва: </span>
         <span className="font-bold text-ink tabular">
           {formatNumber(row.available)} {row.unit}

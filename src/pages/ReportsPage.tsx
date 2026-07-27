@@ -23,6 +23,17 @@ import { MaterialThumbnail } from "../components/materials/MaterialThumbnail";
 import { MaterialStatusBadge } from "../components/materials/MaterialStatusBadge";
 import { PayrollStatusBadge, payrollStatusLabel } from "../components/payroll/PayrollStatusBadge";
 import { WORK_STATUS_CONFIG } from "../utils/workStatus";
+import type { WorkStatus } from "../types";
+
+const RU_WORK_STATUS_LABELS: Record<WorkStatus, string> = {
+  completed: "Завершено",
+  in_progress: "В процессе",
+  overdue: "Просрочено",
+  planned: "Запланировано",
+  on_review: "На проверке",
+  paused: "Приостановлено",
+  cancelled: "Отменено",
+};
 import {
   objectsRepository,
   worksRepository,
@@ -59,8 +70,10 @@ import {
   sumWriteOffsValue,
   percentChange,
 } from "../utils/reportsAnalytics";
+import { useAuth } from "../context/AuthContext";
 import type { Material } from "../types";
 import "../styles/reports.css";
+import BrigadirReportsPage from "./BrigadirReportsPage";
 
 type ReportTab = "financial" | "warehouse" | "works" | "brigades" | "payroll";
 
@@ -128,7 +141,10 @@ const TABS: { key: ReportTab; label: string }[] = [
 
 function formatCompact(value: number): string {
   if (Math.abs(value) < 100000) return formatNumber(Math.round(value * 10) / 10);
-  return `${formatNumber(Math.round(value / 1000))} тыс.`;
+  // Non-breaking space between the number and unit: a regular space here is a valid
+  // wrap point for Recharts' axis-tick line splitting, which clips the top Y-axis
+  // label against the chart's own top edge when it wraps onto two lines.
+  return `${formatNumber(Math.round(value / 1000))} тыс.`;
 }
 
 function downloadCsv(filename: string, header: string[], rows: (string | number)[][]) {
@@ -143,6 +159,12 @@ function downloadCsv(filename: string, header: string[], rows: (string | number)
 }
 
 export default function ReportsPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirReportsPage />;
+  return <CompanyReportsPage />;
+}
+
+function CompanyReportsPage() {
   const { showToast } = useToast();
   const [tab, setTab] = usePersistentState<ReportTab>("reports.tab", "financial");
   const [search, setSearch] = usePersistentState("filters.reports.search", "");
@@ -334,7 +356,7 @@ export default function ReportsPage() {
       downloadCsv(
         "otchet-po-rabotam.csv",
         ["Работа", "Объект", "Раздел", "Ответственный", "Прогресс", "Статус"],
-        filteredWorks.map((w) => [w.title, w.objectName, w.sectionName, w.responsible.name, w.progress, WORK_STATUS_CONFIG[w.status].label]),
+        filteredWorks.map((w) => [w.title, w.objectName, w.sectionName, w.responsible.name, w.progress, RU_WORK_STATUS_LABELS[w.status]]),
       );
     } else if (tab === "brigades") {
       downloadCsv(
@@ -481,7 +503,7 @@ export default function ReportsPage() {
 
           <aside className="reports-aside">
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
               <FilterField label="Период">
                 <div className="reports-filter-period">
@@ -521,7 +543,7 @@ export default function ReportsPage() {
                   options={[
                     { value: "all", label: "Все статусы" },
                     ...(tab === "works"
-                      ? Object.entries(WORK_STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))
+                      ? (Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((key) => ({ value: key, label: RU_WORK_STATUS_LABELS[key] }))
                       : tab === "payroll"
                         ? ["prepared", "needs_review", "pending_approval", "approved", "returned", "paid", "cancelled"].map((s) => ({
                             value: s,
@@ -686,7 +708,7 @@ function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitabi
         </Card>
 
         <Card className="reports-chart-card reports-expense-card">
-          <h2 className="text-[15px] font-bold text-ink">Структура расходов</h2>
+          <h2 className="text-lg font-bold text-ink">Структура расходов</h2>
           {expenseStructure.length > 0 ? (
             <div className="reports-expense-content">
               <DonutChart data={expenseStructure} centerLabel="Расходы" centerValue={formatCompact(kpis.expense)} size={120} />
@@ -711,7 +733,7 @@ function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitabi
 
         <Card className="reports-table-card overflow-hidden p-0">
           <div className="px-4 pt-3.5">
-            <h2 className="text-[15px] font-bold text-ink">Статьи доходов и расходов</h2>
+            <h2 className="text-lg font-bold text-ink">Статьи доходов и расходов</h2>
           </div>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[420px] border-collapse text-xs">
@@ -741,7 +763,7 @@ function FinancialTab({ kpis, prevIncome, prevExpense, prevProfit, prevProfitabi
                   ))
                 )}
                 {rows.length > 0 && (
-                  <tr className="bg-[#F5F5F4] font-bold">
+                  <tr className="bg-surface-3 font-bold">
                     <td className="px-5 py-2.5 text-ink">Итого</td>
                   <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(totals.income)}</td>
                   <td className="px-2.5 py-2.5 text-right tabular text-ink">{formatNumber(totals.expense)}</td>
@@ -786,7 +808,7 @@ function WarehouseTab({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <h2 className="text-[15px] font-bold text-ink">Статусы остатков</h2>
+          <h2 className="text-lg font-bold text-ink">Статусы остатков</h2>
           {buckets.length > 0 ? (
             <div className="mt-4 flex flex-col items-center sm:flex-row sm:gap-6">
               <DonutChart data={buckets} centerLabel="Позиций" centerValue={String(kpis.totalPositions)} size={168} valueFormatter={(v) => formatNumber(v)} />
@@ -807,7 +829,7 @@ function WarehouseTab({
         </Card>
 
         <Card className="p-5">
-          <h2 className="text-[15px] font-bold text-ink">Топ материалов по стоимости</h2>
+          <h2 className="text-lg font-bold text-ink">Топ материалов по стоимости</h2>
           <ul className="mt-3.5 space-y-3">
             {topMaterials.map((m) => (
               <li key={m.id} className="flex items-center gap-2.5">
@@ -823,7 +845,7 @@ function WarehouseTab({
       </div>
 
       <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Критические остатки</h2>
+        <h2 className="text-lg font-bold text-ink">Критические остатки</h2>
         <ul className="mt-3.5 space-y-3">
           {critical.length > 0 ? (
             critical.map((row) => (
@@ -869,16 +891,16 @@ function WorksTab({
       </div>
 
       <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Прогресс по объектам</h2>
+        <h2 className="text-lg font-bold text-ink">Прогресс по объектам</h2>
         <ul className="mt-3.5 space-y-3">
           {byObject.length > 0 ? (
             byObject.map((row) => (
               <li key={row.objectName}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-ink">{row.objectName}</span>
-                  <span className="font-semibold tabular text-ink">{row.averageProgress}%</span>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-ink">{row.objectName}</span>
+                  <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{row.averageProgress}%</span>
                 </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#F0F0EE]">
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-4">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${row.averageProgress}%` }} />
                 </div>
               </li>
@@ -891,12 +913,12 @@ function WorksTab({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <h2 className="text-[15px] font-bold text-ink">По разделам работ</h2>
+          <h2 className="text-lg font-bold text-ink">По разделам работ</h2>
           <ul className="mt-3.5 space-y-2.5 text-sm">
             {sections.map((s) => (
-              <li key={s.section.id} className="flex items-center justify-between">
-                <span className="text-ink-secondary">{s.section.name}</span>
-                <span className="font-semibold tabular text-ink">
+              <li key={s.section.id} className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-ink-secondary">{s.section.name}</span>
+                <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">
                   {s.workCount} · {s.averageProgress}%
                 </span>
               </li>
@@ -905,7 +927,7 @@ function WorksTab({
         </Card>
 
         <Card className="p-5">
-          <h2 className="text-[15px] font-bold text-ink">Просроченные работы</h2>
+          <h2 className="text-lg font-bold text-ink">Просроченные работы</h2>
           <ul className="mt-3.5 space-y-3">
             {critical.length > 0 ? (
               critical.map(({ work, overdueDays }) => (
@@ -928,7 +950,7 @@ function WorksTab({
       </div>
 
       <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Статистика по ответственным</h2>
+        <h2 className="text-lg font-bold text-ink">Статистика по ответственным</h2>
         <div className="mt-3.5 overflow-x-auto">
           <table className="w-full min-w-[420px] border-collapse text-sm">
             <thead>
@@ -977,7 +999,7 @@ function BrigadesTab({
       </div>
 
       <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Загрузка бригад</h2>
+        <h2 className="text-lg font-bold text-ink">Загрузка бригад</h2>
         <div className="mt-3.5 overflow-x-auto">
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead>
@@ -1005,13 +1027,13 @@ function BrigadesTab({
       </Card>
 
       <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Посещаемость по бригадам</h2>
+        <h2 className="text-lg font-bold text-ink">Посещаемость по бригадам</h2>
         <ul className="mt-3.5 space-y-2.5 text-sm">
           {attendanceByBrigade.length > 0 ? (
             attendanceByBrigade.map((row) => (
-              <li key={row.brigadeName} className="flex items-center justify-between">
-                <span className="text-ink-secondary">{row.brigadeName}</span>
-                <span className="font-semibold tabular text-ink">{row.rate}%</span>
+              <li key={row.brigadeName} className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-ink-secondary">{row.brigadeName}</span>
+                <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{row.rate}%</span>
               </li>
             ))
           ) : (
@@ -1042,7 +1064,7 @@ function PayrollTab({
       </div>
 
       <Card className="p-5">
-        <h2 className="text-[15px] font-bold text-ink">Статусы начислений</h2>
+        <h2 className="text-lg font-bold text-ink">Статусы начислений</h2>
         {buckets.length > 0 ? (
           <div className="mt-4 flex flex-col items-center sm:flex-row sm:gap-6">
             <DonutChart data={buckets} centerLabel="Всего" centerValue={String(records.length)} size={168} valueFormatter={(v) => formatNumber(v)} />
@@ -1063,7 +1085,7 @@ function PayrollTab({
 
       <Card className="overflow-hidden p-0">
         <div className="p-5 pb-0">
-          <h2 className="text-[15px] font-bold text-ink">Начисления</h2>
+          <h2 className="text-lg font-bold text-ink">Начисления</h2>
         </div>
         <div className="mt-3 max-h-80 overflow-y-auto overflow-x-auto">
           <table className="w-full min-w-140 border-collapse text-sm">
@@ -1147,12 +1169,12 @@ function ShortSummaryCard({
 
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-bold text-ink">Краткая сводка</h2>
+      <h2 className="text-lg font-bold text-ink">Краткая сводка</h2>
       <dl className="mt-3.5 space-y-2.5 text-sm">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between">
+          <div key={label} className="flex flex-wrap items-baseline justify-between gap-x-2">
             <dt className="text-ink-secondary">{label}</dt>
-            <dd className="font-bold text-ink tabular">{value}</dd>
+            <dd className="whitespace-nowrap font-bold text-ink tabular">{value}</dd>
           </div>
         ))}
       </dl>
@@ -1163,15 +1185,15 @@ function ShortSummaryCard({
 function TopObjectsCard({ rows, onSelectObject }: { rows: ReturnType<typeof getTopObjectsByProfit>; onSelectObject: (name: string) => void }) {
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-bold text-ink">Топ объектов по прибыли</h2>
+      <h2 className="text-lg font-bold text-ink">Топ объектов по прибыли</h2>
       <ul className="mt-3.5 space-y-2.5 text-sm">
         {rows.map((r, i) => (
           <li key={r.objectId}>
-            <button type="button" onClick={() => onSelectObject(r.objectName)} className="flex w-full items-center justify-between text-left hover:text-primary">
-              <span className="text-ink-secondary">
+            <button type="button" onClick={() => onSelectObject(r.objectName)} className="flex w-full items-center gap-2 text-left hover:text-primary">
+              <span className="min-w-0 flex-1 truncate text-ink-secondary">
                 {i + 1}. {r.objectName}
               </span>
-              <span className="font-semibold tabular text-ink">{formatCurrency(r.profit)}</span>
+              <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{formatCurrency(r.profit)}</span>
             </button>
           </li>
         ))}
@@ -1183,7 +1205,7 @@ function TopObjectsCard({ rows, onSelectObject }: { rows: ReturnType<typeof getT
 function TopMaterialsCard({ rows, materials }: { rows: ReturnType<typeof buildStockRows>; materials: Material[] }) {
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-bold text-ink">Топ материалов</h2>
+      <h2 className="text-lg font-bold text-ink">Топ материалов</h2>
       <ul className="mt-3.5 space-y-3">
         {rows.map((r) => (
           <li key={r.id} className="flex items-center gap-2.5">
@@ -1204,12 +1226,12 @@ function TopMaterialsCard({ rows, materials }: { rows: ReturnType<typeof buildSt
 function TopWorksCard({ rows }: { rows: ReturnType<typeof computeProgressByObject> }) {
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-bold text-ink">Прогресс по объектам</h2>
+      <h2 className="text-lg font-bold text-ink">Прогресс по объектам</h2>
       <ul className="mt-3.5 space-y-2.5 text-sm">
         {rows.slice(0, 5).map((r) => (
-          <li key={r.objectName} className="flex items-center justify-between">
-            <span className="text-ink-secondary">{r.objectName}</span>
-            <span className="font-semibold tabular text-ink">{r.averageProgress}%</span>
+          <li key={r.objectName} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-ink-secondary">{r.objectName}</span>
+            <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{r.averageProgress}%</span>
           </li>
         ))}
       </ul>
@@ -1220,12 +1242,12 @@ function TopWorksCard({ rows }: { rows: ReturnType<typeof computeProgressByObjec
 function TopBrigadesCard({ rows }: { rows: ReturnType<typeof computeBrigadeActivity> }) {
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-bold text-ink">Топ бригад по эффективности</h2>
+      <h2 className="text-lg font-bold text-ink">Топ бригад по эффективности</h2>
       <ul className="mt-3.5 space-y-2.5 text-sm">
         {rows.map((r) => (
-          <li key={r.id} className="flex items-center justify-between">
-            <span className="text-ink-secondary">{r.name}</span>
-            <span className="font-semibold tabular text-ink">{r.efficiency}%</span>
+          <li key={r.id} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-ink-secondary">{r.name}</span>
+            <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{r.efficiency}%</span>
           </li>
         ))}
       </ul>
@@ -1236,13 +1258,13 @@ function TopBrigadesCard({ rows }: { rows: ReturnType<typeof computeBrigadeActiv
 function UpcomingPaymentsCard({ rows }: { rows: ReturnType<typeof getUpcomingPayments> }) {
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-bold text-ink">Ближайшие выплаты</h2>
+      <h2 className="text-lg font-bold text-ink">Ближайшие выплаты</h2>
       <ul className="mt-3.5 space-y-2.5 text-sm">
         {rows.length > 0 ? (
           rows.map((r) => (
-            <li key={r.id} className="flex items-center justify-between">
-              <span className="text-ink-secondary">{r.employeeName}</span>
-              <span className="font-semibold tabular text-ink">{formatDateShort(r.paymentDate!)}</span>
+            <li key={r.id} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-ink-secondary">{r.employeeName}</span>
+              <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{formatDateShort(r.paymentDate!)}</span>
             </li>
           ))
         ) : (

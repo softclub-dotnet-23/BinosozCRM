@@ -8,7 +8,8 @@ import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
 import { EmployeeRoleBadge } from "./EmployeeRoleBadge";
 import { formatCurrency } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
-import { SHIFT_CONFIG } from "../../utils/brigadeStatus";
+import { EMPLOYEE_STATUS_CONFIG, SHIFT_CONFIG, employeeStatusLabel, shiftLabel } from "../../utils/brigadeStatus";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Employee, EmployeeStatus, WorkShift } from "../../types";
 
 interface EmployeeDetailsDrawerProps {
@@ -34,9 +35,13 @@ export function EmployeeDetailsDrawer({
   onChangeStatus,
   onRemove,
 }: EmployeeDetailsDrawerProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
+
   if (!employee) {
     return (
-      <Drawer open={open} onClose={onClose} title="Сотрудник">
+      <Drawer open={open} onClose={onClose} title={s.detailsEmployeeDefaultTitle}>
         {null}
       </Drawer>
     );
@@ -59,20 +64,20 @@ export function EmployeeDetailsDrawer({
       footer={
         <div className="grid w-full grid-cols-2 gap-2.5">
           <Button variant="secondary" onClick={() => onEdit(employee)}>
-            <Pencil size={14} /> Редактировать
+            <Pencil size={14} /> {c.edit}
           </Button>
           <Button variant="outline" onClick={() => onTransfer(employee)}>
-            <Repeat size={14} /> Перевести
+            <Repeat size={14} /> {s.actionTransfer}
           </Button>
           <Button
             variant="outline"
             className="col-span-2"
             onClick={() => onChangeShift(employee.id, employee.shift === "day" ? "evening" : "day")}
           >
-            <Clock size={14} /> Изменить смену
+            <Clock size={14} /> {s.actionChangeShift}
           </Button>
           <Button variant="danger" className="col-span-2" onClick={() => onRemove(employee)}>
-            <Trash2 size={14} /> Удалить из бригады
+            <Trash2 size={14} /> {s.actionRemoveFromBrigade}
           </Button>
         </div>
       }
@@ -90,41 +95,36 @@ export function EmployeeDetailsDrawer({
       <div className="my-4 border-t border-border" />
 
       <div className="space-y-2.5">
-        <IconSummaryRow icon={Phone} label="Телефон" value={employee.phone} />
-        <IconSummaryRow icon={Calendar} label="Дата назначения" value={formatDateShort(employee.assignedDate)} />
-        <IconSummaryRow icon={FileText} label="Квалификация" value={`${employee.qualificationGrade} разряд`} />
+        <IconSummaryRow icon={Phone} label={c.colPhone} value={employee.phone} />
+        <IconSummaryRow icon={Calendar} label={s.fieldAssignedDate} value={formatDateShort(employee.assignedDate)} />
+        <IconSummaryRow icon={FileText} label={s.qualificationLabel} value={s.gradeSuffix(employee.qualificationGrade)} />
       </div>
 
       <div className="my-4 border-t border-border" />
 
       <div>
-        <p className="text-sm font-semibold text-ink">Бригада и объект</p>
-        <p className="mt-1 text-sm text-ink">{employee.brigadeName ?? "Не назначен"}</p>
+        <p className="text-sm font-semibold text-ink">{s.brigadeAndObjectTitle}</p>
+        <p className="mt-1 text-sm text-ink">{employee.brigadeName ?? s.noBrigadeAssigned}</p>
         <p className="text-xs text-ink-secondary">{employee.objectName ?? "—"}</p>
         <label className="mt-3 block text-xs text-ink-secondary">
-          Смена
+          {s.fieldShift}
           <CustomSelect
             className="mt-1"
             value={employee.shift}
             onValueChange={(v) => onChangeShift(employee.id, v as WorkShift)}
-            options={(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((s) => ({ value: s, label: SHIFT_CONFIG[s].label }))}
+            options={(Object.keys(SHIFT_CONFIG) as WorkShift[]).map((shift) => ({ value: shift, label: shiftLabel(s, shift) }))}
           />
         </label>
         <label className="mt-3 block text-xs text-ink-secondary">
-          Статус
+          {c.colStatus}
           <CustomSelect
             className="mt-1"
             value={employee.status}
             onValueChange={(v) => onChangeStatus(employee.id, v as EmployeeStatus)}
-            options={[
-              { value: "on_shift", label: "На смене" },
-              { value: "on_site", label: "На объекте" },
-              { value: "available", label: "Свободен" },
-              { value: "on_trip", label: "На выезде" },
-              { value: "absent", label: "Отсутствует" },
-              { value: "on_leave", label: "В отпуске" },
-              { value: "sick_leave", label: "На больничном" },
-            ]}
+            options={(Object.keys(EMPLOYEE_STATUS_CONFIG) as EmployeeStatus[]).map((status) => ({
+              value: status,
+              label: employeeStatusLabel(s, status),
+            }))}
           />
         </label>
       </div>
@@ -132,18 +132,18 @@ export function EmployeeDetailsDrawer({
       <div className="my-4 border-t border-border" />
 
       <div className="space-y-2.5">
-        <IconSummaryRow icon={Clock} label="Отработано часов" value={`${hoursWorked} ч.`} />
-        <IconSummaryRow icon={CheckCircle2} label="Показатель эффективности" value={`${performancePercent}%`} />
-        <IconSummaryRow icon={Wallet} label="Начислено (30 дней)" value={formatCurrency(payrollAmount)} />
+        <IconSummaryRow icon={Clock} label={s.hoursWorkedTitle} value={s.hoursWorkedLabel(hoursWorked)} />
+        <IconSummaryRow icon={CheckCircle2} label={s.performanceLabel} value={`${performancePercent}%`} />
+        <IconSummaryRow icon={Wallet} label={s.accruedTitle} value={formatCurrency(payrollAmount)} />
       </div>
 
       <div className="my-4 border-t border-border" />
 
       <div>
         <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
-          <FileText size={14} className="text-ink-muted" /> Документы
+          <FileText size={14} className="text-ink-muted" /> {s.documentsTitle}
         </p>
-        <p className="text-xs text-ink-muted">Нет прикреплённых документов</p>
+        <p className="text-xs text-ink-muted">{s.noDocuments}</p>
       </div>
     </Drawer>
   );

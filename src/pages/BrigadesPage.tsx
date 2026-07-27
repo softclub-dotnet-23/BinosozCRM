@@ -27,6 +27,7 @@ import {
 import { useToast } from "../hooks/useToast";
 import type { Brigade } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import BrigadirTeamPage from "./BrigadirTeamPage";
 
 export default function BrigadesPage() {
@@ -37,6 +38,9 @@ export default function BrigadesPage() {
 
 function CompanyBrigadesPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
 
   const [brigades, setBrigades] = useRepositoryState(brigadesRepository);
   const allEmployees = useRepositorySnapshot(employeesRepository);
@@ -94,19 +98,19 @@ function CompanyBrigadesPage() {
   function handleCreate(brigade: Brigade, asDraft: boolean) {
     setBrigades((prev) => [brigade, ...prev]);
     setCreateOpen(false);
-    showToast(asDraft ? "Бригада сохранена как черновик" : "Бригада создана");
+    showToast(asDraft ? s.toastCreatedDraft : s.toastCreated);
   }
 
   function handlePause(id: string) {
     setBrigades((prev) => prev.map((b) => (b.id === id ? { ...b, status: "paused" } : b)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "paused" } : prev));
-    showToast("Бригада поставлена на паузу", "info");
+    showToast(s.toastPaused, "info");
   }
 
   function handleActivate(id: string) {
     setBrigades((prev) => prev.map((b) => (b.id === id ? { ...b, status: "active" } : b)));
     setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "active" } : prev));
-    showToast("Бригада активирована");
+    showToast(s.toastActivated);
   }
 
   function handleDuplicate(brigade: Brigade) {
@@ -115,18 +119,18 @@ function CompanyBrigadesPage() {
       ...brigade,
       id: `brigade-copy-${suffix}`,
       number: nextNumber,
-      name: `Бригада №${nextNumber}`,
+      name: s.defaultNamePrefix(nextNumber),
       status: "forming",
     };
     setBrigades((prev) => [duplicated, ...prev]);
-    showToast("Бригада дублирована");
+    showToast(s.toastDuplicated);
   }
 
   function handleDeleteConfirmed() {
     if (!deleteTarget) return;
     setBrigades((prev) => prev.filter((b) => b.id !== deleteTarget.id));
     if (drawerTarget?.id === deleteTarget.id) setDrawerTarget(null);
-    showToast("Бригада удалена", "info");
+    showToast(s.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
@@ -139,7 +143,7 @@ function CompanyBrigadesPage() {
         setDrawerTarget(brigade);
         break;
       case "edit":
-        showToast("Редактирование пока недоступно в демо", "info");
+        showToast(c.editUnavailableInDemo, "info");
         break;
       case "pause":
         handlePause(brigade.id);
@@ -158,50 +162,50 @@ function CompanyBrigadesPage() {
 
   return (
     <AppLayout
-      title="Бригады"
-      subtitle="Управление бригадами и их составом"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск по бригадам, прорабам..." }}
+      title={s.pageTitle}
+      subtitle={s.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
       action={
         <Button onClick={() => setCreateOpen(true)}>
-          <Plus size={15} /> Создать бригаду
+          <Plus size={15} /> {s.createBrigade}
         </Button>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Всего бригад"
+          label={s.kpiTotalBrigades}
           value={String(kpis.totalBrigades)}
           icon={Users}
           tone="orange"
-          footer={`Активных: ${kpis.activeBrigades}`}
+          footer={s.kpiActiveBrigadesFooter(kpis.activeBrigades)}
         />
         <MetricCard
-          label="Сотрудников в бригадах"
+          label={s.kpiTotalMembers}
           value={String(kpis.totalMembers)}
           icon={UsersRound}
           tone="blue"
-          footer={`Из них рабочих: ${kpis.totalWorkers}`}
+          footer={s.kpiWorkersFooter(kpis.totalWorkers)}
         />
         <MetricCard
-          label="Назначено на работы"
+          label={s.kpiAssignedWorks}
           value={String(kpis.assignedWorksCount)}
           icon={ClipboardCheck}
           tone="green"
-          footer="Объектов"
+          footer={s.kpiObjectsFooter}
         />
         <MetricCard
-          label="Средняя эффективность"
+          label={s.kpiAverageEfficiency}
           value={`${kpis.averageEfficiency}%`}
           icon={Gauge}
           tone="purple"
-          footer="За текущий период"
+          footer={s.kpiCurrentPeriodFooter}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_250px]">
         <Card className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Список бригад</h2>
+            <h2 className="text-lg font-bold text-ink">{s.listTitle}</h2>
           </div>
 
           <div className="mt-4 px-5 sm:px-6">
@@ -214,11 +218,11 @@ function CompanyBrigadesPage() {
             ) : (
               <EmptyState
                 icon={Users}
-                title="Бригады не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
+                title={s.emptyTitle}
+                description={c.emptyStateHint}
                 action={
                   <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                    Сбросить фильтры
+                    {c.resetFiltersButton}
                   </Button>
                 }
               />
@@ -230,7 +234,7 @@ function CompanyBrigadesPage() {
             pageCount={pageCount}
             pageSize={pageSize}
             total={filteredBrigades.length}
-            itemLabel="бригад"
+            itemLabel={s.paginationItemLabel}
             onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
@@ -241,7 +245,7 @@ function CompanyBrigadesPage() {
 
         <div className="flex flex-col gap-4">
           <Card className="p-5 sm:p-6">
-            <h2 className="text-[17px] font-bold text-ink">Распределение по специальностям</h2>
+            <h2 className="text-lg font-bold text-ink">{s.distributionBySpecialtyTitle}</h2>
             <div className="mt-4 flex flex-col items-center gap-5">
               <SpecializationDonut slices={specialization} total={kpis.totalMembers} />
               <SpecializationLegend slices={specialization} />
@@ -252,7 +256,7 @@ function CompanyBrigadesPage() {
 
           <UpcomingBrigadeAssignmentsCard
             items={mockUpcomingBrigadeAssignments}
-            onSeeAll={() => showToast("Полный список назначений пока недоступен в демо", "info")}
+            onSeeAll={() => showToast(s.toastFullAssignmentsListUnavailable, "info")}
           />
         </div>
       </div>
@@ -263,10 +267,10 @@ function CompanyBrigadesPage() {
         open={Boolean(drawerTarget)}
         onClose={() => setDrawerTarget(null)}
         brigade={drawerTarget}
-        onEdit={() => showToast("Редактирование пока недоступно в демо", "info")}
-        onChangeComposition={() => showToast("Изменение состава пока недоступно в демо", "info")}
-        onAssignWork={() => showToast("Назначение на работу пока недоступно в демо", "info")}
-        onChangeForeman={() => showToast("Смена прораба пока недоступна в демо", "info")}
+        onEdit={() => showToast(c.editUnavailableInDemo, "info")}
+        onChangeComposition={() => showToast(s.toastChangeCompositionUnavailable, "info")}
+        onAssignWork={() => showToast(s.toastAssignWorkUnavailable, "info")}
+        onChangeForeman={() => showToast(s.toastChangeForemanUnavailable, "info")}
         onPause={handlePause}
         onActivate={handleActivate}
       />
@@ -274,9 +278,9 @@ function CompanyBrigadesPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить бригаду?"
-        description={deleteTarget ? `«${deleteTarget.name}» будет удалена из списка бригад.` : undefined}
-        confirmLabel="Удалить"
+        title={s.deleteConfirmTitle}
+        description={deleteTarget ? s.deleteConfirmDescription(deleteTarget.name) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

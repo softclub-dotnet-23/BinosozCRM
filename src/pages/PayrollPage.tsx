@@ -23,6 +23,7 @@ import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { canEditPayroll, toPayrollRole } from "../utils/payrollPermissions";
 import { useAuth } from "../context/AuthContext";
+import BrigadirSalaryPage from "./BrigadirSalaryPage";
 import { computePayrollKpis, computePayrollStatusBuckets, getUpcomingPayments } from "../utils/payrollAnalytics";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatNumber } from "../utils/format";
@@ -38,7 +39,7 @@ const DEFAULT_FILTERS: PayrollFilters = {
 };
 
 const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function overlaps(record: PayrollRecord, from: string, to: string): boolean {
   if (from && record.periodEnd < from) return false;
@@ -61,6 +62,12 @@ function withHistory(record: PayrollRecord, status: PayrollStatus, actor: string
 }
 
 export default function PayrollPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirSalaryPage />;
+  return <CompanyPayrollPage />;
+}
+
+function CompanyPayrollPage() {
   const { showToast } = useToast();
   const { user } = useAuth();
   const [records, setRecords] = useRepositoryState(payrollRepository);
@@ -238,22 +245,36 @@ export default function PayrollPage() {
   }
 
   const columns: DataTableColumn<PayrollRecord>[] = [
-    { key: "number", header: "№", render: (row) => <span className="text-ink-muted">{row.number}</span> },
+    {
+      key: "number",
+      header: "№",
+      sticky: "left",
+      width: "48px",
+      render: (row) => <span className="text-ink-muted">{row.number}</span>,
+    },
     {
       key: "employee",
       header: "Сотрудник",
+      sticky: "left",
+      width: "212px",
       render: (row) => (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <Avatar name={row.employeeName} size="sm" />
-          <span className="whitespace-nowrap font-semibold text-ink">{row.employeeName}</span>
+          <span className="truncate font-semibold text-ink">{row.employeeName}</span>
         </div>
       ),
     },
-    { key: "position", header: "Должность", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.position}</span> },
+    {
+      key: "position",
+      header: "Должность",
+      render: (row) => <span className="block max-w-[136px] truncate text-ink-secondary">{row.position}</span>,
+    },
     {
       key: "brigade",
       header: "Бригада / Отдел",
-      render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.brigadeName ?? row.department ?? "—"}</span>,
+      render: (row) => (
+        <span className="block max-w-[128px] truncate text-ink-secondary">{row.brigadeName ?? row.department ?? "—"}</span>
+      ),
     },
     { key: "period", header: "Период", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.periodLabel}</span> },
     {
@@ -275,6 +296,8 @@ export default function PayrollPage() {
     {
       key: "actions",
       header: "Действия",
+      sticky: "right",
+      width: "92px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
@@ -305,15 +328,15 @@ export default function PayrollPage() {
         placeholder: "Поиск по сотрудникам...",
       }}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего к выплате" value={formatNumber(kpis.totalPayable)} icon={Wallet} tone="green" footer="сомони" />
-            <MetricCard label="Сотрудников" value={String(kpis.employeeCount)} icon={Users} tone="blue" footer="человек" />
-            <MetricCard label="Начислено" value={formatNumber(kpis.totalAccrued)} icon={TrendingUp} tone="orange" footer="сомони" />
-            <MetricCard label="Удержания" value={formatNumber(kpis.totalDeductions)} icon={TrendingDown} tone="purple" footer="сомони" />
-          </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <MetricCard label="Всего к выплате" value={formatNumber(kpis.totalPayable)} icon={Wallet} tone="green" footer="сомони" />
+        <MetricCard label="Сотрудников" value={String(kpis.employeeCount)} icon={Users} tone="blue" footer="человек" />
+        <MetricCard label="Начислено" value={formatNumber(kpis.totalAccrued)} icon={TrendingUp} tone="orange" footer="сомони" />
+        <MetricCard label="Удержания" value={formatNumber(kpis.totalDeductions)} icon={TrendingDown} tone="purple" footer="сомони" />
+      </div>
 
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-3 text-xs text-ink-secondary">
               <input
@@ -414,7 +437,7 @@ export default function PayrollPage() {
 
         <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Итоги за период</h2>
+            <h2 className="text-lg font-bold text-ink">Итоги за период</h2>
             <dl className="mt-3.5 space-y-2.5 text-sm">
               <div className="flex items-center justify-between">
                 <dt className="text-ink-secondary">Сотрудников</dt>
@@ -436,7 +459,7 @@ export default function PayrollPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Статусы выплат</h2>
+            <h2 className="text-lg font-bold text-ink">Статусы выплат</h2>
             {statusBuckets.length > 0 ? (
               <>
                 <DonutChart
@@ -467,7 +490,7 @@ export default function PayrollPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Ближайшие выплаты</h2>
+            <h2 className="text-lg font-bold text-ink">Ближайшие выплаты</h2>
             <ul className="mt-3.5 space-y-3">
               {upcoming.length > 0 ? (
                 upcoming.map((r) => (

@@ -9,6 +9,7 @@ import { formatDateShort } from "../../utils/date";
 import { formatCurrency } from "../../utils/format";
 import { calculateAge, formatTenure } from "../../utils/staffFormat";
 import { useToast } from "../../hooks/useToast";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface EmployeeProfilePanelProps {
   employee: StaffMember;
@@ -18,6 +19,9 @@ interface EmployeeProfilePanelProps {
 
 export function EmployeeProfilePanel({ employee, onEdit, onTransfer }: EmployeeProfilePanelProps) {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const e = strings.employees;
+  const c = strings.common;
   const age = calculateAge(employee.birthDate);
   const unit = employee.brigadeName ?? employee.department ?? "—";
 
@@ -35,42 +39,42 @@ export function EmployeeProfilePanel({ employee, onEdit, onTransfer }: EmployeeP
 
       <div className="mt-4 flex gap-2">
         <Button className="flex-1" onClick={onEdit}>
-          Редактировать
+          {c.edit}
         </Button>
         <Button variant="outline" className="flex-1" onClick={onTransfer}>
-          Перевести
+          {e.transferButton}
         </Button>
       </div>
 
-      <Section title="Контактная информация">
+      <Section title={e.contactInfoTitle}>
         <InfoRow icon={Phone} value={employee.phone} />
         <InfoRow icon={Mail} value={employee.email} />
-        <InfoRow icon={Cake} value={`${formatDateShort(employee.birthDate)} (${age} лет)`} />
-        <InfoRow icon={UserIcon} value="Мужской" />
+        <InfoRow icon={Cake} value={`${formatDateShort(employee.birthDate)} (${e.ageYearsLabel(age)})`} />
+        <InfoRow icon={UserIcon} value={e.genderMale} />
         <InfoRow icon={MapPin} value={employee.address} />
       </Section>
 
-      <Section title="Рабочая информация">
-        <SummaryRow label="Должность" value={employee.position} />
-        <SummaryRow label="Бригада / Отдел" value={unit} />
-        <SummaryRow label="Тип занятости" value={employee.employmentType} />
-        <SummaryRow label="Дата принятия" value={formatDateShort(employee.hireDate)} />
-        <SummaryRow label="Стаж работы" value={formatTenure(employee.hireDate)} />
-        <SummaryRow label="Оклад" value={formatCurrency(employee.salary)} />
+      <Section title={e.workInfoTitle}>
+        <SummaryRow label={e.colPosition} value={employee.position} />
+        <SummaryRow label={e.colUnit} value={unit} />
+        <SummaryRow label={e.fieldEmploymentType} value={employee.employmentType} />
+        <SummaryRow label={e.colHireDate} value={formatDateShort(employee.hireDate)} />
+        <SummaryRow label={e.fieldTenure} value={formatTenure(employee.hireDate, e)} />
+        <SummaryRow label={e.fieldSalary} value={formatCurrency(employee.salary)} />
       </Section>
 
-      <Section title="Документы">
-        <SummaryRow label="Паспорт" value={employee.passportNumber} />
-        <SummaryRow label="ИНН" value={employee.inn} />
+      <Section title={e.documentsTitle}>
+        <SummaryRow label={e.fieldPassport} value={employee.passportNumber} />
+        <SummaryRow label={e.fieldInn} value={employee.inn} />
         <div className="flex items-center justify-between">
-          <dt className="text-ink-secondary">Трудовой договор</dt>
+          <dt className="text-ink-secondary">{e.laborContractLabel}</dt>
           <dd>
             <button
               type="button"
-              onClick={() => showToast(`Договор сотрудника ${employee.fullName} скачан`, "info")}
+              onClick={() => showToast(e.contractDownloadedToast(employee.fullName), "info")}
               className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
             >
-              Скачать <Download size={14} />
+              {e.downloadButton} <Download size={14} />
             </button>
           </dd>
         </div>

@@ -3,6 +3,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { ProgressBar } from "../ui/ProgressBar";
 import { progressTone } from "../../utils/workStatus";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Work } from "../../types";
 
 interface ProgressUpdateModalProps {
@@ -15,6 +16,9 @@ interface ProgressUpdateModalProps {
 export function ProgressUpdateModal({ open, onClose, work, onSave }: ProgressUpdateModalProps) {
   const [progress, setProgress] = useState(0);
   const [note, setNote] = useState("");
+  const { strings } = useLanguage();
+  const s = strings.works;
+  const c = strings.common;
 
   useEffect(() => {
     if (work) setProgress(work.progress);
@@ -27,13 +31,13 @@ export function ProgressUpdateModal({ open, onClose, work, onSave }: ProgressUpd
     <Modal
       open={open}
       onClose={onClose}
-      title="Изменить прогресс"
+      title={s.progressModalTitle}
       description={`${work.code} — ${work.title}`}
       size="sm"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
           <Button
             onClick={() => {
@@ -41,7 +45,7 @@ export function ProgressUpdateModal({ open, onClose, work, onSave }: ProgressUpd
               onClose();
             }}
           >
-            Сохранить
+            {c.save}
           </Button>
         </>
       }
@@ -49,7 +53,7 @@ export function ProgressUpdateModal({ open, onClose, work, onSave }: ProgressUpd
       <div className="space-y-4">
         <div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-ink-secondary">Прогресс</span>
+            <span className="text-ink-secondary">{s.progressPercentLabel}</span>
             <span className="font-semibold text-ink tabular">{progress}%</span>
           </div>
           <input
@@ -59,17 +63,17 @@ export function ProgressUpdateModal({ open, onClose, work, onSave }: ProgressUpd
             value={progress}
             onChange={(e) => setProgress(Number(e.target.value))}
             className="mt-2 w-full accent-primary"
-            aria-label="Прогресс, %"
+            aria-label={s.progressPercentLabel}
           />
           <ProgressBar value={progress} tone={progressTone(work.status, progress)} className="mt-2" />
         </div>
         <label className="block text-sm font-medium text-ink">
-          Комментарий к обновлению
+          {s.commentUpdateLabel}
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            placeholder="Например, залито 40 м³ бетона"
+            placeholder={s.commentPlaceholderExample}
             className="mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
           />
         </label>

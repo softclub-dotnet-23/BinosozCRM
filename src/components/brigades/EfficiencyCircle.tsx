@@ -1,4 +1,5 @@
 import { efficiencyColor } from "../../utils/brigadeStatus";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface EfficiencyCircleProps {
   value: number;
@@ -7,6 +8,7 @@ interface EfficiencyCircleProps {
 }
 
 export function EfficiencyCircle({ value, size = 44, strokeWidth = 4 }: EfficiencyCircleProps) {
+  const { strings } = useLanguage();
   const clamped = Math.max(0, Math.min(100, value));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -18,7 +20,7 @@ export function EfficiencyCircle({ value, size = 44, strokeWidth = 4 }: Efficien
       className="relative shrink-0"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`Эффективность ${clamped}%`}
+      aria-label={`${strings.brigades.efficiencyLabel} ${clamped}%`}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#EFEFED" strokeWidth={strokeWidth} />
@@ -35,7 +37,7 @@ export function EfficiencyCircle({ value, size = 44, strokeWidth = 4 }: Efficien
           style={{ transition: "stroke-dashoffset 300ms ease" }}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-ink tabular">
+      <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-ink tabular">
         {clamped}%
       </div>
     </div>

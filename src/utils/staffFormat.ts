@@ -1,17 +1,15 @@
 import { differenceInMonths, differenceInYears, parseISO } from "date-fns";
-import { pluralizeRu } from "./pluralize";
+import type { AppStrings } from "../lib/i18n/appStrings";
 
 export function calculateAge(birthDateIso: string): number {
   return differenceInYears(new Date(), parseISO(birthDateIso));
 }
 
-export function formatTenure(hireDateIso: string): string {
+export function formatTenure(hireDateIso: string, s: AppStrings["employees"]): string {
   const totalMonths = Math.max(0, differenceInMonths(new Date(), parseISO(hireDateIso)));
   const years = Math.floor(totalMonths / 12);
   const months = totalMonths % 12;
-  const yearsLabel = pluralizeRu(years, "год", "года", "лет");
-  const monthsLabel = pluralizeRu(months, "месяц", "месяца", "месяцев");
-  if (years === 0) return `${months} ${monthsLabel}`;
-  if (months === 0) return `${years} ${yearsLabel}`;
-  return `${years} ${yearsLabel} ${months} ${monthsLabel}`;
+  if (years === 0) return s.tenureMonthsOnly(months);
+  if (months === 0) return s.tenureYearsOnly(years);
+  return s.tenureYearsMonths(years, months);
 }

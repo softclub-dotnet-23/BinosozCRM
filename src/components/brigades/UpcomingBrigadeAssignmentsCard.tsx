@@ -1,6 +1,7 @@
 import { Calendar } from "lucide-react";
 import { Card } from "../ui/Card";
 import { Badge } from "../ui/StatusBadge";
+import { useLanguage } from "../../context/LanguageContext";
 import type { UpcomingBrigadeAssignment } from "../../data/mockUpcomingBrigadeAssignments";
 
 export function UpcomingBrigadeAssignmentsCard({
@@ -10,9 +11,10 @@ export function UpcomingBrigadeAssignmentsCard({
   items: UpcomingBrigadeAssignment[];
   onSeeAll?: () => void;
 }) {
+  const { strings } = useLanguage();
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold text-ink">Ближайшие назначения</h2>
+      <h2 className="text-lg font-bold text-ink">{strings.common.upcomingAssignmentsTitle}</h2>
       <ul className="mt-3 space-y-3">
         {items.map((item) => (
           <li key={item.id} className="flex items-start gap-3">
@@ -35,7 +37,7 @@ export function UpcomingBrigadeAssignmentsCard({
         onClick={onSeeAll}
         className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
       >
-        Все назначения →
+        {strings.common.allAssignmentsLink}
       </button>
     </Card>
   );

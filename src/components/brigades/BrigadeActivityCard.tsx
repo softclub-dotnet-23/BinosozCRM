@@ -1,12 +1,14 @@
 import { Card } from "../ui/Card";
 import { ProgressBar } from "../ui/ProgressBar";
 import { activityTone } from "../../utils/brigadeAnalytics";
+import { useLanguage } from "../../context/LanguageContext";
 import type { BrigadeActivityRow } from "../../utils/brigadeAnalytics";
 
 export function BrigadeActivityCard({ rows }: { rows: BrigadeActivityRow[] }) {
+  const { strings } = useLanguage();
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold text-ink">Активность бригад</h2>
+      <h2 className="text-lg font-bold text-ink">{strings.brigades.activityTitle}</h2>
       <ul className="mt-4 space-y-3">
         {rows.map((row) => (
           <li key={row.id} className="flex items-center gap-3">

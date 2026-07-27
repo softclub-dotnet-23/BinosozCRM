@@ -4,6 +4,7 @@ import { IconContainer } from "../ui/IconContainer";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/StatusBadge";
 import { Button } from "../ui/Button";
+import { useLanguage } from "../../context/LanguageContext";
 
 const ICONS: Record<AlertIcon, typeof Clock> = {
   clock: Clock,
@@ -25,14 +26,15 @@ const ICON_TONE = {
 } as const;
 
 export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpen?: (item: AttentionItem) => void }) {
+  const { strings } = useLanguage();
   return (
     <div className="divide-y divide-border px-2 sm:px-3">
       {items.map((item) => {
         const Icon = ICONS[item.icon];
         return (
-          <div key={item.id} className="flex items-center gap-3.5 px-3 py-3.5">
+          <div key={item.id} className="flex flex-wrap items-start gap-x-3.5 gap-y-2 px-3 py-3.5">
             <IconContainer icon={Icon} tone={ICON_TONE[item.severity] as "red" | "orange" | "blue"} size="sm" />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-35 flex-1">
               <p className="truncate text-sm font-semibold text-ink">{item.title}</p>
               <p className="truncate text-xs text-ink-secondary">{item.objectName}</p>
               <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-ink-muted">
@@ -40,12 +42,14 @@ export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpe
                 {item.responsible}
               </div>
             </div>
-            <div className="hidden shrink-0 text-right sm:block">
-              <Badge tone={SEVERITY_TONE[item.severity]}>{item.alertLabel}</Badge>
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <div className="hidden sm:block">
+                <Badge tone={SEVERITY_TONE[item.severity]}>{item.alertLabel}</Badge>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => onOpen?.(item)}>
+                {strings.common.open}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="shrink-0" onClick={() => onOpen?.(item)}>
-              Открыть
-            </Button>
           </div>
         );
       })}

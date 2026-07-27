@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { mockObjects } from "../../data/mockObjects";
+import { useLanguage } from "../../context/LanguageContext";
 import type { BudgetLine, BudgetLineStatus } from "../../types";
 
 interface FormState {
@@ -22,13 +23,6 @@ const EMPTY_FORM: FormState = {
   status: "draft",
 };
 
-const STATUS_OPTIONS: { value: BudgetLineStatus; label: string }[] = [
-  { value: "draft", label: "Черновик" },
-  { value: "pending_approval", label: "На согласовании" },
-  { value: "in_progress", label: "В работе" },
-  { value: "completed", label: "Завершён" },
-];
-
 const inputClass =
   "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const errorInputClass = "border-red focus:border-red focus:ring-red/15";
@@ -40,8 +34,18 @@ interface BudgetAddModalProps {
 }
 
 export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps) {
+  const { strings } = useLanguage();
+  const s = strings.budgets;
+  const c = strings.common;
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+
+  const STATUS_OPTIONS: { value: BudgetLineStatus; label: string }[] = [
+    { value: "draft", label: c.statusDraft },
+    { value: "pending_approval", label: s.statusPendingApproval },
+    { value: "in_progress", label: c.statusInProgress },
+    { value: "completed", label: c.statusCompleted },
+  ];
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -50,11 +54,11 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.totalBudget || Number(form.totalBudget) <= 0) nextErrors.totalBudget = "Укажите бюджет больше нуля";
-    if (!form.periodStart) nextErrors.periodStart = "Укажите начало периода";
-    if (!form.periodEnd) nextErrors.periodEnd = "Укажите окончание периода";
+    if (!form.totalBudget || Number(form.totalBudget) <= 0) nextErrors.totalBudget = c.errorBudgetPositive;
+    if (!form.periodStart) nextErrors.periodStart = s.errorPeriodStartRequired;
+    if (!form.periodEnd) nextErrors.periodEnd = s.errorPeriodEndRequired;
     if (form.periodStart && form.periodEnd && form.periodEnd < form.periodStart) {
-      nextErrors.periodEnd = "Окончание не может быть раньше начала";
+      nextErrors.periodEnd = s.errorPeriodEndBeforeStart;
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -90,19 +94,19 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
     <Modal
       open={open}
       onClose={onClose}
-      title="Добавить бюджет"
-      description="Заполните основные параметры бюджета объекта"
+      title={s.addModalTitle}
+      description={s.addModalDescription}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
-          <Button onClick={handleSubmit}>Сохранить бюджет</Button>
+          <Button onClick={handleSubmit}>{s.addBudget}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Объект">
+        <Field label={c.colObject}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -112,7 +116,7 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={c.colStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
@@ -121,7 +125,7 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
           />
         </Field>
 
-        <Field label="Общий бюджет, сомони" error={errors.totalBudget}>
+        <Field label={c.totalBudgetSomoniLabel} error={errors.totalBudget}>
           <input
             type="number"
             min={0}
@@ -134,7 +138,7 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
 
         <div />
 
-        <Field label="Начало периода" error={errors.periodStart}>
+        <Field label={s.fieldPeriodStart} error={errors.periodStart}>
           <input
             type="date"
             value={form.periodStart}
@@ -143,7 +147,7 @@ export function BudgetAddModal({ open, onClose, onCreate }: BudgetAddModalProps)
           />
         </Field>
 
-        <Field label="Окончание периода" error={errors.periodEnd}>
+        <Field label={s.fieldPeriodEnd} error={errors.periodEnd}>
           <input
             type="date"
             value={form.periodEnd}

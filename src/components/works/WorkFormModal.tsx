@@ -6,8 +6,9 @@ import { CustomSelect } from "../ui/CustomSelect";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockAssignments";
 import { WORK_SECTIONS } from "../../data/mockWorks";
-import { WORK_STATUS_CONFIG, WORK_PRIORITY_CONFIG } from "../../utils/workStatus";
+import { WORK_STATUS_CONFIG, WORK_PRIORITY_CONFIG, workStatusLabel, workPriorityLabel, workSectionLabel } from "../../utils/workStatus";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Work, WorkPriority, WorkSectionKey, WorkStatus } from "../../types";
 
 interface FormState {
@@ -102,6 +103,8 @@ interface WorkFormModalProps {
 }
 
 export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode }: WorkFormModalProps) {
+  const { strings } = useLanguage();
+  const s = strings.works;
   const [form, setForm] = useState<FormState>(() => (work ? formFromWork(work) : { ...emptyForm(), code: nextCode }));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [attachments, setAttachments] = useState<string[]>(work?.attachments ?? []);
@@ -142,21 +145,21 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.title.trim()) nextErrors.title = "Укажите название работы";
-    if (!form.code.trim()) nextErrors.code = "Укажите код работы";
+    if (!form.title.trim()) nextErrors.title = s.errorTitleRequired;
+    if (!form.code.trim()) nextErrors.code = s.errorCodeRequired;
     else if (allWorks.some((w) => w.code === form.code.trim() && w.id !== work?.id)) {
-      nextErrors.code = "Такой код уже используется";
+      nextErrors.code = s.errorCodeTaken;
     }
-    if (!form.plannedStart) nextErrors.plannedStart = "Укажите дату начала";
-    if (!form.plannedEnd) nextErrors.plannedEnd = "Укажите дату завершения";
+    if (!form.plannedStart) nextErrors.plannedStart = s.errorPlannedStartRequired;
+    if (!form.plannedEnd) nextErrors.plannedEnd = s.errorPlannedEndRequired;
     if (form.plannedStart && form.plannedEnd && form.plannedEnd < form.plannedStart) {
-      nextErrors.plannedEnd = "Завершение не может быть раньше начала";
+      nextErrors.plannedEnd = s.errorPlannedEndBeforeStart;
     }
     const progressNum = Number(form.progress);
     if (Number.isNaN(progressNum) || progressNum < 0 || progressNum > 100) {
-      nextErrors.progress = "Прогресс от 0 до 100";
+      nextErrors.progress = s.errorProgressRange;
     }
-    if (!form.budget || Number(form.budget) <= 0) nextErrors.budget = "Бюджет должен быть больше нуля";
+    if (!form.budget || Number(form.budget) <= 0) nextErrors.budget = s.errorBudgetPositive;
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -215,54 +218,54 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
     <Modal
       open={open}
       onClose={onClose}
-      title={work ? "Редактировать работу" : "Добавить работу"}
-      description="Заполните параметры работы, сроки и ответственных"
+      title={work ? s.formEditTitle : s.formAddTitle}
+      description={s.formDescription}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {strings.common.cancelLabel}
           </Button>
-          <Button onClick={handleSubmit}>{work ? "Сохранить изменения" : "Создать работу"}</Button>
+          <Button onClick={handleSubmit}>{work ? s.saveChanges : s.createWork}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <Field label="Название работы" error={errors.title}>
+          <Field label={s.fieldTitle} error={errors.title}>
             <input
               type="text"
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
-              placeholder="Например, Устройство фундамента"
+              placeholder={s.fieldTitlePlaceholder}
               className={cn(inputClass, errors.title && errorInputClass)}
             />
           </Field>
         </div>
 
-        <Field label="Код работы" error={errors.code}>
+        <Field label={s.fieldCode} error={errors.code}>
           <input
             type="text"
             value={form.code}
             onChange={(e) => update("code", e.target.value)}
-            placeholder="1.1"
+            placeholder={s.fieldCodePlaceholder}
             className={cn(inputClass, errors.code && errorInputClass)}
           />
         </Field>
 
-        <Field label="Приоритет">
+        <Field label={s.fieldPriority}>
           <CustomSelect
             className="mt-1.5"
             value={form.priority}
             onValueChange={(v) => update("priority", v as WorkPriority)}
             options={(Object.keys(WORK_PRIORITY_CONFIG) as WorkPriority[]).map((p) => ({
               value: p,
-              label: WORK_PRIORITY_CONFIG[p].label,
+              label: workPriorityLabel(s, p),
             }))}
           />
         </Field>
 
-        <Field label="Объект">
+        <Field label={strings.common.colObject}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -272,28 +275,28 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Раздел">
+        <Field label={s.fieldSection}>
           <CustomSelect
             className="mt-1.5"
             value={form.sectionId}
             onValueChange={(v) => update("sectionId", v as WorkSectionKey)}
-            options={WORK_SECTIONS.map((s) => ({ value: s.id, label: s.name }))}
+            options={WORK_SECTIONS.map((section) => ({ value: section.id, label: workSectionLabel(s, section.id) }))}
           />
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Описание">
+          <Field label={strings.common.descriptionLabel}>
             <textarea
               value={form.description}
               onChange={(e) => update("description", e.target.value)}
               rows={3}
-              placeholder="Краткое описание содержания работы"
+              placeholder={s.fieldDescriptionPlaceholder}
               className={inputClass}
             />
           </Field>
         </div>
 
-        <Field label="Ответственный">
+        <Field label={strings.common.responsibleLabel}>
           <CustomSelect
             className="mt-1.5"
             value={form.responsible}
@@ -302,7 +305,7 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Бригада">
+        <Field label={strings.common.colBrigade}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -316,7 +319,7 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Плановая дата начала" error={errors.plannedStart}>
+        <Field label={s.fieldPlannedStart} error={errors.plannedStart}>
           <input
             type="date"
             value={form.plannedStart}
@@ -325,7 +328,7 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Плановая дата завершения" error={errors.plannedEnd}>
+        <Field label={s.fieldPlannedEnd} error={errors.plannedEnd}>
           <input
             type="date"
             value={form.plannedEnd}
@@ -334,15 +337,23 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Плановая продолжительность">
-          <div className={cn(inputClass, "bg-[#FAFAF9] text-ink-secondary")}>
+        <Field label={s.fieldPlannedDuration}>
+          <div className={cn(inputClass, "bg-surface-1 text-ink-secondary")}>
             {form.plannedStart && form.plannedEnd && form.plannedEnd >= form.plannedStart
-              ? `${Math.max(1, Math.round((new Date(`${form.plannedEnd}T00:00:00`).getTime() - new Date(`${form.plannedStart}T00:00:00`).getTime()) / 86_400_000))} дней`
-              : "—"}
+              ? s.durationDaysValue(
+                  Math.max(
+                    1,
+                    Math.round(
+                      (new Date(`${form.plannedEnd}T00:00:00`).getTime() - new Date(`${form.plannedStart}T00:00:00`).getTime()) /
+                        86_400_000,
+                    ),
+                  ),
+                )
+              : s.noValue}
           </div>
         </Field>
 
-        <Field label="Начальный прогресс, %" error={errors.progress}>
+        <Field label={s.fieldInitialProgress} error={errors.progress}>
           <input
             type="number"
             min={0}
@@ -353,19 +364,19 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={strings.common.colStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
             onValueChange={(v) => update("status", v as WorkStatus)}
-            options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => ({
-              value: s,
-              label: WORK_STATUS_CONFIG[s].label,
+            options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((status) => ({
+              value: status,
+              label: workStatusLabel(s, status),
             }))}
           />
         </Field>
 
-        <Field label="Бюджет работы, сомони" error={errors.budget}>
+        <Field label={s.fieldBudget} error={errors.budget}>
           <input
             type="number"
             min={0}
@@ -376,12 +387,12 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
           />
         </Field>
 
-        <Field label="Родительская работа">
+        <Field label={s.fieldParentWork}>
           <CustomSelect
             searchable
             clearable
             className="mt-1.5"
-            placeholder="Нет"
+            placeholder={s.noneOption}
             value={form.parentWorkId}
             onValueChange={(v) => update("parentWorkId", v)}
             options={parentOptions.map((w) => ({ value: w.id, label: `${w.code} — ${w.title}` }))}
@@ -389,11 +400,11 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
         </Field>
 
         <div className="sm:col-span-2">
-          <p className="text-sm font-medium text-ink">Зависимости</p>
+          <p className="text-sm font-medium text-ink">{s.fieldDependencies}</p>
           <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-border-strong p-2">
-            {dependencyOptions.length === 0 && <p className="px-1 py-1 text-xs text-ink-muted">Нет доступных работ</p>}
+            {dependencyOptions.length === 0 && <p className="px-1 py-1 text-xs text-ink-muted">{s.noDependenciesAvailable}</p>}
             {dependencyOptions.map((w) => (
-              <label key={w.id} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm text-ink hover:bg-[#FAFAF9]">
+              <label key={w.id} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm text-ink hover:bg-surface-1">
                 <input
                   type="checkbox"
                   checked={form.dependencyIds.includes(w.id)}
@@ -407,20 +418,20 @@ export function WorkFormModal({ open, onClose, onSave, work, allWorks, nextCode 
         </div>
 
         <div className="sm:col-span-2">
-          <p className="text-sm font-medium text-ink">Вложения</p>
-          <label className="mt-1.5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-dashed border-border-strong px-3 py-3 text-sm text-ink-secondary hover:bg-[#FAFAF9]">
+          <p className="text-sm font-medium text-ink">{s.fieldAttachments}</p>
+          <label className="mt-1.5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-dashed border-border-strong px-3 py-3 text-sm text-ink-secondary hover:bg-surface-1">
             <Paperclip size={14} />
-            Прикрепить файлы
+            {s.attachButton}
             <input type="file" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
           </label>
           {attachments.length > 0 && (
             <ul className="mt-2 space-y-1">
               {attachments.map((name, i) => (
-                <li key={`${name}-${i}`} className="flex items-center justify-between gap-2 rounded-lg bg-[#FAFAF9] px-3 py-1.5 text-xs text-ink-secondary">
+                <li key={`${name}-${i}`} className="flex items-center justify-between gap-2 rounded-lg bg-surface-1 px-3 py-1.5 text-xs text-ink-secondary">
                   <span className="truncate">{name}</span>
                   <button
                     type="button"
-                    aria-label={`Удалить ${name}`}
+                    aria-label={s.removeAttachmentAriaLabel(name)}
                     onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
                     className="shrink-0 text-ink-muted hover:text-red"
                   >

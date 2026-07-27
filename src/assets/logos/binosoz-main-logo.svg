@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-label="BINOSOZ Construction Management CRM">
+  <g transform="translate(6,8) scale(0.46)">
+    <path
+      fill="#FF5A00"
+      fill-rule="evenodd"
+      d="M20,20 L58,20 Q95,20 110,42 L154,9 L147,2 L185,5 L181,43 L173,34 L130,68 Q110,95 98,108 Q158,108 158,161 Q158,215 98,215 L35,215 Q20,215 20,200 Z
+         M78,140 L128,140 Q140,140 140,158 L140,178 Q140,196 122,196 L80,196 Q68,196 68,178 L68,158 Q68,140 78,140 Z
+         M72,38 L98,38 Q108,38 108,50 L108,75 Q108,90 95,90 L72,90 Q62,90 62,75 L62,50 Q62,38 72,38 Z"
+    />
+  </g>
+  <text
+    x="118"
+    y="66"
+    font-family="Arial, Helvetica, sans-serif"
+    font-weight="800"
+    font-size="50"
+    letter-spacing="-1"
+    fill="#111827"
+  >BINOSOZ</text>
+  <text
+    x="120"
+    y="90"
+    font-family="Arial, Helvetica, sans-serif"
+    font-weight="600"
+    font-size="13"
+    letter-spacing="2.2"
+    fill="#64748B"
+  >CONSTRUCTION MANAGEMENT CRM</text>
+</svg>

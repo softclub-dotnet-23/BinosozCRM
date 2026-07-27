@@ -1,6 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { CategorySpend } from "../../types";
 import { formatCurrency } from "../../utils/format";
+import { AnimatedNumber } from "../ui/AnimatedNumber";
 
 interface DonutChartProps {
   data: CategorySpend[];
@@ -8,11 +9,24 @@ interface DonutChartProps {
   centerValue: string;
   size?: number;
   valueFormatter?: (value: number) => string;
+  /** Opt-in slice-in animation — defaults to off, matching every existing caller's current
+   * (instant) behavior, since this component is shared across several pages. */
+  animate?: boolean;
+  /** Opt-in: animate the center total counting up/down instead of swapping `centerValue` instantly. */
+  animatedCenterValue?: number;
 }
 
 const INNER_RADIUS_PERCENT = 64;
 
-export function DonutChart({ data, centerLabel, centerValue, size = 208, valueFormatter = formatCurrency }: DonutChartProps) {
+export function DonutChart({
+  data,
+  centerLabel,
+  centerValue,
+  size = 208,
+  valueFormatter = formatCurrency,
+  animate = false,
+  animatedCenterValue,
+}: DonutChartProps) {
   const innerDiameter = size * (INNER_RADIUS_PERCENT / 100);
   const textMaxWidth = Math.round(innerDiameter - 28);
 
@@ -29,7 +43,9 @@ export function DonutChart({ data, centerLabel, centerValue, size = 208, valueFo
             paddingAngle={2}
             stroke="#FFFFFF"
             strokeWidth={2}
-            isAnimationActive={false}
+            isAnimationActive={animate}
+            animationDuration={500}
+            animationEasing="ease-out"
           >
             {data.map((entry) => (
               <Cell key={entry.category} fill={entry.color} />
@@ -54,8 +70,10 @@ export function DonutChart({ data, centerLabel, centerValue, size = 208, valueFo
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
         <div className="flex flex-col items-center" style={{ maxWidth: textMaxWidth }}>
-          <p className="text-[11px] leading-tight text-ink-secondary">{centerLabel}</p>
-          <p className="mt-1.5 break-words text-[15px] font-bold leading-[1.2] tabular text-ink">{centerValue}</p>
+          <p className="text-xs leading-tight text-ink-secondary">{centerLabel}</p>
+          <p className="mt-1.5 break-words text-lg font-bold leading-[1.2] tabular text-ink">
+            {typeof animatedCenterValue === "number" ? <AnimatedNumber value={animatedCenterValue} /> : centerValue}
+          </p>
         </div>
       </div>
     </div>

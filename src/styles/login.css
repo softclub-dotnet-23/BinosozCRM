@@ -76,29 +76,6 @@ body {
 .login-page .login-visual__brand {
   display: flex;
   align-items: center;
-  gap: 13px;
-}
-
-.login-page .login-visual__logo {
-  width: 48px;
-  height: 48px;
-  flex: 0 0 auto;
-}
-
-.login-page .login-visual__brand-name {
-  margin: 0;
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.login-page .login-visual__brand-tag {
-  margin: 0;
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.7);
 }
 
 .login-page .login-visual__heading {

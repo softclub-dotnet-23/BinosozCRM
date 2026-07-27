@@ -1,6 +1,7 @@
 import { AlertTriangle, PiggyBank, Wallet2, TrendingUp } from "lucide-react";
 import { IconContainer } from "../ui/IconContainer";
 import { formatCurrency } from "../../utils/format";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface BudgetSummaryBlocksProps {
   totalBudget: number;
@@ -10,11 +11,13 @@ interface BudgetSummaryBlocksProps {
 }
 
 export function BudgetSummaryBlocks({ totalBudget, actualSpent, remaining, overBudget }: BudgetSummaryBlocksProps) {
+  const { strings } = useLanguage();
+  const d = strings.dashboard;
   const items = [
-    { icon: Wallet2, tone: "blue" as const, label: "Общий бюджет", value: totalBudget },
-    { icon: PiggyBank, tone: "orange" as const, label: "Фактические расходы", value: actualSpent },
-    { icon: TrendingUp, tone: "green" as const, label: "Остаток", value: remaining },
-    { icon: AlertTriangle, tone: "red" as const, label: "Превышение бюджета", value: overBudget },
+    { icon: Wallet2, tone: "blue" as const, label: d.budgetTotal, value: totalBudget },
+    { icon: PiggyBank, tone: "orange" as const, label: d.budgetSpent, value: actualSpent },
+    { icon: TrendingUp, tone: "green" as const, label: d.budgetRemaining, value: remaining },
+    { icon: AlertTriangle, tone: "red" as const, label: d.budgetOver, value: overBudget },
   ];
 
   return (

@@ -342,7 +342,7 @@ export function ReceiptFormModal({ open, receipt, existingInvoiceNumbers, onClos
           ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
+        <div className="mt-3 flex items-center justify-between rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
           <span className="text-ink-secondary">
             Материалов: <span className="font-semibold text-ink">{form.lines.length}</span> · Кол-во:{" "}
             <span className="font-semibold text-ink tabular">{formatNumber(totalQuantity)}</span>

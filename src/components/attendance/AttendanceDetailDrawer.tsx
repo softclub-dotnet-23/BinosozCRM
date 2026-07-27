@@ -40,7 +40,7 @@ export function AttendanceDetailDrawer({ record, onClose }: { record: Attendance
           </dl>
 
           {record.note && (
-            <div className="rounded-lg bg-[#F5F5F4] px-3.5 py-2.5">
+            <div className="rounded-lg bg-surface-3 px-3.5 py-2.5">
               <p className="text-xs font-semibold text-ink-secondary">Примечание</p>
               <p className="mt-1 text-sm text-ink">{record.note}</p>
             </div>

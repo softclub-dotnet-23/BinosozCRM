@@ -1,5 +1,6 @@
 import { Moon, Sun, CalendarOff, MoonStar } from "lucide-react";
-import { SHIFT_CONFIG } from "../../utils/brigadeStatus";
+import { SHIFT_CONFIG, shiftLabel } from "../../utils/brigadeStatus";
+import { useLanguage } from "../../context/LanguageContext";
 import type { WorkShift } from "../../types";
 
 const SHIFT_ICON: Record<WorkShift, typeof Sun> = {
@@ -10,12 +11,13 @@ const SHIFT_ICON: Record<WorkShift, typeof Sun> = {
 };
 
 export function ShiftBadge({ shift }: { shift: WorkShift }) {
+  const { strings } = useLanguage();
   const config = SHIFT_CONFIG[shift];
   const Icon = SHIFT_ICON[shift];
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${config.className}`}>
       <Icon size={11} className="shrink-0" />
-      {config.label}
+      {shiftLabel(strings.brigades, shift)}
     </span>
   );
 }

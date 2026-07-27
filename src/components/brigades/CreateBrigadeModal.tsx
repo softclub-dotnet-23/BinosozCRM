@@ -5,8 +5,10 @@ import { CustomSelect } from "../ui/CustomSelect";
 import { TeamBuilder } from "./TeamBuilder";
 import { mockObjects } from "../../data/mockObjects";
 import { mockEmployees } from "../../data/mockEmployees";
-import { BRIGADE_STATUS_CONFIG } from "../../utils/brigadeStatus";
+import { BRIGADE_STATUS_CONFIG, brigadeStatusLabel } from "../../utils/brigadeStatus";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { Brigade, BrigadeStatus } from "../../types";
 
 interface FormState {
@@ -24,9 +26,9 @@ interface FormState {
   comment: string;
 }
 
-function emptyForm(nextNumber: number): FormState {
+function emptyForm(nextNumber: number, s: AppStrings["brigades"]): FormState {
   return {
-    name: `Бригада №${nextNumber}`,
+    name: s.defaultNamePrefix(nextNumber),
     specialization: "",
     foremanName: "",
     description: "",
@@ -53,16 +55,19 @@ interface CreateBrigadeModalProps {
 }
 
 export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: CreateBrigadeModalProps) {
-  const [form, setForm] = useState<FormState>(() => emptyForm(nextNumber));
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
+  const [form, setForm] = useState<FormState>(() => emptyForm(nextNumber, s));
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState | "members", string>>>({});
 
   useEffect(() => {
     if (!open) return;
-    setForm(emptyForm(nextNumber));
+    setForm(emptyForm(nextNumber, s));
     setMemberIds([]);
     setErrors({});
-  }, [open, nextNumber]);
+  }, [open, nextNumber, s]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -76,22 +81,22 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState | "members", string>> = {};
-    if (!form.name.trim()) nextErrors.name = "Укажите название бригады";
-    if (!form.specialization.trim()) nextErrors.specialization = "Укажите специализацию";
-    if (!form.foremanName.trim()) nextErrors.foremanName = "Укажите прораба";
-    if (memberIds.length === 0) nextErrors.members = "Добавьте хотя бы одного участника";
+    if (!form.name.trim()) nextErrors.name = s.errorNameRequired;
+    if (!form.specialization.trim()) nextErrors.specialization = s.errorSpecializationRequired;
+    if (!form.foremanName.trim()) nextErrors.foremanName = s.errorForemanRequired;
+    if (memberIds.length === 0) nextErrors.members = s.errorMembersRequired;
     if (
       form.foremanName.trim() &&
       memberIds.some((id) => mockEmployees.find((e) => e.id === id)?.fullName.toLowerCase() === form.foremanName.trim().toLowerCase())
     ) {
-      nextErrors.foremanName = "Прораб не может одновременно быть рядовым участником";
+      nextErrors.foremanName = s.errorForemanIsMember;
     }
     if (form.plannedStart && form.plannedEnd && form.plannedEnd < form.plannedStart) {
-      nextErrors.plannedEnd = "Окончание не может быть раньше начала";
+      nextErrors.plannedEnd = s.errorPlannedEndBeforeStartBrigade;
     }
     const efficiencyNum = Number(form.targetEfficiency);
     if (Number.isNaN(efficiencyNum) || efficiencyNum < 0 || efficiencyNum > 100) {
-      nextErrors.targetEfficiency = "Эффективность от 0 до 100";
+      nextErrors.targetEfficiency = s.errorEfficiencyRange;
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -120,8 +125,8 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
       objectName: object.name,
       objectType: object.objectType,
       imageUrl: object.imageUrl,
-      sectionName: form.currentWork.trim() || "Не определено",
-      currentWork: form.currentWork.trim() || "Не назначено",
+      sectionName: form.currentWork.trim() || s.notDefined,
+      currentWork: form.currentWork.trim() || s.notAssigned,
       workProgress: 0,
       remainingDays: 0,
       efficiency: 0,
@@ -135,13 +140,13 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
     <Modal
       open={open}
       onClose={onClose}
-      title="Создать бригаду"
-      description="Заполните параметры бригады и сформируйте состав"
+      title={s.createModalTitle}
+      description={s.createModalDescription}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
           <Button
             variant="outline"
@@ -150,7 +155,7 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
               if (brigade) onSave(brigade, true);
             }}
           >
-            Сохранить как черновик
+            {s.saveDraftButton}
           </Button>
           <Button
             onClick={() => {
@@ -158,13 +163,13 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
               if (brigade) onSave(brigade, false);
             }}
           >
-            Создать бригаду
+            {s.createBrigade}
           </Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Название бригады" error={errors.name}>
+        <Field label={s.fieldName} error={errors.name}>
           <input
             type="text"
             value={form.name}
@@ -173,55 +178,55 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
           />
         </Field>
 
-        <Field label="Специализация" error={errors.specialization}>
+        <Field label={s.fieldSpecialization} error={errors.specialization}>
           <input
             type="text"
             value={form.specialization}
             onChange={(e) => update("specialization", e.target.value)}
-            placeholder="Например, Монолитные работы"
+            placeholder={s.fieldSpecializationPlaceholder}
             className={cn(inputClass, errors.specialization && errorInputClass)}
           />
         </Field>
 
-        <Field label="Прораб" error={errors.foremanName}>
+        <Field label={s.fieldForemanName} error={errors.foremanName}>
           <input
             type="text"
             value={form.foremanName}
             onChange={(e) => update("foremanName", e.target.value)}
-            placeholder="ФИО прораба"
+            placeholder={s.fieldForemanNamePlaceholder}
             className={cn(inputClass, errors.foremanName && errorInputClass)}
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={c.colStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
             onValueChange={(v) => update("status", v as BrigadeStatus)}
-            options={(Object.keys(BRIGADE_STATUS_CONFIG) as BrigadeStatus[]).map((s) => ({
-              value: s,
-              label: BRIGADE_STATUS_CONFIG[s].label,
+            options={(Object.keys(BRIGADE_STATUS_CONFIG) as BrigadeStatus[]).map((status) => ({
+              value: status,
+              label: brigadeStatusLabel(s, status),
             }))}
           />
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Описание">
+          <Field label={c.descriptionLabel}>
             <textarea
               value={form.description}
               onChange={(e) => update("description", e.target.value)}
               rows={2}
-              placeholder="Краткое описание бригады"
+              placeholder={s.fieldDescriptionPlaceholderBrigade}
               className={inputClass}
             />
           </Field>
         </div>
 
-        <Field label="Дата создания">
+        <Field label={s.fieldCreatedDate}>
           <input type="date" value={form.createdDate} onChange={(e) => update("createdDate", e.target.value)} className={inputClass} />
         </Field>
 
-        <Field label="Объект">
+        <Field label={c.colObject}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -232,22 +237,22 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Текущая работа">
+          <Field label={s.fieldCurrentWork}>
             <input
               type="text"
               value={form.currentWork}
               onChange={(e) => update("currentWork", e.target.value)}
-              placeholder="Например, Устройство котлована"
+              placeholder={s.fieldCurrentWorkPlaceholder}
               className={inputClass}
             />
           </Field>
         </div>
 
-        <Field label="Плановая дата начала">
+        <Field label={strings.works.fieldPlannedStart}>
           <input type="date" value={form.plannedStart} onChange={(e) => update("plannedStart", e.target.value)} className={inputClass} />
         </Field>
 
-        <Field label="Плановая дата завершения" error={errors.plannedEnd}>
+        <Field label={strings.works.fieldPlannedEnd} error={errors.plannedEnd}>
           <input
             type="date"
             value={form.plannedEnd}
@@ -256,7 +261,7 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
           />
         </Field>
 
-        <Field label="Целевая эффективность, %" error={errors.targetEfficiency}>
+        <Field label={s.fieldTargetEfficiency} error={errors.targetEfficiency}>
           <input
             type="number"
             min={0}
@@ -268,7 +273,7 @@ export function CreateBrigadeModal({ open, onClose, onSave, nextNumber }: Create
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Комментарий">
+          <Field label={c.commentLabel}>
             <textarea
               value={form.comment}
               onChange={(e) => update("comment", e.target.value)}

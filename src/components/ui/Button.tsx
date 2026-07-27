@@ -13,10 +13,10 @@ const VARIANT_CLASSNAMES: Record<Variant, string> = {
   primary:
     "bg-primary text-white hover:bg-primary-hover active:bg-primary-hover disabled:bg-[#FFC79E] disabled:text-white/80",
   secondary:
-    "bg-[#F5F5F4] text-ink hover:bg-[#ECECEB] active:bg-[#E4E4E3] disabled:bg-[#F5F5F4] disabled:text-ink-muted",
+    "bg-surface-3 text-ink hover:bg-surface-5 active:bg-surface-6 disabled:bg-surface-3 disabled:text-ink-muted",
   outline:
-    "border border-primary text-primary bg-transparent hover:bg-primary-soft active:bg-[#FFE4CC] disabled:border-border-strong disabled:text-ink-muted",
-  ghost: "bg-transparent text-ink-secondary hover:bg-[#F5F5F4] active:bg-[#ECECEB] disabled:text-ink-muted",
+    "border border-primary text-primary bg-transparent hover:bg-primary-soft active:bg-primary-soft disabled:border-border-strong disabled:text-ink-muted",
+  ghost: "bg-transparent text-ink-secondary hover:bg-surface-3 active:bg-surface-5 disabled:text-ink-muted",
   danger: "bg-red text-white hover:bg-[#D42E2E] active:bg-[#C22626] disabled:bg-[#F3B3B3]",
 };
 

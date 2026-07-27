@@ -1,7 +1,9 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useLanguage } from "../../context/LanguageContext";
 import type { SpecializationSlice } from "../../utils/brigadeAnalytics";
 
 export function SpecializationDonut({ slices, total, size = 176 }: { slices: SpecializationSlice[]; total: number; size?: number }) {
+  const { strings } = useLanguage();
   const chartData = slices.filter((s) => s.value > 0);
   const displayData = chartData.length > 0 ? chartData : slices;
 
@@ -43,7 +45,7 @@ export function SpecializationDonut({ slices, total, size = 176 }: { slices: Spe
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
         <p className="text-2xl font-bold leading-none tabular text-ink">{total}</p>
-        <p className="mt-1.5 text-[11px] text-ink-secondary">человек</p>
+        <p className="mt-1.5 text-xs text-ink-secondary">{strings.brigades.peopleUnitLabel}</p>
       </div>
     </div>
   );

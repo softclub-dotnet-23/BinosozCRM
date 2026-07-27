@@ -5,7 +5,9 @@ import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { mockObjects } from "../../data/mockObjects";
 import { mockBrigades } from "../../data/mockAssignments";
-import { ASSIGNMENT_STATUS_CONFIG } from "../../utils/financeStatus";
+import { assignmentStatusLabel } from "../../utils/financeStatus";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { Assignment, AssignmentStatus } from "../../types";
 
 interface FormState {
@@ -45,9 +47,12 @@ function formFromAssignment(assignment: Assignment): FormState {
   };
 }
 
-const STATUS_OPTIONS: { value: AssignmentStatus; label: string }[] = (
-  ["active", "completed", "overdue", "cancelled"] as const
-).map((value) => ({ value, label: ASSIGNMENT_STATUS_CONFIG[value].label }));
+function buildStatusOptions(s: AppStrings["brigades"]): { value: AssignmentStatus; label: string }[] {
+  return (["active", "completed", "overdue", "cancelled"] as const).map((value) => ({
+    value,
+    label: assignmentStatusLabel(s, value),
+  }));
+}
 
 const inputClass =
   "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
@@ -62,6 +67,12 @@ interface AssignmentFormModalProps {
 }
 
 export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNumber }: AssignmentFormModalProps) {
+  const { strings } = useLanguage();
+  const a = strings.assignments;
+  const w = strings.works;
+  const br = strings.brigades;
+  const c = strings.common;
+  const STATUS_OPTIONS = buildStatusOptions(br);
   const [form, setForm] = useState<FormState>(() => (assignment ? formFromAssignment(assignment) : emptyForm()));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
@@ -78,16 +89,16 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.workTitle.trim()) nextErrors.workTitle = "Укажите название работы";
-    if (!form.amount || Number(form.amount) <= 0) nextErrors.amount = "Укажите сумму больше нуля";
-    if (!form.periodStart) nextErrors.periodStart = "Укажите начало периода";
-    if (!form.periodEnd) nextErrors.periodEnd = "Укажите окончание периода";
+    if (!form.workTitle.trim()) nextErrors.workTitle = w.errorTitleRequired;
+    if (!form.amount || Number(form.amount) <= 0) nextErrors.amount = a.errorAmountPositive;
+    if (!form.periodStart) nextErrors.periodStart = a.errorPeriodStartRequired;
+    if (!form.periodEnd) nextErrors.periodEnd = a.errorPeriodEndRequired;
     if (form.periodStart && form.periodEnd && form.periodEnd < form.periodStart) {
-      nextErrors.periodEnd = "Окончание не может быть раньше начала";
+      nextErrors.periodEnd = br.errorPlannedEndBeforeStartBrigade;
     }
     const progressNum = Number(form.progress);
     if (Number.isNaN(progressNum) || progressNum < 0 || progressNum > 100) {
-      nextErrors.progress = "Прогресс от 0 до 100";
+      nextErrors.progress = w.errorProgressRange;
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -124,19 +135,19 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
     <Modal
       open={open}
       onClose={onClose}
-      title={assignment ? "Редактировать назначение" : "Создать назначение"}
-      description="Назначьте бригаду и прораба на объект и работу"
+      title={assignment ? a.editModalTitle : a.createAssignment}
+      description={a.formDescription}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
-          <Button onClick={handleSubmit}>{assignment ? "Сохранить изменения" : "Создать назначение"}</Button>
+          <Button onClick={handleSubmit}>{assignment ? w.saveChanges : a.createAssignment}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Объект">
+        <Field label={c.colObject}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -146,7 +157,7 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
           />
         </Field>
 
-        <Field label="Бригада">
+        <Field label={c.colBrigade}>
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -157,18 +168,18 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Работа" error={errors.workTitle}>
+          <Field label={a.fieldWorkTitle} error={errors.workTitle}>
             <input
               type="text"
               value={form.workTitle}
               onChange={(e) => update("workTitle", e.target.value)}
-              placeholder="Например, Устройство фундамента"
+              placeholder={w.fieldTitlePlaceholder}
               className={cn(inputClass, errors.workTitle && errorInputClass)}
             />
           </Field>
         </div>
 
-        <Field label="Начало периода" error={errors.periodStart}>
+        <Field label={a.fieldPeriodStart} error={errors.periodStart}>
           <input
             type="date"
             value={form.periodStart}
@@ -177,7 +188,7 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
           />
         </Field>
 
-        <Field label="Окончание периода" error={errors.periodEnd}>
+        <Field label={a.fieldPeriodEnd} error={errors.periodEnd}>
           <input
             type="date"
             value={form.periodEnd}
@@ -186,7 +197,7 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
           />
         </Field>
 
-        <Field label="Сумма, сомони" error={errors.amount}>
+        <Field label={a.fieldAmountSomoni} error={errors.amount}>
           <input
             type="number"
             min={0}
@@ -197,7 +208,7 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={c.colStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
@@ -207,7 +218,7 @@ export function AssignmentFormModal({ open, onClose, onSave, assignment, nextNum
         </Field>
 
         <div className="sm:col-span-2">
-          <Field label="Прогресс, %" error={errors.progress}>
+          <Field label={a.fieldProgressPercent} error={errors.progress}>
             <input
               type="number"
               min={0}

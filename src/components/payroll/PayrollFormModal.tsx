@@ -115,7 +115,7 @@ export function PayrollFormModal({ open, record, onClose, onSave }: PayrollFormM
         </>
       }
     >
-      <div className="rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
+      <div className="rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-ink-secondary">Оклад</span>
           <span className="font-semibold text-ink tabular">{formatCurrency(record.baseSalary)}</span>

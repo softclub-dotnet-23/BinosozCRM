@@ -4,6 +4,8 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { BRIGADE_OPTIONS, DEPARTMENT_OPTIONS } from "../../data/mockStaff";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { StaffCategory, StaffMember, StaffStatus } from "../../types";
 
 type UnitType = "brigade" | "department";
@@ -26,17 +28,21 @@ interface FormState {
   inn: string;
 }
 
-const CATEGORY_OPTIONS: { value: StaffCategory; label: string }[] = [
-  { value: "worker", label: "Рабочий" },
-  { value: "engineer", label: "Инженер / ИТР" },
-  { value: "admin", label: "Администрация" },
-];
+function buildCategoryOptions(e: AppStrings["employees"]): { value: StaffCategory; label: string }[] {
+  return [
+    { value: "worker", label: e.categoryWorker },
+    { value: "engineer", label: e.categoryEngineer },
+    { value: "admin", label: e.categoryAdminOpt },
+  ];
+}
 
-const STATUS_OPTIONS: { value: StaffStatus; label: string }[] = [
-  { value: "active", label: "Активен" },
-  { value: "vacation", label: "Отпуск" },
-  { value: "dismissed", label: "Уволен" },
-];
+function buildStatusOptions(e: AppStrings["employees"]): { value: StaffStatus; label: string }[] {
+  return [
+    { value: "active", label: e.statusActive },
+    { value: "vacation", label: e.statusVacation },
+    { value: "dismissed", label: e.statusDismissed },
+  ];
+}
 
 function emptyForm(): FormState {
   return {
@@ -90,6 +96,11 @@ interface EmployeeFormModalProps {
 }
 
 export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeFormModalProps) {
+  const { strings } = useLanguage();
+  const e = strings.employees;
+  const c = strings.common;
+  const CATEGORY_OPTIONS = buildCategoryOptions(e);
+  const STATUS_OPTIONS = buildStatusOptions(e);
   const [form, setForm] = useState<FormState>(() => (employee ? toForm(employee) : emptyForm()));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
@@ -107,13 +118,13 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.fullName.trim()) nextErrors.fullName = "Укажите ФИО";
-    if (!form.position.trim()) nextErrors.position = "Укажите должность";
-    if (!form.phone.trim()) nextErrors.phone = "Укажите телефон";
-    if (!form.hireDate) nextErrors.hireDate = "Укажите дату принятия";
-    if (!form.email.trim()) nextErrors.email = "Укажите email";
-    if (!form.birthDate) nextErrors.birthDate = "Укажите дату рождения";
-    if (!form.salary || Number(form.salary) <= 0) nextErrors.salary = "Укажите оклад больше нуля";
+    if (!form.fullName.trim()) nextErrors.fullName = e.errorFullNameRequired;
+    if (!form.position.trim()) nextErrors.position = e.errorPositionRequired;
+    if (!form.phone.trim()) nextErrors.phone = e.errorPhoneRequired;
+    if (!form.hireDate) nextErrors.hireDate = e.errorHireDateRequired;
+    if (!form.email.trim()) nextErrors.email = e.errorEmailRequired;
+    if (!form.birthDate) nextErrors.birthDate = e.errorBirthDateRequired;
+    if (!form.salary || Number(form.salary) <= 0) nextErrors.salary = e.errorSalaryPositive;
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -151,40 +162,40 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
     <Modal
       open={open}
       onClose={onClose}
-      title={employee ? "Редактировать сотрудника" : "Добавить сотрудника"}
-      description="Заполните основные данные сотрудника"
+      title={employee ? e.formEditTitle : e.formAddTitle}
+      description={e.formDescription}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
-          <Button onClick={handleSubmit}>{employee ? "Сохранить изменения" : "Добавить сотрудника"}</Button>
+          <Button onClick={handleSubmit}>{employee ? strings.works.saveChanges : e.addEmployeeButton}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="ФИО" error={errors.fullName}>
+        <Field label={e.fieldFullName} error={errors.fullName}>
           <input
             type="text"
             value={form.fullName}
-            onChange={(e) => update("fullName", e.target.value)}
-            placeholder="Например, Мирзоев Шахром"
+            onChange={(ev) => update("fullName", ev.target.value)}
+            placeholder={e.fieldFullNamePlaceholder}
             className={cn(inputClass, errors.fullName && errorInputClass)}
           />
         </Field>
 
-        <Field label="Должность" error={errors.position}>
+        <Field label={e.fieldPositionInput} error={errors.position}>
           <input
             type="text"
             value={form.position}
-            onChange={(e) => update("position", e.target.value)}
-            placeholder="Например, Прораб"
+            onChange={(ev) => update("position", ev.target.value)}
+            placeholder={e.fieldPositionPlaceholder}
             className={cn(inputClass, errors.position && errorInputClass)}
           />
         </Field>
 
-        <Field label="Категория">
+        <Field label={e.fieldCategory}>
           <CustomSelect
             className="mt-1.5"
             value={form.category}
@@ -193,7 +204,7 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={c.colStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
@@ -202,20 +213,20 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
           />
         </Field>
 
-        <Field label="Тип подразделения">
+        <Field label={e.unitTypeLabel}>
           <CustomSelect
             className="mt-1.5"
             value={form.unitType}
             onValueChange={(v) => update("unitType", v as UnitType)}
             options={[
-              { value: "brigade", label: "Бригада" },
-              { value: "department", label: "Отдел" },
+              { value: "brigade", label: e.unitTypeBrigade },
+              { value: "department", label: e.unitTypeDepartment },
             ]}
           />
         </Field>
 
         {form.unitType === "brigade" ? (
-          <Field label="Бригада">
+          <Field label={c.colBrigade}>
             <CustomSelect
               searchable
               className="mt-1.5"
@@ -225,7 +236,7 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
             />
           </Field>
         ) : (
-          <Field label="Отдел">
+          <Field label={e.fieldDepartment}>
             <CustomSelect
               searchable
               className="mt-1.5"
@@ -236,80 +247,80 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
           </Field>
         )}
 
-        <Field label="Телефон" error={errors.phone}>
+        <Field label={c.colPhone} error={errors.phone}>
           <input
             type="text"
             value={form.phone}
-            onChange={(e) => update("phone", e.target.value)}
-            placeholder="+992 90 000 00 00"
+            onChange={(ev) => update("phone", ev.target.value)}
+            placeholder={e.fieldPhonePlaceholder}
             className={cn(inputClass, errors.phone && errorInputClass)}
           />
         </Field>
 
-        <Field label="Email" error={errors.email}>
+        <Field label={e.fieldEmail} error={errors.email}>
           <input
             type="email"
             value={form.email}
-            onChange={(e) => update("email", e.target.value)}
-            placeholder="name@example.com"
+            onChange={(ev) => update("email", ev.target.value)}
+            placeholder={e.fieldEmailPlaceholder}
             className={cn(inputClass, errors.email && errorInputClass)}
           />
         </Field>
 
-        <Field label="Дата рождения" error={errors.birthDate}>
+        <Field label={e.fieldBirthDate} error={errors.birthDate}>
           <input
             type="date"
             value={form.birthDate}
-            onChange={(e) => update("birthDate", e.target.value)}
+            onChange={(ev) => update("birthDate", ev.target.value)}
             className={cn(inputClass, errors.birthDate && errorInputClass)}
           />
         </Field>
 
-        <Field label="Дата принятия" error={errors.hireDate}>
+        <Field label={e.colHireDate} error={errors.hireDate}>
           <input
             type="date"
             value={form.hireDate}
-            onChange={(e) => update("hireDate", e.target.value)}
+            onChange={(ev) => update("hireDate", ev.target.value)}
             className={cn(inputClass, errors.hireDate && errorInputClass)}
           />
         </Field>
 
-        <Field label="Адрес">
+        <Field label={e.fieldAddress}>
           <input
             type="text"
             value={form.address}
-            onChange={(e) => update("address", e.target.value)}
-            placeholder="г. Душанбе, ул. Рудаки 123"
+            onChange={(ev) => update("address", ev.target.value)}
+            placeholder={e.fieldAddressPlaceholder}
             className={inputClass}
           />
         </Field>
 
-        <Field label="Оклад, сомони" error={errors.salary}>
+        <Field label={e.fieldSalaryForm} error={errors.salary}>
           <input
             type="number"
             min={0}
             value={form.salary}
-            onChange={(e) => update("salary", e.target.value)}
+            onChange={(ev) => update("salary", ev.target.value)}
             placeholder="5000"
             className={cn(inputClass, errors.salary && errorInputClass)}
           />
         </Field>
 
-        <Field label="Паспорт">
+        <Field label={e.fieldPassport}>
           <input
             type="text"
             value={form.passportNumber}
-            onChange={(e) => update("passportNumber", e.target.value)}
+            onChange={(ev) => update("passportNumber", ev.target.value)}
             placeholder="AA1234567"
             className={inputClass}
           />
         </Field>
 
-        <Field label="ИНН">
+        <Field label={e.fieldInn}>
           <input
             type="text"
             value={form.inn}
-            onChange={(e) => update("inn", e.target.value)}
+            onChange={(ev) => update("inn", ev.target.value)}
             placeholder="1234567890123"
             className={inputClass}
           />

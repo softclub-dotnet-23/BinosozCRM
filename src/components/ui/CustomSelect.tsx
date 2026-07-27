@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
 
 export interface SelectOption {
   value: string;
@@ -91,7 +92,7 @@ export function CustomSelect({
   value,
   onValueChange,
   options,
-  placeholder = "Выберите...",
+  placeholder,
   disabled = false,
   loading = false,
   error = false,
@@ -102,10 +103,15 @@ export function CustomSelect({
   className,
   id,
   name,
-  emptyText = "Ничего не найдено",
-  searchPlaceholder = "Поиск...",
+  emptyText,
+  searchPlaceholder,
   ...ariaProps
 }: CustomSelectProps) {
+  const { strings } = useLanguage();
+  const c = strings.common;
+  const resolvedPlaceholder = placeholder ?? c.selectPlaceholder;
+  const resolvedEmptyText = emptyText ?? c.selectEmpty;
+  const resolvedSearchPlaceholder = searchPlaceholder ?? c.selectSearch;
   const resolvedFullWidth = fullWidth ?? size !== "sm";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -326,8 +332,8 @@ export function CustomSelect({
               : "border-red"
             : open
               ? "border-primary ring-2 ring-primary/15"
-              : "border-border-strong hover:border-[#d4d4d2]",
-          disabled && "cursor-not-allowed bg-[#FAFAF9] text-ink-muted",
+              : "border-border-strong hover:border-border-hover",
+          disabled && "cursor-not-allowed bg-surface-1 text-ink-muted",
           loading && "cursor-wait",
         )}
       >
@@ -337,7 +343,7 @@ export function CustomSelect({
             className={cn("truncate", !selectedOption && "font-normal text-ink-muted")}
             title={selectedOption?.label}
           >
-            {selectedOption ? selectedOption.label : placeholder}
+            {selectedOption ? selectedOption.label : resolvedPlaceholder}
           </span>
         </span>
         <span className="flex flex-shrink-0 items-center gap-1">
@@ -345,12 +351,12 @@ export function CustomSelect({
             <button
               type="button"
               tabIndex={-1}
-              aria-label="Очистить"
+              aria-label={c.selectClear}
               onClick={(e) => {
                 e.stopPropagation();
                 onValueChange("");
               }}
-              className="rounded p-0.5 text-ink-muted transition-colors hover:bg-[#F0F0EF] hover:text-ink"
+              className="rounded p-0.5 text-ink-muted transition-colors hover:bg-surface-4 hover:text-ink"
             >
               <X size={13} />
             </button>
@@ -373,7 +379,7 @@ export function CustomSelect({
             ref={panelRef}
             role="listbox"
             id={listboxId}
-            aria-label={ariaProps["aria-label"] ?? placeholder}
+            aria-label={ariaProps["aria-label"] ?? resolvedPlaceholder}
             className="fixed z-[1000] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-popover)]"
             style={{
               left: rect.left,
@@ -393,7 +399,7 @@ export function CustomSelect({
                     setActiveIndex(0);
                   }}
                   onKeyDown={handleSearchKeyDown}
-                  placeholder={searchPlaceholder}
+                  placeholder={resolvedSearchPlaceholder}
                   role="combobox"
                   aria-expanded={open}
                   aria-autocomplete="list"
@@ -405,12 +411,12 @@ export function CustomSelect({
             )}
             <div className="overflow-y-auto py-1" style={{ maxHeight }}>
               {flatOptions.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-ink-muted">{emptyText}</p>
+                <p className="px-3 py-6 text-center text-sm text-ink-muted">{resolvedEmptyText}</p>
               ) : (
                 renderGroups.map((group) => (
                   <div key={group.key}>
                     {group.label && (
-                      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                      <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         {group.label}
                       </p>
                     )}
@@ -437,7 +443,7 @@ export function CustomSelect({
                           className={cn(
                             "mx-1 flex cursor-pointer items-center gap-2 rounded-lg text-ink transition-colors",
                             SIZE_OPTION_CLASSNAMES[size],
-                            isActive && !option.disabled && "bg-[#F5F5F4]",
+                            isActive && !option.disabled && "bg-surface-3",
                             isSelected && "bg-primary-soft font-medium text-primary",
                             option.disabled && "cursor-not-allowed opacity-40",
                           )}

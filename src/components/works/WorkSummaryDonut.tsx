@@ -1,5 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { WorkAnalytics } from "../../types";
+import { useLanguage } from "../../context/LanguageContext";
+import type { AppStrings } from "../../lib/i18n/appStrings";
 
 interface DonutSegment {
   key: string;
@@ -9,17 +11,18 @@ interface DonutSegment {
   color: string;
 }
 
-function buildSegments(analytics: WorkAnalytics): DonutSegment[] {
+function buildSegments(s: AppStrings["works"], analytics: WorkAnalytics): DonutSegment[] {
   return [
-    { key: "completed", label: "Завершено", value: analytics.completed, percent: analytics.completedPercent, color: "#22A447" },
-    { key: "inProgress", label: "В процессе", value: analytics.inProgress, percent: analytics.inProgressPercent, color: "#FF6B00" },
-    { key: "overdue", label: "Просрочено", value: analytics.overdue, percent: analytics.overduePercent, color: "#E83939" },
-    { key: "planned", label: "Запланировано", value: analytics.planned, percent: analytics.plannedPercent, color: "#2869C9" },
+    { key: "completed", label: s.statusCompleted, value: analytics.completed, percent: analytics.completedPercent, color: "#22A447" },
+    { key: "inProgress", label: s.statusInProgress, value: analytics.inProgress, percent: analytics.inProgressPercent, color: "#FF6B00" },
+    { key: "overdue", label: s.statusOverdue, value: analytics.overdue, percent: analytics.overduePercent, color: "#E83939" },
+    { key: "planned", label: s.statusPlanned, value: analytics.planned, percent: analytics.plannedPercent, color: "#2869C9" },
   ];
 }
 
 export function WorkSummaryDonut({ analytics, size = 176 }: { analytics: WorkAnalytics; size?: number }) {
-  const segments = buildSegments(analytics);
+  const { strings } = useLanguage();
+  const segments = buildSegments(strings.works, analytics);
   const chartData = segments.filter((s) => s.value > 0);
   const displayData = chartData.length > 0 ? chartData : segments;
 
@@ -61,14 +64,15 @@ export function WorkSummaryDonut({ analytics, size = 176 }: { analytics: WorkAna
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
         <p className="text-2xl font-bold leading-none tabular text-ink">{analytics.total}</p>
-        <p className="mt-1.5 text-[11px] text-ink-secondary">работ</p>
+        <p className="mt-1.5 text-xs text-ink-secondary">{strings.works.donutSuffix}</p>
       </div>
     </div>
   );
 }
 
 export function WorkSummaryLegend({ analytics }: { analytics: WorkAnalytics }) {
-  const segments = buildSegments(analytics);
+  const { strings } = useLanguage();
+  const segments = buildSegments(strings.works, analytics);
   return (
     <ul className="w-full space-y-2.5">
       {segments.map((row) => (

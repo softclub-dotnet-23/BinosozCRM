@@ -42,7 +42,7 @@ export function Drawer({ open, onClose, title, children, footer }: DrawerProps) 
             type="button"
             aria-label="Закрыть"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-[#F5F5F4] hover:text-ink"
+            className="rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink"
           >
             <X size={18} />
           </button>

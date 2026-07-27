@@ -21,6 +21,7 @@ import { formatCurrency, formatPercent } from "../utils/format";
 import { formatDateRu } from "../utils/date";
 import type { AttentionItem, ObjectStatus, ObjectSummaryRow, PeriodFilter } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import BrigadirDashboardPage from "./BrigadirDashboardPage";
 
 const OBJECT_STATUS_PRIORITY: Record<ObjectStatus, number> = {
@@ -29,13 +30,6 @@ const OBJECT_STATUS_PRIORITY: Record<ObjectStatus, number> = {
   almost_done: 2,
   completed: 3,
 };
-
-const PERIOD_TABS: { key: PeriodFilter; label: string }[] = [
-  { key: "week", label: "Неделя" },
-  { key: "month", label: "Месяц" },
-  { key: "quarter", label: "Квартал" },
-  { key: "year", label: "Год" },
-];
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -48,6 +42,14 @@ export default function DashboardPage() {
 function CompanyDashboard() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const d = strings.dashboard;
+  const PERIOD_TABS: { key: PeriodFilter; label: string }[] = [
+    { key: "week", label: d.periodWeek },
+    { key: "month", label: d.periodMonth },
+    { key: "quarter", label: d.periodQuarter },
+    { key: "year", label: d.periodYear },
+  ];
   const [period, setPeriod] = useState<PeriodFilter>("month");
   const [payrollRecords, setPayrollRecords] = useRepositoryState(payrollRepository);
   const objects = useRepositorySnapshot(objectsRepository);
@@ -90,7 +92,7 @@ function CompanyDashboard() {
       title: work.title,
       objectName: work.objectName,
       responsible: work.responsible.name,
-      alertLabel: `Просрочено на ${overdueDays} дн.`,
+      alertLabel: d.overdueBy(overdueDays),
       severity: "red" as const,
       icon: "clock" as const,
     }));
@@ -101,12 +103,12 @@ function CompanyDashboard() {
         title: material.name,
         objectName: material.warehouse,
         responsible: material.supplier,
-        alertLabel: material.stock <= 0 ? "Остаток исчерпан" : "Остаток ниже минимума",
+        alertLabel: material.stock <= 0 ? d.stockDepleted : d.stockLow,
         severity: material.stock <= 0 ? ("red" as const) : ("orange" as const),
         icon: "box" as const,
       }));
     return [...overdueWorks, ...criticalMaterials].slice(0, 6);
-  }, [works, materials, todayIso]);
+  }, [works, materials, todayIso, d]);
 
   const chartData = budgetSeriesByPeriod[period];
   const remaining = dashboardKpis.totalBudget - dashboardKpis.spentBudget;
@@ -140,73 +142,73 @@ function CompanyDashboard() {
   }
 
   return (
-    <AppLayout title="Обзор компании" subtitle="Контроль объектов, финансов и выполнения работ">
+    <AppLayout title={d.pageTitle} subtitle={d.pageSubtitle}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Общий бюджет"
+          label={d.kpiTotalBudget}
           value={formatCurrency(dashboardKpis.totalBudget)}
           icon={Wallet}
           tone="orange"
           progress={budgetProgress}
-          progressLabel={`Израсходовано: ${formatCurrency(dashboardKpis.spentBudget)}`}
+          progressLabel={d.kpiSpent(formatCurrency(dashboardKpis.spentBudget))}
         />
         <MetricCard
-          label="Активные объекты"
+          label={d.kpiActiveObjects}
           value={String(dashboardKpis.activeObjects)}
           icon={Building2}
           tone="blue"
           footer={
             <>
-              <span className="font-semibold text-green">{dashboardKpis.inProgressObjects} в работе</span>
+              <span className="font-semibold text-green">{d.kpiInProgress(dashboardKpis.inProgressObjects)}</span>
               {" · "}
-              <span className="font-semibold text-blue">{dashboardKpis.completedObjects} завершены</span>
+              <span className="font-semibold text-blue">{d.kpiCompletedObjects(dashboardKpis.completedObjects)}</span>
             </>
           }
         />
         <MetricCard
-          label="Задолженность по зарплате"
+          label={d.kpiPayrollDebt}
           value={formatCurrency(payrollDebt)}
           icon={Banknote}
           tone="green"
-          footer={<>Следующая выплата: {nextPayment?.paymentDate ? formatDateRu(nextPayment.paymentDate) : "не запланирована"}</>}
+          footer={<>{d.kpiNextPayment(nextPayment?.paymentDate ? formatDateRu(nextPayment.paymentDate) : d.kpiNotScheduled)}</>}
         />
         <MetricCard
-          label="Выполненные работы"
+          label={d.kpiCompletedWorks}
           value={formatPercent(dashboardKpis.completedWorksPercent)}
           icon={ClipboardCheck}
           tone="purple"
-          footer="Общий прогресс по всем объектам"
+          footer={d.kpiOverallProgress}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Card>
+        <Card className="min-w-0">
           <PageHeader
-            title="Состояние объектов"
+            title={d.objectsStateTitle}
             action={
               <button
                 type="button"
                 onClick={() => navigate("/objects")}
                 className="text-sm font-semibold text-primary hover:text-primary-hover"
               >
-                Все объекты →
+                {d.viewAllObjects}
               </button>
             }
           />
           <ObjectStateTable rows={objectStateRows} />
         </Card>
 
-        <Card>
-          <PageHeader title="Работы, требующие внимания" />
+        <Card className="min-w-0">
+          <PageHeader title={d.attentionTitle} />
           <AttentionList items={attentionItems} />
         </Card>
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Card className="p-5 sm:p-6">
+        <Card className="min-w-0 p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-[17px] font-bold text-ink">Бюджет и фактические расходы</h2>
-            <div className="flex items-center gap-1 rounded-lg bg-[#F5F5F4] p-1">
+            <h2 className="text-lg font-bold text-ink">{d.budgetChartTitle}</h2>
+            <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
               {PERIOD_TABS.map((tab) => (
                 <button
                   key={tab.key}
@@ -238,11 +240,11 @@ function CompanyDashboard() {
             summary={payrollSummary}
             onApprove={() => {
               transitionBatch("pending_approval", "approved", "");
-              showToast("Зарплата утверждена");
+              showToast(d.toastApproved);
             }}
             onReturn={(comment) => {
               transitionBatch("pending_approval", "returned", comment);
-              showToast("Расчёт возвращён бухгалтеру", "info");
+              showToast(d.toastReturned, "info");
             }}
           />
         )}

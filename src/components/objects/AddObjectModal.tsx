@@ -5,6 +5,7 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { OBJECT_TYPE_IMAGE_FALLBACK } from "../../utils/objectImages";
+import { useLanguage } from "../../context/LanguageContext";
 import type { ConstructionObject, ObjectStatus, ObjectType } from "../../types";
 
 interface FormState {
@@ -35,25 +36,10 @@ const EMPTY_FORM: FormState = {
   description: "",
 };
 
-const OBJECT_TYPE_OPTIONS: { value: ObjectType; label: string }[] = [
-  { value: "residential", label: "Жилой комплекс" },
-  { value: "business", label: "Бизнес-центр" },
-  { value: "cottage", label: "Коттедж" },
-  { value: "warehouse", label: "Складской комплекс" },
-  { value: "school", label: "Школа / образование" },
-  { value: "clinic", label: "Медицинская клиника" },
-  { value: "mall", label: "Торговый центр" },
-  { value: "service", label: "Автосервис" },
-  { value: "hotel", label: "Гостиница" },
-  { value: "sport", label: "Спортивный комплекс" },
-  { value: "factory", label: "Производственный цех" },
-];
+type SelectableObjectType = Exclude<ObjectType, "infrastructure">;
 
-const STATUS_OPTIONS: { value: ObjectStatus; label: string }[] = [
-  { value: "in_progress", label: "В работе" },
-  { value: "at_risk", label: "Есть риск" },
-  { value: "almost_done", label: "Почти готов" },
-  { value: "completed", label: "Завершён" },
+const OBJECT_TYPE_KEYS: SelectableObjectType[] = [
+  "residential", "business", "cottage", "warehouse", "school", "clinic", "mall", "service", "hotel", "sport", "factory",
 ];
 
 const inputClass =
@@ -67,9 +53,20 @@ interface AddObjectModalProps {
 }
 
 export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps) {
+  const { strings } = useLanguage();
+  const s = strings.objects;
+  const c = strings.common;
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const OBJECT_TYPE_OPTIONS = OBJECT_TYPE_KEYS.map((value) => ({ value, label: s.objectTypeOptions[value] }));
+  const STATUS_OPTIONS: { value: ObjectStatus; label: string }[] = [
+    { value: "in_progress", label: c.statusInProgress },
+    { value: "at_risk", label: c.statusAtRisk },
+    { value: "almost_done", label: c.statusAlmostDone },
+    { value: "completed", label: c.statusCompleted },
+  ];
 
   function handleImageChange(file: File | undefined) {
     if (!file) return;
@@ -86,19 +83,19 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.name.trim()) nextErrors.name = "Укажите название объекта";
-    if (!form.city.trim()) nextErrors.city = "Укажите город";
-    if (!form.address.trim()) nextErrors.address = "Укажите адрес";
-    if (!form.foreman.trim()) nextErrors.foreman = "Укажите прораба";
-    if (!form.startDate) nextErrors.startDate = "Укажите дату начала";
-    if (!form.deadline) nextErrors.deadline = "Укажите крайний срок";
+    if (!form.name.trim()) nextErrors.name = s.errorNameRequired;
+    if (!form.city.trim()) nextErrors.city = s.errorCityRequired;
+    if (!form.address.trim()) nextErrors.address = s.errorAddressRequired;
+    if (!form.foreman.trim()) nextErrors.foreman = s.errorForemanRequired;
+    if (!form.startDate) nextErrors.startDate = s.errorStartDateRequired;
+    if (!form.deadline) nextErrors.deadline = s.errorDeadlineRequired;
     if (form.startDate && form.deadline && form.deadline < form.startDate) {
-      nextErrors.deadline = "Срок не может быть раньше даты начала";
+      nextErrors.deadline = s.errorDeadlineBeforeStart;
     }
-    if (!form.budget || Number(form.budget) <= 0) nextErrors.budget = "Укажите бюджет больше нуля";
+    if (!form.budget || Number(form.budget) <= 0) nextErrors.budget = c.errorBudgetPositive;
     const progressNum = Number(form.progress);
     if (Number.isNaN(progressNum) || progressNum < 0 || progressNum > 100) {
-      nextErrors.progress = "Прогресс должен быть от 0 до 100";
+      nextErrors.progress = s.errorProgressRange;
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -134,30 +131,30 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
     <Modal
       open={open}
       onClose={onClose}
-      title="Добавить объект"
-      description="Заполните основные данные строительного объекта"
+      title={s.addModalTitle}
+      description={s.addModalDescription}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
-          <Button onClick={handleSubmit}>Сохранить объект</Button>
+          <Button onClick={handleSubmit}>{s.saveObjectButton}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Название объекта" error={errors.name}>
+        <Field label={s.fieldName} error={errors.name}>
           <input
             type="text"
             value={form.name}
             onChange={(e) => update("name", e.target.value)}
-            placeholder="Например, Жилой комплекс «Заря»"
+            placeholder={s.fieldNamePlaceholder}
             className={cn(inputClass, errors.name && errorInputClass)}
           />
         </Field>
 
-        <Field label="Тип объекта">
+        <Field label={s.fieldType}>
           <CustomSelect
             className="mt-1.5"
             value={form.objectType}
@@ -166,37 +163,37 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
           />
         </Field>
 
-        <Field label="Город" error={errors.city}>
+        <Field label={s.fieldCity} error={errors.city}>
           <input
             type="text"
             value={form.city}
             onChange={(e) => update("city", e.target.value)}
-            placeholder="Например, Душанбе"
+            placeholder={s.fieldCityPlaceholder}
             className={cn(inputClass, errors.city && errorInputClass)}
           />
         </Field>
 
-        <Field label="Адрес" error={errors.address}>
+        <Field label={s.fieldAddress} error={errors.address}>
           <input
             type="text"
             value={form.address}
             onChange={(e) => update("address", e.target.value)}
-            placeholder="Улица, дом"
+            placeholder={s.fieldAddressPlaceholder}
             className={cn(inputClass, errors.address && errorInputClass)}
           />
         </Field>
 
-        <Field label="Прораб" error={errors.foreman}>
+        <Field label={s.fieldForeman} error={errors.foreman}>
           <input
             type="text"
             value={form.foreman}
             onChange={(e) => update("foreman", e.target.value)}
-            placeholder="ФИО прораба"
+            placeholder={s.fieldForemanPlaceholder}
             className={cn(inputClass, errors.foreman && errorInputClass)}
           />
         </Field>
 
-        <Field label="Статус">
+        <Field label={s.fieldStatus}>
           <CustomSelect
             className="mt-1.5"
             value={form.status}
@@ -205,7 +202,7 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
           />
         </Field>
 
-        <Field label="Дата начала" error={errors.startDate}>
+        <Field label={s.fieldStartDate} error={errors.startDate}>
           <input
             type="date"
             value={form.startDate}
@@ -214,7 +211,7 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
           />
         </Field>
 
-        <Field label="Крайний срок" error={errors.deadline}>
+        <Field label={s.fieldDeadline} error={errors.deadline}>
           <input
             type="date"
             value={form.deadline}
@@ -223,7 +220,7 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
           />
         </Field>
 
-        <Field label="Общий бюджет, сомони" error={errors.budget}>
+        <Field label={s.fieldBudget} error={errors.budget}>
           <input
             type="number"
             min={0}
@@ -234,7 +231,7 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
           />
         </Field>
 
-        <Field label="Начальный прогресс, %" error={errors.progress}>
+        <Field label={s.fieldProgress} error={errors.progress}>
           <input
             type="number"
             min={0}
@@ -247,14 +244,14 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
       </div>
 
       <div className="mt-4">
-        <p className="text-sm font-medium text-ink">Изображение объекта</p>
-        <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-border-strong text-center transition-colors hover:bg-[#FAFAF9]">
+        <p className="text-sm font-medium text-ink">{s.fieldImage}</p>
+        <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-border-strong text-center transition-colors hover:bg-surface-1">
           {imagePreview ? (
-            <img src={imagePreview} alt="Предпросмотр объекта" className="h-32 w-full object-cover" />
+            <img src={imagePreview} alt={s.fieldImagePreviewAlt} className="h-32 w-full object-cover" />
           ) : (
             <div className="flex flex-col items-center gap-2 px-4 py-6">
               <ImagePlus size={22} className="text-ink-muted" />
-              <span className="text-sm text-ink-secondary">Нажмите, чтобы загрузить изображение</span>
+              <span className="text-sm text-ink-secondary">{s.fieldImageUploadHint}</span>
             </div>
           )}
           <input
@@ -267,12 +264,12 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
       </div>
 
       <div className="mt-4">
-        <Field label="Описание">
+        <Field label={s.fieldDescription}>
           <textarea
             value={form.description}
             onChange={(e) => update("description", e.target.value)}
             rows={3}
-            placeholder="Краткое описание объекта и объёма работ"
+            placeholder={s.fieldDescriptionPlaceholder}
             className={inputClass}
           />
         </Field>

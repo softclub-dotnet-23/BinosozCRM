@@ -1,31 +1,66 @@
 import type { BrigadeStatus, EmployeeStatus, WorkShift } from "../types";
+import type { AppStrings } from "../lib/i18n/appStrings";
 
-export const BRIGADE_STATUS_CONFIG: Record<BrigadeStatus, { label: string; className: string }> = {
-  active: { label: "Активна", className: "bg-green-soft text-green" },
-  paused: { label: "На паузе", className: "bg-blue-soft text-blue" },
-  inactive: { label: "Неактивна", className: "bg-[#F3F3F1] text-ink-secondary" },
-  forming: { label: "Формируется", className: "bg-warning-soft text-warning" },
-  overloaded: { label: "Перегружена", className: "bg-red-soft text-red" },
+export const BRIGADE_STATUS_CONFIG: Record<BrigadeStatus, { className: string }> = {
+  active: { className: "bg-green-soft text-green" },
+  paused: { className: "bg-blue-soft text-blue" },
+  inactive: { className: "bg-surface-3 text-ink-secondary" },
+  forming: { className: "bg-warning-soft text-warning" },
+  overloaded: { className: "bg-red-soft text-red" },
 };
 
-export const EMPLOYEE_STATUS_CONFIG: Record<EmployeeStatus, { label: string; className: string; dotClassName: string }> = {
-  on_shift: { label: "На смене", className: "bg-green-soft text-green", dotClassName: "bg-green" },
-  on_site: { label: "На объекте", className: "bg-blue-soft text-blue", dotClassName: "bg-blue" },
-  available: { label: "Свободен", className: "bg-[#F3F3F1] text-ink-secondary", dotClassName: "bg-ink-muted" },
-  on_trip: { label: "На выезде", className: "bg-warning-soft text-warning", dotClassName: "bg-warning" },
-  absent: { label: "Отсутствует", className: "bg-red-soft text-red", dotClassName: "bg-red" },
-  on_leave: { label: "В отпуске", className: "bg-purple-soft text-purple", dotClassName: "bg-purple" },
-  sick_leave: { label: "На больничном", className: "bg-red-soft text-red", dotClassName: "bg-red" },
+export const EMPLOYEE_STATUS_CONFIG: Record<EmployeeStatus, { className: string; dotClassName: string }> = {
+  on_shift: { className: "bg-green-soft text-green", dotClassName: "bg-green" },
+  on_site: { className: "bg-blue-soft text-blue", dotClassName: "bg-blue" },
+  available: { className: "bg-surface-3 text-ink-secondary", dotClassName: "bg-ink-muted" },
+  on_trip: { className: "bg-warning-soft text-warning", dotClassName: "bg-warning" },
+  absent: { className: "bg-red-soft text-red", dotClassName: "bg-red" },
+  on_leave: { className: "bg-purple-soft text-purple", dotClassName: "bg-purple" },
+  sick_leave: { className: "bg-red-soft text-red", dotClassName: "bg-red" },
 };
 
-export const SHIFT_CONFIG: Record<WorkShift, { label: string; className: string }> = {
-  day: { label: "Дневная", className: "bg-blue-soft text-blue" },
-  evening: { label: "Вечерняя", className: "bg-purple-soft text-purple" },
-  night: { label: "Ночная", className: "bg-[#1E293B]/10 text-[#1E293B]" },
-  day_off: { label: "Выходной", className: "bg-[#F3F3F1] text-ink-secondary" },
+export const SHIFT_CONFIG: Record<WorkShift, { className: string }> = {
+  day: { className: "bg-blue-soft text-blue" },
+  evening: { className: "bg-purple-soft text-purple" },
+  night: { className: "bg-[#1E293B]/10 text-[#1E293B]" },
+  day_off: { className: "bg-surface-3 text-ink-secondary" },
 };
 
-const ROLE_BADGE_PALETTE = ["bg-blue-soft text-blue", "bg-purple-soft text-purple", "bg-warning-soft text-warning", "bg-green-soft text-green", "bg-[#F3F3F1] text-ink-secondary"];
+export function brigadeStatusLabel(s: AppStrings["brigades"], status: BrigadeStatus): string {
+  const map: Record<BrigadeStatus, string> = {
+    active: s.statusActive,
+    paused: s.statusPaused,
+    inactive: s.statusInactive,
+    forming: s.statusForming,
+    overloaded: s.statusOverloaded,
+  };
+  return map[status];
+}
+
+export function employeeStatusLabel(s: AppStrings["brigades"], status: EmployeeStatus): string {
+  const map: Record<EmployeeStatus, string> = {
+    on_shift: s.employeeStatusOnShift,
+    on_site: s.employeeStatusOnSite,
+    available: s.employeeStatusAvailable,
+    on_trip: s.employeeStatusOnTrip,
+    absent: s.employeeStatusAbsent,
+    on_leave: s.employeeStatusOnLeave,
+    sick_leave: s.employeeStatusSickLeave,
+  };
+  return map[status];
+}
+
+export function shiftLabel(s: AppStrings["brigades"], shift: WorkShift): string {
+  const map: Record<WorkShift, string> = {
+    day: s.shiftDay,
+    evening: s.shiftEvening,
+    night: s.shiftNight,
+    day_off: s.shiftDayOff,
+  };
+  return map[shift];
+}
+
+const ROLE_BADGE_PALETTE = ["bg-blue-soft text-blue", "bg-purple-soft text-purple", "bg-warning-soft text-warning", "bg-green-soft text-green", "bg-surface-3 text-ink-secondary"];
 
 export function roleBadgeClassName(specialty: string): string {
   let hash = 0;

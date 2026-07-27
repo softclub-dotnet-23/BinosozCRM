@@ -44,7 +44,7 @@ const STATUS_FILTER_OPTIONS: { value: AttendanceStatus | "all"; label: string }[
 const dateInputClass =
   "h-9 rounded-[10px] border border-border-strong bg-card px-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -160,6 +160,8 @@ function CompanyAttendancePage() {
   const columns: DataTableColumn<AttendanceRecord>[] = [
     {
       key: "checkbox",
+      sticky: "left",
+      width: "36px",
       header: (
         <input
           type="checkbox"
@@ -182,25 +184,27 @@ function CompanyAttendancePage() {
       ),
     },
     {
+      key: "employee",
+      header: "Сотрудник",
+      sticky: "left",
+      width: "196px",
+      render: (row) => (
+        <div className="flex items-center gap-2.5">
+          <Avatar name={row.employeeName} size="sm" />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-ink">{row.employeeName}</p>
+            <p className="truncate text-xs text-ink-muted">{row.position}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
       key: "date",
       header: "Дата",
       render: (row) => (
         <div className="whitespace-nowrap">
           <p className="text-ink">{formatDateShort(row.date)}</p>
           <p className="text-xs text-ink-muted">{formatWeekdayShort(row.date)}</p>
-        </div>
-      ),
-    },
-    {
-      key: "employee",
-      header: "Сотрудник",
-      render: (row) => (
-        <div className="flex items-center gap-2.5">
-          <Avatar name={row.employeeName} size="sm" />
-          <div className="min-w-0">
-            <p className="whitespace-nowrap font-semibold text-ink">{row.employeeName}</p>
-            <p className="whitespace-nowrap text-xs text-ink-muted">{row.position}</p>
-          </div>
         </div>
       ),
     },
@@ -255,6 +259,8 @@ function CompanyAttendancePage() {
     {
       key: "actions",
       header: "Действия",
+      sticky: "right",
+      width: "108px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
@@ -440,7 +446,7 @@ function CompanyAttendancePage() {
           </div>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
               <div>
                 <p className="text-xs font-medium text-ink-secondary">Период</p>
@@ -530,7 +536,7 @@ function CompanyAttendancePage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Статистика за период</h2>
+            <h2 className="text-lg font-bold text-ink">Статистика за период</h2>
             <div className="mt-4">
               <SpecializationDonut slices={statusSlices} total={filteredKpis.total} size={176} />
             </div>
@@ -540,7 +546,7 @@ function CompanyAttendancePage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Частые опоздания</h2>
+            <h2 className="text-lg font-bold text-ink">Частые опоздания</h2>
             <ul className="mt-3.5 space-y-3">
               {frequentLateness.map((row) => (
                 <li key={row.employeeName} className="flex items-center gap-2.5">

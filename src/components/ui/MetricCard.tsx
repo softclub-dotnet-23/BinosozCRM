@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import { Card } from "./Card";
 import { IconContainer } from "./IconContainer";
 import { ProgressBar } from "./ProgressBar";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 interface MetricCardProps {
   label: string;
@@ -11,16 +12,27 @@ interface MetricCardProps {
   footer?: ReactNode;
   progress?: number;
   progressLabel?: string;
+  /** Opt-in: when set alongside `valueFormatter`, the headline number counts up/down to this
+   * value on change instead of the plain `value` string swapping instantly. Omit both to keep
+   * every other caller's static-text behavior unchanged. */
+  numericValue?: number;
+  valueFormatter?: (value: number) => string;
 }
 
-export function MetricCard({ label, value, icon, tone, footer, progress, progressLabel }: MetricCardProps) {
+export function MetricCard({ label, value, icon, tone, footer, progress, progressLabel, numericValue, valueFormatter }: MetricCardProps) {
   return (
-    <Card className="p-5">
+    <Card className="min-w-0 p-5">
       <div className="flex items-start gap-3.5">
         <IconContainer icon={icon} tone={tone} />
         <div className="min-w-0 flex-1 pt-0.5">
-          <p className="text-sm text-ink-secondary">{label}</p>
-          <p className="mt-1 whitespace-nowrap text-[22px] font-bold leading-tight tabular text-ink">{value}</p>
+          <p className="text-sm leading-snug text-ink-secondary">{label}</p>
+          <p className="wrap-break-word text-xl font-bold leading-tight tabular text-ink">
+            {typeof numericValue === "number" && valueFormatter ? (
+              <AnimatedNumber value={numericValue} formatter={valueFormatter} />
+            ) : (
+              value
+            )}
+          </p>
         </div>
       </div>
       {typeof progress === "number" ? (

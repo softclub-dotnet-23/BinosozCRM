@@ -20,15 +20,17 @@ import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { usersRepository } from "../data/repositories";
-import { ROLE_LABEL } from "../lib/auth/roleAccess";
 import { resolvePersonPhoto } from "../utils/personPhotos";
+import type { AppStrings } from "../lib/i18n/appStrings";
 import type { UserAccount, UserAccountStatus, UserRole } from "../types";
 import "../styles/users.css";
 
 type UserTab = "all" | "active" | "inactive";
+type UsersStrings = AppStrings["users"];
 
 const ROLE_CLASS_NAME: Record<UserRole, string> = {
   owner: "role-owner",
@@ -39,7 +41,7 @@ const ROLE_CLASS_NAME: Record<UserRole, string> = {
   accountant: "role-accountant",
 };
 
-const ROLE_OPTIONS = (Object.keys(ROLE_LABEL) as UserRole[]).map((value) => ({ value, label: ROLE_LABEL[value] }));
+const ROLE_KEYS = Object.keys(ROLE_CLASS_NAME) as UserRole[];
 
 const EMPTY_FORM: Omit<UserAccount, "id" | "registeredAt"> = {
   fullName: "",
@@ -55,6 +57,9 @@ const TAJIK_PHONE_RE = /^\+992 \d{2} \d{3} ?\d{2} ?\d{2}$|^\+992 9\d{2} \d{2} \d
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
+  const { strings } = useLanguage();
+  const s = strings.users;
+  const { roleLabels } = strings.common;
   const [users, setUsers] = useRepositoryState(usersRepository);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<UserTab>("all");
@@ -68,6 +73,8 @@ export default function UsersPage() {
   const [selected, setSelected] = useState<UserAccount | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
+
+  const roleOptions = useMemo(() => ROLE_KEYS.map((value) => ({ value, label: roleLabels[value] })), [roleLabels]);
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -90,16 +97,16 @@ export default function UsersPage() {
     const active = users.filter((u) => u.status === "active").length;
     const inactive = users.filter((u) => u.status !== "active").length;
     const administrators = users.filter((u) => u.role === "administrator" || u.role === "owner").length;
-    return { total: users.length, active, inactive, administrators, roleCount: ROLE_OPTIONS.length };
-  }, [users]);
+    return { total: users.length, active, inactive, administrators, roleCount: roleOptions.length };
+  }, [users, roleOptions]);
 
   const roleDistribution = useMemo(() => {
     const total = users.length || 1;
-    return ROLE_OPTIONS.map(({ value, label }) => {
+    return roleOptions.map(({ value, label }) => {
       const count = users.filter((u) => u.role === value).length;
       return { role: value, label, count, percent: (count / total) * 100 };
     }).filter((entry) => entry.count > 0);
-  }, [users]);
+  }, [users, roleOptions]);
 
   function resetFilters() {
     setSearch("");
@@ -127,11 +134,11 @@ export default function UsersPage() {
   function submitUser(event: FormEvent) {
     event.preventDefault();
     if (!form.fullName.trim() || !form.login.trim() || !form.email.trim()) {
-      setFormError("Заполните имя, логин и email");
+      setFormError(s.errorRequiredFields);
       return;
     }
     if (form.phone.trim() && !TAJIK_PHONE_RE.test(form.phone.trim())) {
-      setFormError("Формат телефона: +992 XX XXX XX XX");
+      setFormError(s.errorPhoneFormat);
       return;
     }
     const normalizedLogin = form.login.trim().toLowerCase();
@@ -139,7 +146,7 @@ export default function UsersPage() {
       (user) => user.login.toLowerCase() === normalizedLogin && user.id !== selected?.id,
     );
     if (loginTaken) {
-      setFormError("Этот логин уже занят другим пользователем");
+      setFormError(s.errorLoginTaken);
       return;
     }
     if (modalMode === "edit" && selected) {
@@ -159,8 +166,8 @@ export default function UsersPage() {
   }
 
   function exportCsv() {
-    const rows = filteredUsers.map((user) => [user.fullName, ROLE_LABEL[user.role], user.phone, user.email, user.status]);
-    const csv = [["Пользователь", "Роль", "Телефон", "Email", "Статус"], ...rows]
+    const rows = filteredUsers.map((user) => [user.fullName, roleLabels[user.role], user.phone, user.email, user.status]);
+    const csv = [[s.csvUser, s.csvRole, s.csvPhone, s.csvEmail, s.csvStatus], ...rows]
       .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
       .join("\n");
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
@@ -171,51 +178,57 @@ export default function UsersPage() {
     URL.revokeObjectURL(url);
   }
 
+  function statusLabel(status: UserAccountStatus): string {
+    if (status === "active") return s.statusActive;
+    if (status === "blocked") return s.statusBlocked;
+    return s.statusInactive;
+  }
+
   return (
-    <AppLayout title="Пользователи" subtitle="Управление учетными записями и правами доступа" search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "Поиск по пользователям..." }}>
+    <AppLayout title={s.pageTitle} subtitle={s.pageSubtitle} search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: s.searchPlaceholder }}>
       <div className="users-page">
         <div className="users-overview-row">
           <div className="users-kpi-grid">
-            <UserKpi icon={UserRound} tone="green" label="Всего пользователей" value={String(stats.total)} suffix="учётных записей" />
-            <UserKpi icon={UserCheck} tone="blue" label="Активные" value={String(stats.active)} suffix="пользователя" />
-            <UserKpi icon={UserX} tone="orange" label="Неактивные" value={String(stats.inactive)} suffix="пользователя" />
-            <UserKpi icon={ShieldCheck} tone="purple" label="Администраторы" value={String(stats.administrators)} suffix="пользователя" />
-            <UserKpi icon={Grid2X2} tone="yellow" label="Роли" value={String(stats.roleCount)} suffix="ролей в системе" />
+            <UserKpi icon={UserRound} tone="green" label={s.kpiTotal} value={String(stats.total)} suffix={s.kpiTotalSuffix} />
+            <UserKpi icon={UserCheck} tone="blue" label={s.kpiActive} value={String(stats.active)} suffix={s.kpiActiveSuffix} />
+            <UserKpi icon={UserX} tone="orange" label={s.kpiInactive} value={String(stats.inactive)} suffix={s.kpiInactiveSuffix} />
+            <UserKpi icon={ShieldCheck} tone="purple" label={s.kpiAdmins} value={String(stats.administrators)} suffix={s.kpiAdminsSuffix} />
+            <UserKpi icon={Grid2X2} tone="yellow" label={s.kpiRoles} value={String(stats.roleCount)} suffix={s.kpiRolesSuffix} />
           </div>
           <div className="users-top-actions">
-            <Button onClick={openAdd}><Plus size={15} /> Добавить пользователя</Button>
-            <Button variant="secondary" onClick={exportCsv}><Download size={15} /> Экспорт</Button>
+            <Button onClick={openAdd}><Plus size={15} /> {s.addUser}</Button>
+            <Button variant="secondary" onClick={exportCsv}><Download size={15} /> {s.export}</Button>
           </div>
         </div>
 
         <div className="users-content-grid">
           <Card className="users-table-card">
             <div className="users-tabs">
-              {([['all', 'Все пользователи'], ['active', 'Активные'], ['inactive', 'Неактивные']] as [UserTab, string][]).map(([key, label]) => (
+              {([['all', s.tabAll], ['active', s.tabActive], ['inactive', s.tabInactive]] as [UserTab, string][]).map(([key, label]) => (
                 <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); setPage(1); }}>{label}</button>
               ))}
             </div>
             <div className="users-table-scroll">
               <table>
-                <thead><tr><th><input type="checkbox" aria-label="Выбрать всех" /></th><th>Пользователь</th><th>Роль</th><th>Телефон</th><th>Email</th><th>Статус</th><th>Дата регистрации</th><th>Действия</th></tr></thead>
+                <thead><tr><th><input type="checkbox" aria-label={s.colSelectAll} /></th><th>{s.colUser}</th><th>{s.colRole}</th><th>{s.colPhone}</th><th>{s.colEmail}</th><th>{s.colStatus}</th><th>{s.colRegisteredAt}</th><th>{s.colActions}</th></tr></thead>
                 <tbody>
                   {visibleUsers.map((user) => (
                     <tr key={user.id}>
-                      <td><input type="checkbox" aria-label={`Выбрать ${user.fullName}`} /></td>
+                      <td><input type="checkbox" aria-label={s.selectUser(user.fullName)} /></td>
                       <td><div className="users-person"><UserAvatar user={user} /><div><strong>{user.fullName}</strong><span>@{user.login}</span></div></div></td>
-                      <td><span className={`user-role ${ROLE_CLASS_NAME[user.role]}`}>{ROLE_LABEL[user.role]}</span></td>
+                      <td><span className={`user-role ${ROLE_CLASS_NAME[user.role]}`}>{roleLabels[user.role]}</span></td>
                       <td className="nowrap">{user.phone}</td>
                       <td>{user.email}</td>
-                      <td><span className={`user-status ${user.status === "active" ? "active" : "inactive"}`}>{user.status === "active" ? "Активен" : user.status === "blocked" ? "Заблокирован" : "Неактивен"}</span></td>
+                      <td><span className={`user-status ${user.status === "active" ? "active" : "inactive"}`}>{statusLabel(user.status)}</span></td>
                       <td className="nowrap">{user.registeredAt}</td>
                       <td>
                         <div className="user-row-actions">
-                          <button type="button" aria-label="Просмотреть" onClick={() => openUser(user, "view")}><Eye size={14} /></button>
-                          <button type="button" aria-label="Редактировать" onClick={() => openUser(user, "edit")}><Pencil size={14} /></button>
+                          <button type="button" aria-label={s.actionView} onClick={() => openUser(user, "view")}><Eye size={14} /></button>
+                          <button type="button" aria-label={s.actionEdit} onClick={() => openUser(user, "edit")}><Pencil size={14} /></button>
                           <button
                             type="button"
-                            aria-label="Изменить статус"
-                            title={user.id === currentUser?.id ? "Нельзя изменить статус своей учётной записи" : "Изменить статус"}
+                            aria-label={s.actionChangeStatus}
+                            title={user.id === currentUser?.id ? s.actionChangeStatusDisabled : s.actionChangeStatus}
                             disabled={user.id === currentUser?.id}
                             onClick={() => toggleStatus(user)}
                           >
@@ -229,10 +242,10 @@ export default function UsersPage() {
               </table>
             </div>
             <div className="users-pagination">
-              <span>Показано {visibleUsers.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filteredUsers.length)} из {filteredUsers.length} пользователей</span>
+              <span>{strings.common.paginationShown(visibleUsers.length ? (page - 1) * pageSize + 1 : 0, Math.min(page * pageSize, filteredUsers.length), filteredUsers.length, s.paginationItemLabel)}</span>
               <div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>‹</button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} className={page === index + 1 ? "active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>›</button></div>
               <label>
-                Показывать по:{" "}
+                {strings.common.showPerPage}{" "}
                 <CustomSelect
                   size="sm"
                   value={String(pageSize)}
@@ -245,21 +258,21 @@ export default function UsersPage() {
 
           <aside className="users-aside">
             <Card className="users-filter-card">
-              <h2>Фильтры</h2>
-              <FilterLabel label="Поиск"><div className="users-filter-search"><Search size={13} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email или телефон..." /></div></FilterLabel>
-              <FilterLabel label="Роль"><CustomSelect size="sm" fullWidth value={roleFilter} onValueChange={(value) => { setRoleFilter(value); setPage(1); }} options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS]} /></FilterLabel>
-              <FilterLabel label="Статус"><CustomSelect size="sm" fullWidth value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }} options={[{ value: "all", label: "Все статусы" }, { value: "active", label: "Активные" }, { value: "inactive", label: "Неактивные" }, { value: "blocked", label: "Заблокированные" }]} /></FilterLabel>
-              <FilterLabel label="Дата регистрации"><div className="users-date-range"><CalendarDays size={13} /><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /><span>–</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></div></FilterLabel>
-              <div className="users-filter-actions"><Button size="sm" onClick={() => setPage(1)}>Применить</Button><Button size="sm" variant="secondary" onClick={resetFilters}>Сбросить</Button></div>
+              <h2>{s.filtersTitle}</h2>
+              <FilterLabel label={s.filterSearch}><div className="users-filter-search"><Search size={13} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={s.filterSearchPlaceholder} /></div></FilterLabel>
+              <FilterLabel label={s.filterRole}><CustomSelect size="sm" fullWidth value={roleFilter} onValueChange={(value) => { setRoleFilter(value); setPage(1); }} options={[{ value: "all", label: s.filterAllRoles }, ...roleOptions]} /></FilterLabel>
+              <FilterLabel label={s.filterStatus}><CustomSelect size="sm" fullWidth value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }} options={[{ value: "all", label: s.filterAllStatuses }, { value: "active", label: s.filterActiveStatus }, { value: "inactive", label: s.filterInactiveStatus }, { value: "blocked", label: s.filterBlockedStatus }]} /></FilterLabel>
+              <FilterLabel label={s.filterRegisteredDate}><div className="users-date-range"><CalendarDays size={13} /><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /><span>–</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></div></FilterLabel>
+              <div className="users-filter-actions"><Button size="sm" onClick={() => setPage(1)}>{s.filterApply}</Button><Button size="sm" variant="secondary" onClick={resetFilters}>{s.filterReset}</Button></div>
             </Card>
 
             <Card className="users-role-card">
-              <h2>Пользователей по ролям</h2>
+              <h2>{s.roleDistributionTitle}</h2>
               <div className="users-role-content">
-                <div className="users-role-donut" aria-label="Распределение пользователей по ролям" />
+                <div className="users-role-donut" aria-label={s.roleDistributionTitle} />
                 <ul>
                   {roleDistribution.map((entry) => (
-                    <li key={entry.role}><i className={ROLE_CLASS_NAME[entry.role]} />{entry.label} <b>{entry.count} ({entry.percent.toFixed(1)}%)</b></li>
+                    <li key={entry.role}><i className={ROLE_CLASS_NAME[entry.role]} /><span className="users-role-label" title={entry.label}>{entry.label}</span> <b>{entry.count} ({entry.percent.toFixed(1)}%)</b></li>
                   ))}
                 </ul>
               </div>
@@ -268,7 +281,7 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <UserModal mode={modalMode} selected={selected} form={form} error={formError} setForm={setForm} onSubmit={submitUser} onClose={() => setModalMode(null)} />
+      <UserModal s={s} roleOptions={roleOptions} mode={modalMode} selected={selected} form={form} error={formError} setForm={setForm} onSubmit={submitUser} onClose={() => setModalMode(null)} />
     </AppLayout>
   );
 }
@@ -286,18 +299,28 @@ function FilterLabel({ label, children }: { label: string; children: React.React
   return <label className="users-filter-label"><span>{label}</span>{children}</label>;
 }
 
-function UserModal({ mode, selected, form, error, setForm, onSubmit, onClose }: { mode: "add" | "edit" | "view" | null; selected: UserAccount | null; form: typeof EMPTY_FORM; error: string; setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
+function UserModal({ s, roleOptions, mode, selected, form, error, setForm, onSubmit, onClose }: {
+  s: UsersStrings;
+  roleOptions: { value: UserRole; label: string }[];
+  mode: "add" | "edit" | "view" | null;
+  selected: UserAccount | null;
+  form: typeof EMPTY_FORM;
+  error: string;
+  setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) {
   const readOnly = mode === "view";
-  return <Modal open={mode !== null} onClose={onClose} title={mode === "add" ? "Добавить пользователя" : mode === "edit" ? "Редактировать пользователя" : "Профиль пользователя"} description={selected ? `@${selected.login}` : "Создайте новую учётную запись"} size="md">
+  return <Modal open={mode !== null} onClose={onClose} title={mode === "add" ? s.modalAddTitle : mode === "edit" ? s.modalEditTitle : s.modalViewTitle} description={selected ? `@${selected.login}` : s.modalAddDescription} size="md">
     <form className="users-modal-form" onSubmit={onSubmit}>
-      <label><span>ФИО</span><input readOnly={readOnly} value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder="Имя и фамилия" /></label>
-      <label><span>Логин</span><input readOnly={readOnly} value={form.login} onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))} placeholder="username" /></label>
-      <label><span>Email</span><input readOnly={readOnly} type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@binosoz.tj" /></label>
-      <label><span>Телефон</span><input readOnly={readOnly} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+992 00 000 00 00" /></label>
-      <label><span>Роль</span><CustomSelect fullWidth value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as UserRole }))} disabled={readOnly} options={ROLE_OPTIONS} /></label>
-      <label><span>Статус</span><CustomSelect fullWidth value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as UserAccountStatus }))} disabled={readOnly} options={[{ value: "active", label: "Активен" }, { value: "inactive", label: "Неактивен" }, { value: "blocked", label: "Заблокирован" }]} /></label>
+      <label><span>{s.fieldFullName}</span><input readOnly={readOnly} value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder={s.fieldFullNamePlaceholder} /></label>
+      <label><span>{s.fieldLogin}</span><input readOnly={readOnly} value={form.login} onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))} placeholder={s.fieldLoginPlaceholder} /></label>
+      <label><span>{s.fieldEmail}</span><input readOnly={readOnly} type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder={s.fieldEmailPlaceholder} /></label>
+      <label><span>{s.fieldPhone}</span><input readOnly={readOnly} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder={s.fieldPhonePlaceholder} /></label>
+      <label><span>{s.fieldRole}</span><CustomSelect fullWidth value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as UserRole }))} disabled={readOnly} options={roleOptions} /></label>
+      <label><span>{s.fieldStatus}</span><CustomSelect fullWidth value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as UserAccountStatus }))} disabled={readOnly} options={[{ value: "active", label: s.statusActive }, { value: "inactive", label: s.statusInactive }, { value: "blocked", label: s.statusBlocked }]} /></label>
       {error && <p className="users-modal-error" role="alert">{error}</p>}
-      <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={onClose}>{readOnly ? "Закрыть" : "Отмена"}</Button>{!readOnly && <Button type="submit">{mode === "add" ? "Добавить" : "Сохранить"}</Button>}</div>
+      <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={onClose}>{readOnly ? s.buttonClose : s.buttonCancel}</Button>{!readOnly && <Button type="submit">{mode === "add" ? s.buttonAdd : s.buttonSave}</Button>}</div>
     </form>
   </Modal>;
 }

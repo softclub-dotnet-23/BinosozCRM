@@ -40,6 +40,7 @@ import { estimatesRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../context/LanguageContext";
 import { formatCurrency, formatMillionsCompact, formatNumber } from "../utils/format";
 import { formatDateShort } from "../utils/date";
 import { ESTIMATE_STATUS_CONFIG } from "../utils/financeStatus";
@@ -47,24 +48,33 @@ import type { Estimate, EstimateStatus } from "../types";
 
 type PeriodKey = "week" | "month" | "quarter" | "year";
 
-const PERIOD_TABS: { key: PeriodKey; label: string }[] = [
-  { key: "week", label: "Неделя" },
-  { key: "month", label: "Месяц" },
-  { key: "quarter", label: "Квартал" },
-  { key: "year", label: "Год" },
-];
-
 const PERIOD_SCALE: Record<PeriodKey, number> = { week: 0.25, month: 1, quarter: 3, year: 12 };
-
-const STATUS_OPTIONS: { value: EstimateStatus | "all"; label: string }[] = [
-  { value: "all", label: "Статус: Все" },
-  { value: "draft", label: "Черновик" },
-  { value: "pending_review", label: "На рассмотрении" },
-  { value: "approved", label: "Утверждена" },
-];
 
 export default function EstimatesPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.estimates;
+  const c = strings.common;
+
+  const PERIOD_TABS: { key: PeriodKey; label: string }[] = [
+    { key: "week", label: c.periodWeek },
+    { key: "month", label: c.periodMonth },
+    { key: "quarter", label: c.periodQuarter },
+    { key: "year", label: c.periodYear },
+  ];
+
+  const STATUS_OPTIONS: { value: EstimateStatus | "all"; label: string }[] = [
+    { value: "all", label: s.statusAllLabel },
+    { value: "draft", label: s.statusDraft },
+    { value: "pending_review", label: s.statusPendingReview },
+    { value: "approved", label: s.statusApproved },
+  ];
+
+  const ESTIMATE_STATUS_LABEL: Record<EstimateStatus, string> = {
+    draft: s.statusDraft,
+    pending_review: s.statusPendingReview,
+    approved: s.statusApproved,
+  };
 
   const [estimates, setEstimates] = useRepositoryState(estimatesRepository);
   const [selectedId, setSelectedId] = useState<string>(() => estimatesRepository.getSnapshot()[0]?.id ?? "");
@@ -113,6 +123,21 @@ export default function EstimatesPage() {
     }));
   }, [period]);
 
+  const translatedCategorySpend = useMemo(
+    () => estimateCategorySpend.map((entry) => ({ ...entry, category: s.categoryLabels[entry.category] ?? entry.category })),
+    [s],
+  );
+
+  const translatedRiskItems = useMemo(
+    () =>
+      estimateRiskItems.map((item) => ({
+        ...item,
+        description: s.riskDescriptionLabels[item.description] ?? item.description,
+        badgeLabel: c.riskBadgeLabels[item.badgeLabel] ?? item.badgeLabel,
+      })),
+    [s, c],
+  );
+
   function handleSearchChange(value: string) {
     setSearch(value);
     setPage(1);
@@ -130,7 +155,7 @@ export default function EstimatesPage() {
     setEstimates((prev) => [estimate, ...prev]);
     setSelectedId(estimate.id);
     setAddModalOpen(false);
-    showToast("Смета создана");
+    showToast(s.toastCreated);
   }
 
   function handleDeleteConfirmed() {
@@ -139,14 +164,14 @@ export default function EstimatesPage() {
     if (selectedId === deleteTarget.id) {
       setSelectedId((prev) => estimates.find((e) => e.id !== prev)?.id ?? "");
     }
-    showToast("Смета удалена", "info");
+    showToast(s.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
   const columns: DataTableColumn<Estimate>[] = [
     {
       key: "number",
-      header: "№ сметы",
+      header: s.colNumber,
       width: "15%",
       render: (row) => (
         <span className="flex items-center gap-1.5 whitespace-nowrap font-semibold text-ink">
@@ -157,74 +182,66 @@ export default function EstimatesPage() {
     },
     {
       key: "object",
-      header: "Объект",
+      header: c.colObject,
       width: "17%",
       render: (row) => <span className="line-clamp-2 min-w-0 text-ink leading-snug">{row.objectName}</span>,
     },
     {
       key: "date",
-      header: "Дата",
+      header: c.colDate,
       width: "9%",
       render: (row) => <span className="whitespace-nowrap text-ink-secondary">{formatDateShort(row.date)}</span>,
     },
     {
       key: "version",
-      header: "Версия",
+      header: s.colVersion,
       width: "6%",
       render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.version}</span>,
     },
     {
       key: "amount",
-      header: "Сумма, сомони",
+      header: s.colAmount,
       width: "13%",
       render: (row) => <span className="whitespace-nowrap tabular text-ink">{formatNumber(row.amount)}</span>,
     },
     {
       key: "status",
-      header: "Статус",
+      header: c.colStatus,
       width: "16%",
       render: (row) => {
         const config = ESTIMATE_STATUS_CONFIG[row.status];
-        return <Badge tone={config.tone}>{config.label}</Badge>;
+        return <Badge tone={config.tone}>{ESTIMATE_STATUS_LABEL[row.status]}</Badge>;
       },
     },
     {
       key: "responsible",
-      header: "Ответственный",
+      header: s.colResponsible,
       width: "16%",
       render: (row) => (
         <div className="whitespace-nowrap">
           <p className="font-medium text-ink">{row.responsible}</p>
-          <p className="text-xs text-ink-muted">{row.responsibleRole}</p>
+          <p className="text-xs text-ink-muted">{row.responsibleRole === "Прораб" ? c.roleLabels.prorab : row.responsibleRole}</p>
         </div>
       ),
     },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
       width: "8%",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            aria-label="Просмотреть смету"
-            onClick={() => setSelectedId(row.id)}
-            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink"
-          >
-            <Eye size={16} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
             trigger={<span className="text-lg leading-none">⋯</span>}
             items={[
-              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
+              { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
               {
-                label: "Редактировать",
+                label: c.edit,
                 icon: <Pencil size={14} />,
-                onClick: () => showToast("Редактирование пока недоступно в демо", "info"),
+                onClick: () => showToast(c.editUnavailableInDemo, "info"),
               },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+              { label: c.delete, icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
             ]}
           />
         </div>
@@ -234,43 +251,43 @@ export default function EstimatesPage() {
 
   return (
     <AppLayout
-      title="Сметы"
-      subtitle="Управление сметами по объектам"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск смет..." }}
+      title={s.pageTitle}
+      subtitle={s.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
       action={
         <Button onClick={() => setAddModalOpen(true)}>
-          <Plus size={15} /> Новая смета
+          <Plus size={15} /> {s.newEstimateButton}
         </Button>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Всего смет"
+          label={s.kpiTotal}
           value={String(estimateKpis.total)}
           icon={Building2}
           tone="orange"
-          footer={<>На сумму <span className="font-semibold text-ink">{formatCurrency(estimateKpis.totalAmount)}</span></>}
+          footer={<>{s.kpiTotalOfPrefix} <span className="font-semibold text-ink">{formatCurrency(estimateKpis.totalAmount)}</span></>}
         />
         <MetricCard
-          label="Утверждённые"
+          label={s.kpiApproved}
           value={String(estimateKpis.approved)}
           icon={CheckCircle2}
           tone="green"
-          footer={<>На сумму <span className="font-semibold text-ink">{formatCurrency(estimateKpis.approvedAmount)}</span></>}
+          footer={<>{s.kpiTotalOfPrefix} <span className="font-semibold text-ink">{formatCurrency(estimateKpis.approvedAmount)}</span></>}
         />
         <MetricCard
-          label="На рассмотрении"
+          label={s.kpiPendingReview}
           value={String(estimateKpis.pendingReview)}
           icon={Clock}
           tone="orange"
-          footer={<>На сумму <span className="font-semibold text-ink">{formatCurrency(estimateKpis.pendingReviewAmount)}</span></>}
+          footer={<>{s.kpiTotalOfPrefix} <span className="font-semibold text-ink">{formatCurrency(estimateKpis.pendingReviewAmount)}</span></>}
         />
         <MetricCard
-          label="Черновики"
+          label={s.kpiDraft}
           value={String(estimateKpis.draft)}
           icon={FileText}
           tone="blue"
-          footer={<>На сумму <span className="font-semibold text-ink">{formatCurrency(estimateKpis.draftAmount)}</span></>}
+          footer={<>{s.kpiTotalOfPrefix} <span className="font-semibold text-ink">{formatCurrency(estimateKpis.draftAmount)}</span></>}
         />
       </div>
 
@@ -281,21 +298,21 @@ export default function EstimatesPage() {
               <CustomSelect
                 searchable
                 size="sm"
-                aria-label="Объект"
+                aria-label={s.filterObjectAriaLabel}
                 value={objectFilter}
                 onValueChange={(v) => {
                   setObjectFilter(v);
                   setPage(1);
                 }}
                 options={[
-                  { value: "all", label: "Все объекты" },
+                  { value: "all", label: s.allObjectsOption },
                   ...Object.keys(ESTIMATE_OBJECT_META).map((name) => ({ value: name, label: name })),
                 ]}
               />
 
               <CustomSelect
                 size="sm"
-                aria-label="Статус"
+                aria-label={s.filterStatusAriaLabel}
                 value={statusFilter}
                 onValueChange={(v) => {
                   setStatusFilter(v as EstimateStatus | "all");
@@ -313,16 +330,16 @@ export default function EstimatesPage() {
                   setMinAmount("");
                   setMaxAmount("");
                 }}
-                className="flex h-9 items-center gap-2 rounded-[10px] border border-border-strong px-3 text-sm text-ink-secondary transition-colors hover:bg-[#F5F5F4]"
+                className="flex h-9 items-center gap-2 rounded-[10px] border border-border-strong px-3 text-sm text-ink-secondary transition-colors hover:bg-surface-3"
               >
                 <RotateCcw size={13} /> 01.07.2026 – 30.07.2026
               </button>
 
               <button
                 type="button"
-                aria-label="Фильтры"
+                aria-label={c.filtersButton}
                 onClick={() => setDrawerOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4]"
+                className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3"
               >
                 <Filter size={15} />
               </button>
@@ -340,8 +357,8 @@ export default function EstimatesPage() {
               ) : (
                 <EmptyState
                   icon={FileText}
-                  title="Сметы не найдены"
-                  description="Измените параметры поиска или сбросьте фильтры"
+                  title={s.emptyTitle}
+                  description={c.emptyStateHint}
                   action={
                     <Button
                       variant="outline"
@@ -352,7 +369,7 @@ export default function EstimatesPage() {
                         setSearch("");
                       }}
                     >
-                      Сбросить фильтры
+                      {c.resetFiltersButton}
                     </Button>
                   }
                 />
@@ -364,7 +381,7 @@ export default function EstimatesPage() {
               pageCount={pageCount}
               pageSize={pageSize}
               total={filteredEstimates.length}
-              itemLabel="смет"
+              itemLabel={s.paginationItemLabel}
               onPageChange={setPage}
               onPageSizeChange={(size) => {
                 setPageSize(size);
@@ -374,10 +391,10 @@ export default function EstimatesPage() {
           </Card>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <Card className="min-w-0 p-5 sm:p-6">
+            <Card className="min-w-0 p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[17px] font-bold text-ink">Бюджет и фактические расходы</h2>
-                <div className="flex items-center gap-1 rounded-lg bg-[#F5F5F4] p-1">
+                <h2 className="text-lg font-bold text-ink">{s.budgetChartTitle}</h2>
+                <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
                   {PERIOD_TABS.map((tab) => (
                     <button
                       key={tab.key}
@@ -397,8 +414,8 @@ export default function EstimatesPage() {
                   data={chartData}
                   categoryKey="objectName"
                   series={[
-                    { key: "planned", label: "Запланировано", color: "#2869C9" },
-                    { key: "spent", label: "Потрачено", color: "#FF6B00" },
+                    { key: "planned", label: c.seriesPlanned, color: "#2869C9" },
+                    { key: "spent", label: c.seriesSpent, color: "#FF6B00" },
                   ]}
                   valueFormatter={formatMillionsCompact}
                   maxBarSize={20}
@@ -406,35 +423,35 @@ export default function EstimatesPage() {
               </div>
             </Card>
 
-            <Card className="p-5 sm:p-6">
-              <h2 className="text-[17px] font-bold text-ink">Расходы по категориям</h2>
-              <div className="mt-5 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+            <Card className="min-w-0 p-4 sm:p-5">
+              <h2 className="text-lg font-bold text-ink">{s.categorySpendTitle}</h2>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-6">
                 <DonutChart
-                  data={estimateCategorySpend}
-                  centerLabel="Всего расходов"
+                  data={translatedCategorySpend}
+                  centerLabel={s.categorySpendCenterLabel}
                   centerValue={formatCurrency(estimateKpis.approvedAmount)}
                 />
-                <CategoryLegend data={estimateCategorySpend} secondaryOrder="amount-first" />
+                <CategoryLegend data={translatedCategorySpend} secondaryOrder="amount-first" />
               </div>
             </Card>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {selectedEstimate && (
-            <EstimateSummary estimate={selectedEstimate} onOpen={() => showToast("Открытие детальной страницы сметы пока недоступно в демо", "info")} />
+            <EstimateSummary estimate={selectedEstimate} onOpen={() => showToast(s.toastOpenUnavailable, "info")} />
           )}
 
-          <Card className="p-5 sm:p-6">
-            <h2 className="text-[17px] font-bold text-ink">Сметы, требующие внимания</h2>
+          <Card className="min-w-0 p-4 sm:p-5">
+            <h2 className="text-lg font-bold text-ink">{s.riskCardTitle}</h2>
             <div className="mt-2">
-              <RiskList items={estimateRiskItems} onOpen={(item) => showToast(`Открыта смета: ${item.title}`, "info")} />
+              <RiskList items={translatedRiskItems} onOpen={(item) => showToast(s.toastRiskOpened(item.title), "info")} />
             </div>
             <button
               type="button"
               className="mt-3 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
             >
-              Все сметы с рисками →
+              {s.riskAllLink}
             </button>
           </Card>
         </div>
@@ -443,7 +460,7 @@ export default function EstimatesPage() {
       <Drawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title="Фильтры"
+        title={c.filtersButton}
         footer={
           <>
             <Button
@@ -455,28 +472,28 @@ export default function EstimatesPage() {
                 setMaxAmount("");
               }}
             >
-              Сбросить
+              {c.resetButton}
             </Button>
             <Button className="flex-1" onClick={() => setDrawerOpen(false)}>
-              Применить
+              {c.applyButton}
             </Button>
           </>
         }
       >
         <div className="space-y-5">
           <label className="block text-sm font-medium text-ink">
-            Ответственный
+            {s.colResponsible}
             <input
               type="text"
               value={responsibleFilter}
               onChange={(e) => setResponsibleFilter(e.target.value)}
-              placeholder="Имя прораба"
+              placeholder={s.filterResponsiblePlaceholder}
               className="mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium text-ink">
-              Мин. сумма
+              {s.filterMinAmount}
               <input
                 type="number"
                 min={0}
@@ -486,7 +503,7 @@ export default function EstimatesPage() {
               />
             </label>
             <label className="block text-sm font-medium text-ink">
-              Макс. сумма
+              {s.filterMaxAmount}
               <input
                 type="number"
                 min={0}
@@ -509,9 +526,9 @@ export default function EstimatesPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить смету?"
-        description={deleteTarget ? `Смета «${deleteTarget.number}» будет удалена.` : undefined}
-        confirmLabel="Удалить"
+        title={s.deleteConfirmTitle}
+        description={deleteTarget ? s.deleteConfirmDescription(deleteTarget.number) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

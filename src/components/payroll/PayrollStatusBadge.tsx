@@ -8,7 +8,7 @@ const STATUS_CONFIG: Record<PayrollStatus, { label: string; className: string }>
   approved: { label: "Утверждено", className: "bg-purple-soft text-purple" },
   returned: { label: "Возвращено", className: "bg-red-soft text-red" },
   paid: { label: "Выплачено", className: "bg-green-soft text-green" },
-  cancelled: { label: "Отменено", className: "bg-[#F5F5F4] text-ink-muted" },
+  cancelled: { label: "Отменено", className: "bg-surface-3 text-ink-muted" },
 };
 
 export const PAYROLL_STATUSES: PayrollStatus[] = [

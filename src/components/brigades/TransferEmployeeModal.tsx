@@ -6,6 +6,7 @@ import { Avatar } from "../ui/Avatar";
 import { CustomSelect } from "../ui/CustomSelect";
 import { mockBrigades } from "../../data/mockBrigades";
 import { cn } from "../../utils/cn";
+import { useLanguage } from "../../context/LanguageContext";
 import type { BrigadeMemberRole, Employee } from "../../types";
 
 interface FormState {
@@ -42,6 +43,9 @@ interface TransferEmployeeModalProps {
 }
 
 export function TransferEmployeeModal({ open, onClose, employee, allEmployees, onConfirm }: TransferEmployeeModalProps) {
+  const { strings } = useLanguage();
+  const s = strings.brigades;
+  const c = strings.common;
   const [form, setForm] = useState<FormState>(() => (employee ? emptyForm(employee) : emptyForm(allEmployees[0])));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
@@ -53,7 +57,7 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
 
   if (!employee) {
     return (
-      <Modal open={open} onClose={onClose} title="Перевести сотрудника">
+      <Modal open={open} onClose={onClose} title={s.transferModalTitle}>
         {null}
       </Modal>
     );
@@ -74,8 +78,8 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (form.toBrigadeId === employee!.brigadeId) nextErrors.toBrigadeId = "Новая бригада должна отличаться от текущей";
-    if (!form.transferDate) nextErrors.transferDate = "Укажите дату перевода";
+    if (form.toBrigadeId === employee!.brigadeId) nextErrors.toBrigadeId = s.errorNewBrigadeDifferent;
+    if (!form.transferDate) nextErrors.transferDate = s.errorTransferDateRequired;
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -91,19 +95,19 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
     <Modal
       open={open}
       onClose={onClose}
-      title="Перевести сотрудника"
-      description="Перемещение сотрудника в другую бригаду"
+      title={s.transferModalTitle}
+      description={s.transferModalDescription}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
-          <Button onClick={handleConfirm}>Подтвердить перевод</Button>
+          <Button onClick={handleConfirm}>{s.confirmTransferButton}</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <div className="flex items-center gap-3 rounded-xl bg-[#FAFAF9] px-3.5 py-3">
+        <div className="flex items-center gap-3 rounded-xl bg-surface-1 px-3.5 py-3">
           <Avatar name={employee.fullName} size="sm" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-ink">{employee.fullName}</p>
@@ -112,12 +116,12 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
         </div>
 
         <label className="block text-sm font-medium text-ink">
-          Текущая бригада
-          <input type="text" value={currentBrigade?.name ?? "—"} disabled className={cn(inputClass, "bg-[#FAFAF9] text-ink-secondary")} />
+          {s.currentBrigadeLabel}
+          <input type="text" value={currentBrigade?.name ?? "—"} disabled className={cn(inputClass, "bg-surface-1 text-ink-secondary")} />
         </label>
 
         <label className="block text-sm font-medium text-ink">
-          Новая бригада
+          {s.newBrigadeLabel}
           <CustomSelect
             searchable
             error={Boolean(errors.toBrigadeId)}
@@ -130,22 +134,22 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
         </label>
 
         <label className="block text-sm font-medium text-ink">
-          Новая роль
+          {s.newRoleLabel}
           <CustomSelect
             className="mt-1.5"
             value={form.newRole}
             onValueChange={(v) => update("newRole", v as BrigadeMemberRole)}
             options={[
-              { value: "worker", label: "Рабочий" },
-              { value: "helper", label: "Разнорабочий" },
-              { value: "brigadir", label: "Бригадир" },
-              { value: "foreman", label: "Прораб" },
+              { value: "worker", label: s.roleWorker },
+              { value: "helper", label: s.roleHelper },
+              { value: "brigadir", label: s.roleBrigadir },
+              { value: "foreman", label: s.roleForeman },
             ]}
           />
         </label>
 
         <label className="block text-sm font-medium text-ink">
-          Дата перевода
+          {s.transferDateLabel}
           <input
             type="date"
             value={form.transferDate}
@@ -156,17 +160,17 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
         </label>
 
         <label className="block text-sm font-medium text-ink">
-          Причина
-          <input type="text" value={form.reason} onChange={(e) => update("reason", e.target.value)} placeholder="Например, нехватка кадров" className={inputClass} />
+          {s.reasonLabel}
+          <input type="text" value={form.reason} onChange={(e) => update("reason", e.target.value)} placeholder={s.reasonPlaceholder} className={inputClass} />
         </label>
 
         {replaceCandidates.length > 0 && (
           <label className="block text-sm font-medium text-ink">
-            Заменить другого сотрудника
+            {s.replaceEmployeeLabel}
             <CustomSelect
               searchable
               clearable
-              placeholder="Не заменять"
+              placeholder={s.doNotReplaceOption}
               className="mt-1.5"
               value={form.replaceEmployeeId}
               onValueChange={(v) => update("replaceEmployeeId", v)}
@@ -176,7 +180,7 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
         )}
 
         <label className="block text-sm font-medium text-ink">
-          Комментарий
+          {c.commentLabel}
           <textarea value={form.comment} onChange={(e) => update("comment", e.target.value)} rows={2} className={inputClass} />
         </label>
 
@@ -184,8 +188,8 @@ export function TransferEmployeeModal({ open, onClose, employee, allEmployees, o
           <div className="flex items-start gap-2.5 rounded-xl bg-warning-soft px-3.5 py-3 text-xs text-warning">
             <AlertTriangle size={15} className="mt-0.5 shrink-0" />
             <div className="space-y-1">
-              {overCapacity && <p>Целевая бригада укомплектована на пределе штатной численности.</p>}
-              {hasActiveWork && <p>У сотрудника есть текущее активное назначение — перевод завершит его участие в нём.</p>}
+              {overCapacity && <p>{s.warningOverCapacity}</p>}
+              {hasActiveWork && <p>{s.warningActiveWork}</p>}
             </div>
           </div>
         )}

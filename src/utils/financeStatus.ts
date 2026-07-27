@@ -1,13 +1,24 @@
 import type { AssignmentStatus, BudgetLineStatus, EstimateStatus } from "../types";
+import type { AppStrings } from "../lib/i18n/appStrings";
 
 type Tone = "red" | "orange" | "blue" | "green" | "purple";
 
-export const ASSIGNMENT_STATUS_CONFIG: Record<AssignmentStatus, { label: string; tone: Tone }> = {
-  active: { label: "В работе", tone: "orange" },
-  completed: { label: "Завершено", tone: "green" },
-  cancelled: { label: "Отменено", tone: "red" },
-  overdue: { label: "Просрочено", tone: "red" },
+export const ASSIGNMENT_STATUS_CONFIG: Record<AssignmentStatus, { tone: Tone }> = {
+  active: { tone: "orange" },
+  completed: { tone: "green" },
+  cancelled: { tone: "red" },
+  overdue: { tone: "red" },
 };
+
+export function assignmentStatusLabel(s: AppStrings["brigades"], status: AssignmentStatus): string {
+  const map: Record<AssignmentStatus, string> = {
+    active: s.assignmentStatusActive,
+    completed: s.assignmentStatusCompleted,
+    cancelled: s.assignmentStatusCancelled,
+    overdue: s.assignmentStatusOverdue,
+  };
+  return map[status];
+}
 
 export const ESTIMATE_STATUS_CONFIG: Record<EstimateStatus, { label: string; tone: Tone }> = {
   draft: { label: "Черновик", tone: "blue" },

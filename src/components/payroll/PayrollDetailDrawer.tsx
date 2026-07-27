@@ -5,6 +5,7 @@ import { Avatar } from "../ui/Avatar";
 import { PayrollStatusBadge } from "./PayrollStatusBadge";
 import { formatCurrency } from "../../utils/format";
 import { formatDateShort, formatDateTimeShort } from "../../utils/date";
+import { readJson } from "../../lib/storage/localStorageEngine";
 import { useToast } from "../../hooks/useToast";
 import {
   canApprovePayroll,
@@ -49,8 +50,10 @@ export function PayrollDetailDrawer({
 
   function handleDownloadPayslip() {
     if (!record) return;
+    // Real, persisted "Название компании" setting (Settings → Company) instead of a hardcoded name.
+    const companyName = readJson<{ companyName?: string }>("app.settings.v1")?.companyName || "BINOSOZ";
     const lines = [
-      "BINOSOZ — Расчётный лист",
+      `${companyName} — Расчётный лист`,
       `Сотрудник: ${record.employeeName}`,
       `Должность: ${record.position}`,
       `Подразделение: ${record.brigadeName ?? record.department ?? "—"}`,

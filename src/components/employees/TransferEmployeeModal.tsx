@@ -3,6 +3,7 @@ import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { BRIGADE_OPTIONS, DEPARTMENT_OPTIONS } from "../../data/mockStaff";
+import { useLanguage } from "../../context/LanguageContext";
 import type { StaffMember } from "../../types";
 
 type UnitType = "brigade" | "department";
@@ -15,6 +16,9 @@ interface TransferEmployeeModalProps {
 }
 
 export function TransferEmployeeModal({ open, employee, onClose, onTransfer }: TransferEmployeeModalProps) {
+  const { strings } = useLanguage();
+  const e = strings.employees;
+  const c = strings.common;
   const [unitType, setUnitType] = useState<UnitType>("brigade");
   const [brigadeName, setBrigadeName] = useState(BRIGADE_OPTIONS[0].name);
   const [department, setDepartment] = useState(DEPARTMENT_OPTIONS[0]);
@@ -44,35 +48,35 @@ export function TransferEmployeeModal({ open, employee, onClose, onTransfer }: T
     <Modal
       open={open}
       onClose={onClose}
-      title="Перевести сотрудника"
-      description={`${employee.fullName} — текущее подразделение: ${currentUnit}`}
+      title={e.transferModalTitle}
+      description={e.transferModalDescription(employee.fullName, currentUnit)}
       size="sm"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Отмена
+            {c.cancelLabel}
           </Button>
-          <Button onClick={handleConfirm}>Перевести</Button>
+          <Button onClick={handleConfirm}>{e.transferButton}</Button>
         </>
       }
     >
       <div className="space-y-4">
         <label className="block text-sm font-medium text-ink">
-          Тип подразделения
+          {e.unitTypeLabel}
           <CustomSelect
             className="mt-1.5"
             value={unitType}
             onValueChange={(v) => setUnitType(v as UnitType)}
             options={[
-              { value: "brigade", label: "Бригада" },
-              { value: "department", label: "Отдел" },
+              { value: "brigade", label: e.unitTypeBrigade },
+              { value: "department", label: e.unitTypeDepartment },
             ]}
           />
         </label>
 
         {unitType === "brigade" ? (
           <label className="block text-sm font-medium text-ink">
-            Новая бригада
+            {strings.brigades.newBrigadeLabel}
             <CustomSelect
               searchable
               className="mt-1.5"
@@ -83,7 +87,7 @@ export function TransferEmployeeModal({ open, employee, onClose, onTransfer }: T
           </label>
         ) : (
           <label className="block text-sm font-medium text-ink">
-            Новый отдел
+            {e.newDepartmentLabel}
             <CustomSelect
               searchable
               className="mt-1.5"

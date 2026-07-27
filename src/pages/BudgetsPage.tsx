@@ -23,11 +23,12 @@ import { budgetsRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../context/LanguageContext";
 import { formatCurrency, formatMillionsCompact } from "../utils/format";
 import { formatDateShort } from "../utils/date";
 import { BUDGET_STATUS_CONFIG, getBudgetProgressTone } from "../utils/financeStatus";
 import { cn } from "../utils/cn";
-import type { BudgetLine } from "../types";
+import type { BudgetLine, BudgetLineStatus } from "../types";
 
 type TabKey = "all" | "active" | "completed" | "over_budget";
 
@@ -53,13 +54,6 @@ function shortenObjectLabel(name: string, objectType: BudgetLine["objectType"]):
   return OBJECT_TYPE_SHORT_LABEL[objectType] ?? quoted?.replace(/[«»]/g, "") ?? name;
 }
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "active", label: "Активные" },
-  { key: "completed", label: "Завершённые" },
-  { key: "over_budget", label: "С превышением" },
-];
-
 function matchesTab(status: BudgetLine["status"], tab: TabKey): boolean {
   if (tab === "all") return true;
   if (tab === "completed") return status === "completed";
@@ -69,6 +63,24 @@ function matchesTab(status: BudgetLine["status"], tab: TabKey): boolean {
 
 export default function BudgetsPage() {
   const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.budgets;
+  const c = strings.common;
+
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: "all", label: s.tabAll },
+    { key: "active", label: s.tabActive },
+    { key: "completed", label: s.tabCompleted },
+    { key: "over_budget", label: s.tabOverBudget },
+  ];
+
+  const BUDGET_STATUS_LABEL: Record<BudgetLineStatus, string> = {
+    in_progress: c.statusInProgress,
+    over_budget: s.statusOverBudget,
+    completed: c.statusCompleted,
+    pending_approval: s.statusPendingApproval,
+    draft: c.statusDraft,
+  };
 
   const [budgets, setBudgets] = useRepositoryState(budgetsRepository);
   const [selectedId, setSelectedId] = useState<string>(() => budgetsRepository.getSnapshot()[0]?.id ?? "");
@@ -107,6 +119,26 @@ export default function BudgetsPage() {
     }));
   }, [budgets, period]);
 
+  const translatedCategorySpend = useMemo(
+    () => budgetCategorySpend.map((entry) => ({ ...entry, category: s.categoryLabels[entry.category] ?? entry.category })),
+    [s],
+  );
+
+  const translatedOperations = useMemo(
+    () => budgetOperations.map((op) => ({ ...op, action: s.operationActionLabels[op.action] ?? op.action })),
+    [s],
+  );
+
+  const translatedRiskItems = useMemo(
+    () =>
+      budgetRiskItems.map((item) => ({
+        ...item,
+        description: s.riskDescriptionLabels[item.description] ?? item.description,
+        badgeLabel: c.riskBadgeLabels[item.badgeLabel] ?? item.badgeLabel,
+      })),
+    [s, c],
+  );
+
   function handleTabChange(nextTab: TabKey) {
     setTab(nextTab);
     setPage(1);
@@ -121,7 +153,7 @@ export default function BudgetsPage() {
     setBudgets((prev) => [budget, ...prev]);
     setSelectedId(budget.id);
     setAddModalOpen(false);
-    showToast("Бюджет добавлен");
+    showToast(s.toastCreated);
   }
 
   function handleDeleteConfirmed() {
@@ -130,27 +162,27 @@ export default function BudgetsPage() {
     if (selectedId === deleteTarget.id) {
       setSelectedId((prev) => budgets.find((b) => b.id !== prev)?.id ?? "");
     }
-    showToast("Бюджет удалён", "info");
+    showToast(s.toastDeleted, "info");
     setDeleteTarget(null);
   }
 
   const columns: DataTableColumn<BudgetLine>[] = [
     {
       key: "object",
-      header: "Объект",
+      header: c.colObject,
       width: "19%",
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <div className="h-10 w-11 shrink-0 overflow-hidden rounded-lg border border-border">
             <ObjectImage src={row.imageUrl} type={row.objectType} alt={row.objectName} />
           </div>
-          <span className="line-clamp-2 min-w-0 text-[13px] font-semibold leading-snug text-ink">{row.objectName}</span>
+          <span className="line-clamp-2 min-w-0 text-sm font-semibold leading-snug text-ink">{row.objectName}</span>
         </div>
       ),
     },
     {
       key: "totalBudget",
-      header: "Бюджет",
+      header: c.totalBudgetLabel,
       width: "10%",
       render: (row) => (
         <span className="whitespace-nowrap tabular text-ink">{formatCurrency(row.totalBudget).replace(" сомони", " с.")}</span>
@@ -158,7 +190,7 @@ export default function BudgetsPage() {
     },
     {
       key: "spent",
-      header: "Потрачено",
+      header: c.spentLabel,
       width: "10%",
       render: (row) => (
         <span className="whitespace-nowrap tabular text-ink">{formatCurrency(row.spent).replace(" сомони", " с.")}</span>
@@ -166,7 +198,7 @@ export default function BudgetsPage() {
     },
     {
       key: "remaining",
-      header: "Остаток",
+      header: s.colRemaining,
       width: "10%",
       render: (row) => {
         const remaining = row.totalBudget - row.spent;
@@ -179,7 +211,7 @@ export default function BudgetsPage() {
     },
     {
       key: "usage",
-      header: "Использование",
+      header: s.colUsage,
       width: "13%",
       render: (row) => {
         const usagePercent = Math.round((row.spent / row.totalBudget) * 100);
@@ -197,7 +229,7 @@ export default function BudgetsPage() {
     },
     {
       key: "overspend",
-      header: "Превышение",
+      header: s.colOverspend,
       width: "10%",
       render: (row) => {
         const overspend = Math.max(0, row.spent - row.totalBudget);
@@ -210,16 +242,16 @@ export default function BudgetsPage() {
     },
     {
       key: "status",
-      header: "Статус",
+      header: c.colStatus,
       width: "17%",
       render: (row) => {
         const config = BUDGET_STATUS_CONFIG[row.status];
-        return <Badge tone={config.tone}>{config.label}</Badge>;
+        return <Badge tone={config.tone}>{BUDGET_STATUS_LABEL[row.status]}</Badge>;
       },
     },
     {
       key: "actions",
-      header: "Действия",
+      header: c.tableActions,
       width: "11%",
       headerClassName: "text-right",
       className: "text-right",
@@ -227,22 +259,22 @@ export default function BudgetsPage() {
         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            aria-label="Просмотреть бюджет"
+            aria-label={s.actionViewBudget}
             onClick={() => setSelectedId(row.id)}
-            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink"
+            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
           >
             <Eye size={16} />
           </button>
           <DropdownMenu
             trigger={<span className="text-lg leading-none">⋯</span>}
             items={[
-              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
+              { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
               {
-                label: "Редактировать",
+                label: c.edit,
                 icon: <Pencil size={14} />,
-                onClick: () => showToast("Редактирование пока недоступно в демо", "info"),
+                onClick: () => showToast(c.editUnavailableInDemo, "info"),
               },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+              { label: c.delete, icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
             ]}
           />
         </div>
@@ -252,51 +284,51 @@ export default function BudgetsPage() {
 
   return (
     <AppLayout
-      title="Бюджеты"
-      subtitle="Планирование, контроль и анализ бюджетов по объектам"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск бюджетов, объектов..." }}
+      title={s.pageTitle}
+      subtitle={s.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Общий бюджет"
+          label={s.kpiTotalBudget}
           value={formatCurrency(budgetKpis.totalBudget)}
           icon={Wallet}
           tone="orange"
-          footer="По всем активным объектам"
+          footer={s.kpiTotalBudgetFooter}
         />
         <MetricCard
-          label="Утверждённые бюджеты"
+          label={s.kpiApprovedBudget}
           value={formatCurrency(budgetKpis.approvedBudget)}
           icon={CheckCircle2}
           tone="green"
-          footer={`${budgetKpis.approvedPercent}% от общего бюджета`}
+          footer={s.kpiApprovedFooter(budgetKpis.approvedPercent)}
         />
         <MetricCard
-          label="Фактические расходы"
+          label={s.kpiActualSpent}
           value={formatCurrency(budgetKpis.actualSpent)}
           icon={Wallet}
           tone="blue"
-          footer={`${budgetKpis.actualSpentPercent}% бюджета использовано`}
+          footer={s.kpiActualSpentFooter(budgetKpis.actualSpentPercent)}
         />
         <MetricCard
-          label="Превышение бюджета"
+          label={s.kpiOverBudget}
           value={formatCurrency(budgetKpis.overBudgetAmount)}
           icon={AlertTriangle}
           tone="red"
-          footer={<span className="text-red">{budgetKpis.overBudgetObjectCount} объекта с превышением</span>}
+          footer={<span className="text-red">{s.kpiOverBudgetFooter(budgetKpis.overBudgetObjectCount)}</span>}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.85fr_1fr]">
         <Card className="min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Бюджеты по объектам</h2>
+            <h2 className="text-lg font-bold text-ink">{s.listTitle}</h2>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm">
-                <Filter size={14} /> Фильтры
+                <Filter size={14} /> {c.filtersButton}
               </Button>
               <Button size="sm" onClick={() => setAddModalOpen(true)}>
-                <Plus size={14} /> Добавить бюджет
+                <Plus size={14} /> {s.addBudget}
               </Button>
             </div>
           </div>
@@ -308,7 +340,7 @@ export default function BudgetsPage() {
                 type="button"
                 onClick={() => handleTabChange(t.key)}
                 className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                  tab === t.key ? "bg-primary text-white" : "bg-[#F5F5F4] text-ink-secondary hover:bg-[#ECECEB]"
+                  tab === t.key ? "bg-primary text-white" : "bg-surface-3 text-ink-secondary hover:bg-surface-5"
                 }`}
               >
                 {t.label}
@@ -328,11 +360,11 @@ export default function BudgetsPage() {
             ) : (
               <EmptyState
                 icon={Wallet}
-                title="Бюджеты не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
+                title={s.emptyTitle}
+                description={c.emptyStateHint}
                 action={
                   <Button variant="outline" size="sm" onClick={() => { setSearch(""); setTab("all"); }}>
-                    Сбросить фильтры
+                    {c.resetFiltersButton}
                   </Button>
                 }
               />
@@ -344,7 +376,7 @@ export default function BudgetsPage() {
             pageCount={pageCount}
             pageSize={pageSize}
             total={filteredBudgets.length}
-            itemLabel="бюджетов"
+            itemLabel={s.paginationItemLabel}
             onPageChange={setPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
@@ -353,25 +385,25 @@ export default function BudgetsPage() {
           />
         </Card>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           {selectedBudget && (
-            <BudgetSummary budget={selectedBudget} onEdit={() => showToast("Редактирование пока недоступно в демо", "info")} />
+            <BudgetSummary budget={selectedBudget} onEdit={() => showToast(s.toastEditUnavailable, "info")} />
           )}
         </div>
       </div>
 
       {/* Analytics: row 1 — budget dynamics (~63%) + budget distribution (~37%) */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr] lg:items-stretch">
-        <Card className="flex min-w-0 flex-col p-5 sm:p-6">
+        <Card className="flex min-w-0 flex-col p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-[17px] font-bold text-ink">Динамика бюджета</h2>
-            <div className="flex items-center gap-1 rounded-lg bg-[#F5F5F4] p-1">
+            <h2 className="text-lg font-bold text-ink">{s.chartTitle}</h2>
+            <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
               {(
                 [
-                  { key: "week", label: "Неделя" },
-                  { key: "month", label: "Месяц" },
-                  { key: "quarter", label: "Квартал" },
-                  { key: "year", label: "Год" },
+                  { key: "week", label: c.periodWeek },
+                  { key: "month", label: c.periodMonth },
+                  { key: "quarter", label: c.periodQuarter },
+                  { key: "year", label: c.periodYear },
                 ] as const
               ).map((opt) => (
                 <button
@@ -393,9 +425,9 @@ export default function BudgetsPage() {
               categoryKey="objectName"
               tooltipLabelKey="fullName"
               series={[
-                { key: "total", label: "Общий бюджет", color: "#2869C9" },
-                { key: "spent", label: "Потрачено", color: "#FF6B00" },
-                { key: "remaining", label: "Остаток бюджета", color: "#22A447" },
+                { key: "total", label: s.seriesTotalBudget, color: "#2869C9" },
+                { key: "spent", label: c.seriesSpent, color: "#FF6B00" },
+                { key: "remaining", label: s.seriesRemaining, color: "#22A447" },
               ]}
               valueFormatter={formatMillionsCompact}
               maxBarSize={18}
@@ -404,16 +436,16 @@ export default function BudgetsPage() {
           </div>
         </Card>
 
-        <Card className="flex flex-col p-5 sm:p-6">
-          <h2 className="text-[17px] font-bold text-ink">Распределение бюджета</h2>
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6 sm:flex-row">
+        <Card className="flex min-w-0 flex-col p-4 sm:p-5">
+          <h2 className="text-lg font-bold text-ink">{s.distributionTitle}</h2>
+          <div className="mt-4 flex flex-1 flex-wrap items-center justify-center gap-6">
             <DonutChart
-              data={budgetCategorySpend}
-              centerLabel="Всего бюджет"
+              data={translatedCategorySpend}
+              centerLabel={s.centerLabel}
               centerValue={formatCurrency(budgetKpis.totalBudget)}
               size={192}
             />
-            <CategoryLegend data={budgetCategorySpend} secondaryOrder="percent-first" unitSuffix=" с." />
+            <CategoryLegend data={translatedCategorySpend} secondaryOrder="percent-first" unitSuffix=" с." />
           </div>
         </Card>
       </div>
@@ -422,22 +454,22 @@ export default function BudgetsPage() {
       <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-[2fr_1fr]">
         <Card className="min-w-0">
           <div className="px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Последние операции по бюджетам</h2>
+            <h2 className="text-lg font-bold text-ink">{s.operationsTitle}</h2>
           </div>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[560px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-ink-secondary">
-                  <th className="px-5 py-2.5 font-medium sm:px-6">Дата</th>
-                  <th className="px-3 py-2.5 font-medium">Объект</th>
-                  <th className="px-3 py-2.5 font-medium">Действие</th>
-                  <th className="px-3 py-2.5 font-medium">Сумма, сомони</th>
-                  <th className="px-3 py-2.5 pr-5 font-medium sm:pr-6">Ответственный</th>
+                  <th className="px-5 py-2.5 font-medium sm:px-6">{c.colDate}</th>
+                  <th className="px-3 py-2.5 font-medium">{c.colObject}</th>
+                  <th className="px-3 py-2.5 font-medium">{s.opColAction}</th>
+                  <th className="px-3 py-2.5 font-medium">{c.colAmountSomoni}</th>
+                  <th className="px-3 py-2.5 pr-5 font-medium sm:pr-6">{c.responsibleLabel}</th>
                 </tr>
               </thead>
               <tbody>
-                {budgetOperations.map((op) => (
-                  <tr key={op.id} className="border-b border-border last:border-0 hover:bg-[#FAFAF9]">
+                {translatedOperations.map((op) => (
+                  <tr key={op.id} className="border-b border-border last:border-0 hover:bg-surface-1">
                     <td className="whitespace-nowrap px-5 py-3 text-ink-secondary sm:px-6">{formatDateShort(op.date)}</td>
                     <td className="px-3 py-3 font-medium text-ink">{op.objectName}</td>
                     <td className="px-3 py-3 text-ink-secondary">{op.action}</td>
@@ -452,21 +484,21 @@ export default function BudgetsPage() {
           </div>
           <div className="px-5 py-4 sm:px-6">
             <button type="button" className="text-sm font-semibold text-primary hover:text-primary-hover">
-              Все операции →
+              {s.allOperationsLink}
             </button>
           </div>
         </Card>
 
-        <Card className="p-5 sm:p-6">
-          <h2 className="text-[17px] font-bold text-ink">Бюджеты с превышением</h2>
+        <Card className="min-w-0 p-4 sm:p-5">
+          <h2 className="text-lg font-bold text-ink">{s.riskCardTitle}</h2>
           <div className="mt-2">
-            <RiskList items={budgetRiskItems} onOpen={(item) => showToast(`Открыт бюджет: ${item.title}`, "info")} />
+            <RiskList items={translatedRiskItems} onOpen={(item) => showToast(s.toastRiskOpened(item.title), "info")} />
           </div>
           <button
             type="button"
             className="mt-3 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
           >
-            Все бюджеты с рисками →
+            {s.riskAllLink}
           </button>
         </Card>
       </div>
@@ -476,9 +508,9 @@ export default function BudgetsPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
-        title="Удалить бюджет?"
-        description={deleteTarget ? `Бюджет объекта «${deleteTarget.objectName}» будет удалён.` : undefined}
-        confirmLabel="Удалить"
+        title={s.deleteConfirmTitle}
+        description={deleteTarget ? s.deleteConfirmDescription(deleteTarget.objectName) : undefined}
+        confirmLabel={c.delete}
         danger
         onConfirm={handleDeleteConfirmed}
       />

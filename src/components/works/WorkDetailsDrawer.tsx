@@ -10,7 +10,14 @@ import { WorkStatusBadge } from "./WorkStatusBadge";
 import { WorkProgressBar } from "./WorkProgressBar";
 import { formatCurrency } from "../../utils/format";
 import { formatDateShort } from "../../utils/date";
-import { WORK_PRIORITY_CONFIG, WORK_STATUS_CONFIG } from "../../utils/workStatus";
+import {
+  WORK_STATUS_CONFIG,
+  workHistoryNoteLabel,
+  workPriorityLabel,
+  workSectionLabel,
+  workStatusLabel,
+} from "../../utils/workStatus";
+import { useLanguage } from "../../context/LanguageContext";
 import type { Work, WorkStatus } from "../../types";
 
 interface WorkDetailsDrawerProps {
@@ -40,10 +47,13 @@ export function WorkDetailsDrawer({
   allowManagement = true,
 }: WorkDetailsDrawerProps) {
   const [commentDraft, setCommentDraft] = useState("");
+  const { strings } = useLanguage();
+  const s = strings.works;
+  const c = strings.common;
 
   if (!work) {
     return (
-      <Drawer open={open} onClose={onClose} title="Работа">
+      <Drawer open={open} onClose={onClose} title={s.detailsDefaultTitle}>
         {null}
       </Drawer>
     );
@@ -65,15 +75,15 @@ export function WorkDetailsDrawer({
         <div className="grid w-full grid-cols-2 gap-2.5">
           {allowManagement && (
             <Button variant="secondary" onClick={() => onEdit(work)}>
-              <Pencil size={14} /> Редактировать
+              <Pencil size={14} /> {c.edit}
             </Button>
           )}
           <Button variant="outline" className={!allowManagement ? "col-span-2" : undefined} onClick={() => onUpdateProgress(work)}>
-            <TrendingUp size={14} /> Обновить прогресс
+            <TrendingUp size={14} /> {s.updateProgressButton}
           </Button>
           {!isClosed && allowManagement && (
             <Button className="col-span-2" onClick={() => onComplete(work.id)}>
-              <CheckCircle2 size={14} /> Завершить работу
+              <CheckCircle2 size={14} /> {s.completeWorkButton}
             </Button>
           )}
         </div>
@@ -87,7 +97,7 @@ export function WorkDetailsDrawer({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs text-ink-secondary">
-              {work.objectName} • {work.sectionName}
+              {work.objectName} • {workSectionLabel(s, work.sectionId)}
             </p>
             <p className="text-base font-bold text-ink">{work.title}</p>
           </div>
@@ -96,14 +106,14 @@ export function WorkDetailsDrawer({
 
         {allowManagement && (
           <label className="mt-2 block text-xs text-ink-secondary">
-            Изменить статус
+            {s.changeStatusLabel}
             <CustomSelect
               className="mt-1"
               value={work.status}
               onValueChange={(v) => onChangeStatus(work.id, v as WorkStatus)}
-              options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((s) => ({
-                value: s,
-                label: WORK_STATUS_CONFIG[s].label,
+              options={(Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((status) => ({
+                value: status,
+                label: workStatusLabel(s, status),
               }))}
             />
           </label>
@@ -112,7 +122,9 @@ export function WorkDetailsDrawer({
         <div className="mt-4 flex items-center gap-2.5">
           <Avatar name={work.responsible.name} size="sm" />
           <div>
-            <p className="text-xs text-ink-secondary">{work.responsible.role} · {work.brigadeName}</p>
+            <p className="text-xs text-ink-secondary">
+              {work.responsible.role === "Прораб" ? c.roleLabels.prorab : work.responsible.role} · {work.brigadeName}
+            </p>
             <p className="text-sm font-semibold text-ink">{work.responsible.name}</p>
           </div>
         </div>
@@ -120,25 +132,29 @@ export function WorkDetailsDrawer({
         <div className="mt-4 space-y-2.5">
           <IconSummaryRow
             icon={Calendar}
-            label="Плановые сроки"
+            label={s.plannedTermsLabel}
             value={`${formatDateShort(work.plannedStart)} – ${formatDateShort(work.plannedEnd)}`}
           />
           <IconSummaryRow
             icon={Clock}
-            label="Фактические сроки"
-            value={work.actualStart ? `${formatDateShort(work.actualStart)} – ${work.actualEnd ? formatDateShort(work.actualEnd) : "…"}` : "Не начато"}
+            label={s.actualTermsLabel}
+            value={work.actualStart ? `${formatDateShort(work.actualStart)} – ${work.actualEnd ? formatDateShort(work.actualEnd) : "…"}` : s.notStartedLabel}
           />
-          <IconSummaryRow icon={Calendar} label="Плановая продолжительность" value={`${work.plannedDurationDays} дней`} />
-          <IconSummaryRow icon={Clock} label="Фактическая продолжительность" value={actualDuration !== null ? `${actualDuration} дней` : "—"} />
-          <IconSummaryRow icon={Wallet} label="Бюджет работы" value={formatCurrency(work.budget)} />
-          <IconSummaryRow icon={Users} label="Приоритет" value={WORK_PRIORITY_CONFIG[work.priority].label} />
+          <IconSummaryRow icon={Calendar} label={s.fieldPlannedDuration} value={s.durationDaysValue(work.plannedDurationDays)} />
+          <IconSummaryRow
+            icon={Clock}
+            label={s.actualDurationLabel}
+            value={actualDuration !== null ? s.durationDaysValue(actualDuration) : s.noValue}
+          />
+          <IconSummaryRow icon={Wallet} label={s.budgetLabel} value={formatCurrency(work.budget)} />
+          <IconSummaryRow icon={Users} label={s.priorityLabel} value={workPriorityLabel(s, work.priority)} />
         </div>
 
         <div className="my-4 border-t border-border" />
 
         <div>
           <div className="flex items-center justify-between text-xs text-ink-secondary">
-            <span>Прогресс выполнения</span>
+            <span>{s.progressExecutionLabel}</span>
           </div>
           <WorkProgressBar progress={work.progress} status={work.status} className="mt-2" barClassName="flex-1" />
         </div>
@@ -147,7 +163,7 @@ export function WorkDetailsDrawer({
           <>
             <div className="my-4 border-t border-border" />
             <div>
-              <p className="text-sm font-semibold text-ink">Зависимости</p>
+              <p className="text-sm font-semibold text-ink">{s.dependenciesLabel}</p>
               <ul className="mt-2 space-y-1">
                 {dependencies.map((dep) => (
                   <li key={dep.id} className="text-xs text-ink-secondary">
@@ -163,7 +179,7 @@ export function WorkDetailsDrawer({
           <>
             <div className="my-4 border-t border-border" />
             <div>
-              <p className="text-sm font-semibold text-ink">Описание</p>
+              <p className="text-sm font-semibold text-ink">{c.descriptionLabel}</p>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-secondary">{work.description}</p>
             </div>
           </>
@@ -171,24 +187,24 @@ export function WorkDetailsDrawer({
 
         <div className="my-4 border-t border-border" />
         <div>
-          <p className="text-sm font-semibold text-ink">Вложения</p>
+          <p className="text-sm font-semibold text-ink">{s.fieldAttachments}</p>
           {work.attachments.length > 0 ? (
             <ul className="mt-2 space-y-1.5">
               {work.attachments.map((name) => (
-                <li key={name} className="flex items-center gap-2 rounded-lg bg-[#FAFAF9] px-3 py-1.5 text-xs text-ink-secondary">
+                <li key={name} className="flex items-center gap-2 rounded-lg bg-surface-1 px-3 py-1.5 text-xs text-ink-secondary">
                   <Paperclip size={12} className="shrink-0 text-ink-muted" />
                   <span className="truncate">{name}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-1.5 text-xs text-ink-muted">Нет вложений</p>
+            <p className="mt-1.5 text-xs text-ink-muted">{s.noAttachments}</p>
           )}
         </div>
 
         <div className="my-4 border-t border-border" />
         <div>
-          <p className="text-sm font-semibold text-ink">История прогресса</p>
+          <p className="text-sm font-semibold text-ink">{s.progressHistoryLabel}</p>
           <ul className="mt-2 space-y-2.5">
             {[...work.progressHistory].reverse().map((entry) => (
               <li key={entry.id} className="text-xs">
@@ -196,7 +212,7 @@ export function WorkDetailsDrawer({
                   <span className="font-semibold text-ink">{entry.progress}%</span>
                   <span className="text-ink-muted">{formatDateShort(entry.date)}</span>
                 </div>
-                <p className="mt-0.5 text-ink-secondary">{entry.note}</p>
+                <p className="mt-0.5 text-ink-secondary">{workHistoryNoteLabel(s, entry.note)}</p>
                 <p className="text-ink-muted">{entry.author}</p>
               </li>
             ))}
@@ -205,11 +221,11 @@ export function WorkDetailsDrawer({
 
         <div className="my-4 border-t border-border" />
         <div>
-          <p className="text-sm font-semibold text-ink">Комментарии</p>
+          <p className="text-sm font-semibold text-ink">{s.commentsLabel}</p>
           {work.comments.length > 0 ? (
             <ul className="mt-2 space-y-2.5">
               {work.comments.map((comment) => (
-                <li key={comment.id} className="rounded-lg bg-[#FAFAF9] px-3 py-2">
+                <li key={comment.id} className="rounded-lg bg-surface-1 px-3 py-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-ink">{comment.author}</span>
                     <span className="text-ink-muted">{formatDateShort(comment.date)}</span>
@@ -219,14 +235,14 @@ export function WorkDetailsDrawer({
               ))}
             </ul>
           ) : (
-            <p className="mt-1.5 text-xs text-ink-muted">Комментариев пока нет</p>
+            <p className="mt-1.5 text-xs text-ink-muted">{s.noCommentsYet}</p>
           )}
           <div className="mt-2.5 flex items-center gap-2">
             <input
               type="text"
               value={commentDraft}
               onChange={(e) => setCommentDraft(e.target.value)}
-              placeholder="Добавить комментарий..."
+              placeholder={s.addCommentPlaceholder}
               className="flex-1 rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && commentDraft.trim()) {
@@ -244,7 +260,7 @@ export function WorkDetailsDrawer({
                 setCommentDraft("");
               }}
             >
-              Добавить
+              {s.addButton}
             </Button>
           </div>
         </div>

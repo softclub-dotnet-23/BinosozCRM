@@ -12,7 +12,6 @@ import {
   TrendingDown,
   TrendingUp,
   Trash2,
-  Wallet,
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
@@ -48,6 +47,7 @@ import { formatCurrency, formatNumber } from "../utils/format";
 import { formatDateShort } from "../utils/date";
 import { useAuth } from "../context/AuthContext";
 import type { Material, MaterialFilters, MaterialStatus } from "../types";
+import BrigadirMaterialsPage from "./BrigadirMaterialsPage";
 
 type TabKey = "all" | "critical" | "categories";
 
@@ -69,7 +69,7 @@ const STATUS_FILTER_OPTIONS: { value: MaterialStatus | "all"; label: string }[] 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
+  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function formatCompactAmount(value: number): string {
   if (value < 100000) return formatNumber(Math.round(value));
@@ -83,6 +83,12 @@ function stockColorClass(status: MaterialStatus): string {
 }
 
 export default function MaterialsPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirMaterialsPage />;
+  return <CompanyMaterialsPage />;
+}
+
+function CompanyMaterialsPage() {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -244,17 +250,21 @@ export default function MaterialsPage() {
     {
       key: "number",
       header: "№",
+      sticky: "left",
+      width: "44px",
       render: (row) => <span className="text-ink-muted">{row.number}</span>,
     },
     {
       key: "material",
       header: "Материал",
+      sticky: "left",
+      width: "208px",
       render: (row) => (
         <div className="flex items-center gap-3">
           <MaterialThumbnail src={row.imageUrl} alt={row.name} className="h-10 w-10 shrink-0" />
           <div className="min-w-0">
-            <p className="whitespace-nowrap font-semibold text-ink">{row.name}</p>
-            <p className="whitespace-nowrap text-xs text-ink-muted">{row.supplier}</p>
+            <p className="truncate font-semibold text-ink">{row.name}</p>
+            <p className="truncate text-xs text-ink-muted">{row.supplier}</p>
           </div>
         </div>
       ),
@@ -301,6 +311,8 @@ export default function MaterialsPage() {
     {
       key: "actions",
       header: "Действия",
+      sticky: "right",
+      width: "116px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
@@ -343,16 +355,25 @@ export default function MaterialsPage() {
         placeholder: "Поиск по материалам...",
       }}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <MetricCard label="Всего материалов" value={String(kpis.totalCount)} icon={Layers} tone="green" footer="Наименований" />
-            <MetricCard label="Общий остаток" value={formatCompactAmount(kpis.totalStock)} icon={LayoutGrid} tone="blue" footer="Ед. измерения" />
-            <MetricCard label="Поступило за период" value={formatNumber(Math.round(receivedInPeriod))} icon={Download} tone="orange" footer="Ед. измерения" />
-            <MetricCard label="Израсходовано" value={formatNumber(Math.round(consumedInPeriod))} icon={TrendingUp} tone="purple" footer="Ед. измерения" />
-            <MetricCard label="Общая стоимость" value={formatCompactAmount(kpis.totalValue)} icon={Wallet} tone="orange" footer="сомони" />
-          </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <MetricCard
+          label="Всего материалов"
+          value={String(kpis.totalCount)}
+          icon={Layers}
+          tone="green"
+          footer={
+            <>
+              Наименований · <span className="font-semibold text-ink">{formatCompactAmount(kpis.totalValue)} сомони</span>
+            </>
+          }
+        />
+        <MetricCard label="Общий остаток" value={formatCompactAmount(kpis.totalStock)} icon={LayoutGrid} tone="blue" footer="Ед. измерения" />
+        <MetricCard label="Поступило за период" value={formatNumber(Math.round(receivedInPeriod))} icon={Download} tone="orange" footer="Ед. измерения" />
+        <MetricCard label="Израсходовано" value={formatNumber(Math.round(consumedInPeriod))} icon={TrendingUp} tone="purple" footer="Ед. измерения" />
+      </div>
 
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <div className="flex flex-wrap items-center gap-1 border-b border-border px-5 pt-2 sm:px-6">
               {TABS.map((t) => (
@@ -430,7 +451,7 @@ export default function MaterialsPage() {
           </div>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
             <div className="mt-4 space-y-3.5">
               <FilterField label="Поиск">
                 <input
@@ -477,9 +498,9 @@ export default function MaterialsPage() {
 
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-ink">Критический остаток</h2>
+              <h2 className="text-lg font-bold text-ink">Критический остаток</h2>
               {criticalItems.length > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red px-1.5 text-[11px] font-bold text-white">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red px-1.5 text-xs font-bold text-white">
                   {criticalItems.length}
                 </span>
               )}
@@ -522,7 +543,7 @@ export default function MaterialsPage() {
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Последние операции</h2>
+            <h2 className="text-lg font-bold text-ink">Последние операции</h2>
             <ul className="mt-3.5 space-y-3">
               {recentOperations.length > 0 ? (
                 recentOperations.map((op) => (

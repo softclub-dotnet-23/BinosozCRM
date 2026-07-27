@@ -1,215 +1,266 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, ClipboardCheck, Phone, ShieldCheck, UserRoundX, Users } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppLayout } from "../components/layout/AppLayout";
-import { Card } from "../components/ui/Card";
-import { MetricCard } from "../components/ui/MetricCard";
-import { ErrorState } from "../components/ui/ErrorState";
-import { EmptyState } from "../components/ui/EmptyState";
-import { Avatar } from "../components/ui/Avatar";
-import { EmployeeStatusBadge } from "../components/brigades/EmployeeStatusBadge";
-import { EmployeeRoleBadge } from "../components/brigades/EmployeeRoleBadge";
-import { WorkStatusBadge } from "../components/works/WorkStatusBadge";
-import { WorkProgressBar } from "../components/works/WorkProgressBar";
-import { brigadesRepository, employeesRepository, worksRepository, attendanceRepository } from "../data/repositories";
-import { useRepositorySnapshot } from "../hooks/useRepositoryState";
-import { findBrigadirScope } from "../utils/brigadeAccess";
-import { computeAttendanceKpis } from "../utils/attendanceAnalytics";
-import { BRIGADE_STATUS_CONFIG } from "../utils/brigadeStatus";
-import { resolvePersonPhoto } from "../utils/personPhotos";
-import { useAuth } from "../context/AuthContext";
+import { useToast } from "../hooks/useToast";
+import { cn } from "../utils/cn";
+import {
+  BoltIcon,
+  BoxIcon,
+  BuildingIcon,
+  CalendarIcon,
+  Card,
+  CardHeader,
+  CheckIcon,
+  AlertIcon,
+  Badge,
+  HammerIcon,
+  KpiCard,
+  MasterIcon,
+  PersonAvatar,
+  PhoneIcon,
+  RebarIcon,
+  TrowelIcon,
+  UserIcon,
+  UserXIcon,
+  UsersIcon,
+  WalkingPersonIcon,
+  WelderSparkIcon,
+  WheelbarrowIcon,
+  tone,
+} from "../components/brigadir/shared";
+
+const team = [
+  ["Абдуллоев Бахтиёр", "Арматурщик", "На объекте", "08:05", "+992 90 123 45 67", "abdulloev-bakhtiyor.jpg", "green"],
+  ["Юсупов Далер", "Плотник", "На объекте", "07:58", "+992 90 234 56 78", "daler-yusupov.jpg", "green"],
+  ["Рустамов Комрон", "Мастер", "На объекте", "08:20", "+992 90 345 67 89", "rustamov-komron.jpg", "green"],
+  ["Темуров Фирӯз", "Подсобный рабочий", "Опоздание", "08:35", "+992 90 456 78 90", "temurov-firuz.jpg", "orange"],
+  ["Саидов Акмал", "Бетонщик", "На объекте", "08:00", "+992 90 567 89 01", "rustam-saidov.jpg", "green"],
+  ["Ибрагимов Шохрух", "Сварщик", "Отсутствует", "—", "+992 90 678 90 12", "mirzoev-shakhrom.jpg", "red"],
+  ["Мирзоев Низом", "Арматурщик", "Выходной", "—", "+992 90 789 01 23", "nozim-ikromov.jpg", "gray"],
+  ["Холов Икром", "Подсобный рабочий", "На объекте", "08:10", "+992 90 890 12 34", "mukhiddin-kholov.jpg", "green"],
+] as const;
+
+const roles = [
+  ["Арматурщик", 3, "blue", RebarIcon],
+  ["Подсобный рабочий", 3, "purple", WalkingPersonIcon],
+  ["Плотник", 2, "orange", HammerIcon],
+  ["Бетонщик", 2, "purple", WheelbarrowIcon],
+  ["Мастер", 1, "green", MasterIcon],
+  ["Сварщик", 1, "orange", WelderSparkIcon],
+] as const;
+
+const tasks = [
+  ["Заливка фундамента", "ЖК «Сомон»", "В работе", "blue", BuildingIcon],
+  ["Электромонтаж", "Бизнес-центр «Ватан»", "Нужна проверка", "orange", BoltIcon],
+  ["Кладка стен", "Школа №25", "По графику", "green", TrowelIcon],
+  ["Подготовка материалов", "Коттедж «Наврӯз»", "Срочно", "red", BoxIcon],
+] as const;
+
+const attendanceData = [
+  { day: "Пн|14 июл", value: 95 },
+  { day: "Вт|15 июл", value: 90 },
+  { day: "Ср|16 июл", value: 93 },
+  { day: "Чт|17 июл", value: 88 },
+  { day: "Пт|18 июл", value: 94 },
+  { day: "Сб|19 июл", value: 85 },
+  { day: "Вс|20 июл", value: 80 },
+];
+
+function BarValueLabel({ x = 0, y = 0, width = 0, value }: { x?: number; y?: number; width?: number; value?: number }) {
+  return (
+    <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">
+      {value}%
+    </text>
+  );
+}
+
+function DayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
+  const [day = "", date = ""] = (payload?.value ?? "").split("|");
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text textAnchor="middle" fill="#64748b" fontSize="9">
+        <tspan x="0" dy="12">{day}</tspan>
+        <tspan x="0" dy="12">{date}</tspan>
+      </text>
+    </g>
+  );
+}
 
 export default function BrigadirTeamPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const employees = useRepositorySnapshot(employeesRepository);
-  const brigades = useRepositorySnapshot(brigadesRepository);
-  const works = useRepositorySnapshot(worksRepository);
-  const attendance = useRepositorySnapshot(attendanceRepository);
-
-  const scope = user ? findBrigadirScope(employees, brigades, user.employeeId ?? null) : null;
-
-  if (!scope) {
-    return (
-      <AppLayout title="Моя бригада" subtitle="Состав бригады, роли, посещаемость и производительность">
-        <Card className="p-0">
-          <ErrorState
-            title="Бригада не найдена"
-            description="Ваша учётная запись не привязана ни к одной бригаде. Обратитесь к администратору."
-          />
-        </Card>
-      </AppLayout>
-    );
-  }
-
-  const { brigade } = scope;
-  const crew = employees.filter((e) => e.brigadeId === brigade.id);
-  const onSiteCrew = crew.filter((e) => e.status === "on_shift" || e.status === "on_site");
-  const absentCrew = crew.filter((e) => e.status === "absent" || e.status === "sick_leave" || e.status === "on_leave");
-  const brigadeAttendance = attendance.filter((a) => a.brigadeName === brigade.name);
-  const attendanceKpis = computeAttendanceKpis(brigadeAttendance);
-
-  const brigadeWorks = works.filter((w) => w.brigadeId === brigade.id);
-  const upcomingWorks = brigadeWorks
-    .filter((w) => w.status !== "completed" && w.status !== "cancelled")
-    .sort((a, b) => (a.plannedStart < b.plannedStart ? -1 : 1))
-    .slice(0, 5);
-
-  const roleCounts = Array.from(
-    crew.reduce((map, e) => map.set(e.specialty, (map.get(e.specialty) ?? 0) + 1), new Map<string, number>()),
-  ).sort((a, b) => b[1] - a[1]);
-
-  const foreman = employees.find((e) => e.brigadeId === brigade.id && e.memberRole === "foreman");
+  const { showToast } = useToast();
+  const [search, setSearch] = useState("");
+  const visibleTeam = team.filter((row) => `${row[0]} ${row[1]} ${row[2]} ${row[4]}`.toLowerCase().includes(search.toLowerCase()));
+  const visibleTasks = tasks.filter((row) => `${row[0]} ${row[1]} ${row[2]}`.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <AppLayout title="Моя бригада" subtitle="Состав бригады, роли, посещаемость и производительность">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        <MetricCard label="Всего сотрудников" value={String(crew.length)} icon={Users} tone="blue" footer={brigade.name} />
-        <MetricCard label="На объекте сейчас" value={String(onSiteCrew.length)} icon={CheckCircle2} tone="green" footer="На смене / на объекте" />
-        <MetricCard label="Отсутствуют" value={String(absentCrew.length)} icon={UserRoundX} tone="orange" footer="Отпуск / больничный / неявка" />
-        <MetricCard
-          label="Посещаемость"
-          value={attendanceKpis.total > 0 ? `${attendanceKpis.presentPercent}%` : "—"}
-          icon={CheckCircle2}
-          tone="green"
-          footer={attendanceKpis.total > 0 ? `${attendanceKpis.total} отметок за период` : "Нет данных"}
-        />
+    <AppLayout title="Моя бригада" subtitle="Состав бригады, роли, посещаемость и производительность" titleBelowHeader contentMaxWidth="1280px" search={{ value: search, onChange: setSearch, placeholder: "Поиск..." }}>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 [&>section]:min-h-[80px]">
+        <KpiCard label="Всего сотрудников" value="12" note="" color="blue" icon={UsersIcon} />
+        <KpiCard label="На объекте сегодня" value="10" note="" color="green" icon={CheckIcon} />
+        <KpiCard label="Отсутствуют" value="2" note="" color="red" icon={UserXIcon} />
+        <KpiCard label="Средняя посещаемость" value="92%" note="" color="green" icon={CheckIcon} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 2xl:grid-cols-[1.04fr_1fr]">
-        <Card className="2xl:row-span-2">
-          <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-            <h2 className="text-[15px] font-bold text-ink">Состав бригады ({crew.length})</h2>
-          </div>
-          {crew.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left">
-                <thead>
-                  <tr className="bg-[#fafaf9] text-[10px] font-semibold text-ink-muted">
-                    <th className="px-5 py-3">Сотрудник</th>
-                    <th className="px-3 py-3">Специальность</th>
-                    <th className="px-3 py-3">Статус</th>
-                    <th className="px-4 py-3">Телефон</th>
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1.03fr_1fr]">
+        <Card className="overflow-hidden lg:row-span-2">
+          <CardHeader onMore={() => showToast("Действия со списком бригады открыты", "info")}>Список бригады</CardHeader>
+          <div className="table-scroll-x overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-50 text-[10px] font-semibold text-ink-muted">
+                  <th className="whitespace-nowrap px-3 py-2.5">Сотрудник</th>
+                  <th className="whitespace-nowrap px-1.5">Должность</th>
+                  <th className="whitespace-nowrap px-1.5">Статус</th>
+                  <th className="whitespace-nowrap px-1.5">Приход</th>
+                  <th className="whitespace-nowrap px-3">Телефон</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTeam.map((r) => (
+                  <tr key={r[0]} className="border-t border-border hover:bg-orange-50/40">
+                    <td className="px-3 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <PersonAvatar name={r[0]} photo={r[5]} size={24} />
+                        <span className="whitespace-nowrap text-[11px] font-semibold">{r[0]}</span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-1.5 text-[10px] text-ink-secondary">{r[1]}</td>
+                    <td className="whitespace-nowrap px-1.5">
+                      <Badge color={r[6]}>{r[2]}</Badge>
+                    </td>
+                    <td className="whitespace-nowrap px-1.5 text-[10px] text-ink-secondary">{r[3]}</td>
+                    <td className="whitespace-nowrap px-3 text-[10px] text-ink-secondary">{r[4]}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {crew.map((m) => (
-                    <tr key={m.id} className="border-t border-border hover:bg-[#fffaf6]">
-                      <td className="px-5 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          {resolvePersonPhoto(m.fullName) ? (
-                            <img src={resolvePersonPhoto(m.fullName)} alt={m.fullName} className="h-8 w-8 rounded-full object-cover" />
-                          ) : (
-                            <Avatar name={m.fullName} size="sm" />
-                          )}
-                          <span className="whitespace-nowrap text-[11px] font-semibold text-ink">
-                            {m.fullName}
-                            {m.memberRole === "foreman" && <span className="ml-1 font-normal text-ink-muted">(прораб)</span>}
-                            {m.memberRole === "brigadir" && <span className="ml-1 font-normal text-ink-muted">(бригадир)</span>}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5"><EmployeeRoleBadge specialty={m.specialty} /></td>
-                      <td className="px-3 py-2.5"><EmployeeStatusBadge status={m.status} /></td>
-                      <td className="px-4 py-2.5 text-[10px] text-ink-secondary">{m.phone}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState icon={Users} title="В бригаде пока нет сотрудников" />
-          )}
+                ))}
+              </tbody>
+            </table>
+          </div>
           <button
-            onClick={() => navigate("/employees")}
-            className="flex w-full items-center justify-between border-t border-border px-5 py-3.5 text-xs font-bold text-blue hover:bg-blue-soft"
+            onClick={() => navigate("/brigades/composition")}
+            className="flex w-full items-center justify-between border-t border-border px-5 py-3 text-[11px] font-bold text-primary hover:bg-primary-soft"
           >
-            <span>Полный список сотрудников →</span>
+            <span>Показать весь состав</span>
+            <span>→</span>
           </button>
         </Card>
 
-        <Card>
-          <div className="border-b border-border px-5 py-3.5"><h2 className="text-[15px] font-bold text-ink">Специальности в бригаде</h2></div>
-          {roleCounts.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-              {roleCounts.map(([specialty, count]) => (
-                <div key={specialty} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5">
-                  <span className="flex-1 text-[11px] font-semibold text-ink">{specialty}</span>
-                  <b className="rounded-lg border border-border px-2 py-1 text-sm">{count}</b>
+        <Card className="overflow-hidden">
+          <CardHeader onMore={() => navigate("/brigades/composition")}>Роли в бригаде</CardHeader>
+          <div className="grid grid-cols-2 gap-2 p-3">
+            {roles.map(([name, count, color, Icon]) => (
+              <div key={name} className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1.5" title={name}>
+                <div className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full", tone[color])}>
+                  <Icon size={13} />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={Users} title="Нет данных" />
-          )}
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between border-b border-border px-5 py-3.5"><h2 className="text-[15px] font-bold text-ink">Ближайшие работы бригады</h2></div>
-          {upcomingWorks.length > 0 ? (
-            <div className="divide-y divide-border px-4">
-              {upcomingWorks.map((w) => (
-                <div key={w.id} className="grid grid-cols-[1fr_auto] items-center gap-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-[11px] font-bold text-ink">{w.title}</p>
-                    <p className="truncate text-[9px] text-ink-muted">{w.objectName}</p>
-                    <WorkProgressBar progress={w.progress} status={w.status} className="mt-1.5 w-28" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <WorkStatusBadge status={w.status} />
-                    <button onClick={() => navigate("/works")} className="rounded-lg border border-primary/50 px-4 py-1.5 text-[10px] font-bold text-primary hover:bg-primary hover:text-white">
-                      Открыть
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={ClipboardCheck} title="Нет активных работ у бригады" />
-          )}
-        </Card>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 items-stretch gap-4 2xl:grid-cols-[1.43fr_1fr]">
-        <Card className="p-5">
-          <h2 className="text-[15px] font-bold text-ink">Посещаемость за период</h2>
-          {attendanceKpis.total > 0 ? (
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-border p-3"><p className="text-[9px] text-ink-muted">Присутствовали</p><b className="text-lg text-green">{attendanceKpis.present}</b></div>
-              <div className="rounded-xl border border-border p-3"><p className="text-[9px] text-ink-muted">Опоздания</p><b className="text-lg text-warning">{attendanceKpis.late}</b></div>
-              <div className="rounded-xl border border-border p-3"><p className="text-[9px] text-ink-muted">Отсутствия</p><b className="text-lg text-red">{attendanceKpis.absent}</b></div>
-            </div>
-          ) : (
-            <EmptyState icon={Users} title="Нет отметок посещаемости за период" />
-          )}
-          <button onClick={() => navigate("/attendance")} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/60 py-2.5 text-xs font-bold text-primary hover:bg-primary hover:text-white">
-            Открыть посещаемость
-          </button>
-        </Card>
-
-        <Card className="p-5">
-          <div className="flex items-center justify-between"><h2 className="text-[15px] font-bold text-ink">Краткая информация</h2><ShieldCheck className="text-green" size={22} /></div>
-          <div className="mt-3 divide-y divide-border">
-            {[
-              [Users, "Бригадир:", user?.fullName ?? "—"],
-              [ShieldCheck, "Прораб:", brigade.foremanName],
-              [ClipboardCheck, "Объект:", brigade.objectName],
-              [CheckCircle2, "Статус бригады:", BRIGADE_STATUS_CONFIG[brigade.status].label],
-            ].map(([Icon, label, value]) => (
-              <div key={String(label)} className="flex items-center gap-2 py-2 text-[11px]">
-                <Icon size={15} className="text-ink-muted" />
-                <span className="text-ink-secondary">{label as string}</span>
-                <b className="ml-auto">{value as string}</b>
+                <span className="min-w-0 flex-1 truncate text-[10.5px] font-semibold">{name}</span>
+                <b className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md border border-border bg-white px-1 text-sm shadow-sm">{count}</b>
               </div>
             ))}
           </div>
-          {foreman?.phone && (
-            <a
-              href={`tel:${foreman.phone.replace(/\s/g, "")}`}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/60 py-2.5 text-xs font-bold text-primary hover:bg-primary hover:text-white"
-            >
-              <Phone size={16} /> Позвонить прорабу ({foreman.phone})
-            </a>
-          )}
+        </Card>
+
+        <Card className="overflow-hidden lg:col-start-2">
+          <CardHeader onMore={() => navigate("/works")}>Ближайшие задачи бригады</CardHeader>
+          <div className="divide-y divide-border px-4">
+            {visibleTasks.map(([name, obj, status, color, Icon]) => (
+              <div key={name} className="grid grid-cols-[32px_minmax(0,1fr)_auto_78px] items-center gap-2 py-1.5">
+                <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-md", tone[color])}>
+                  <Icon size={17} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-bold">{name}</p>
+                  <p className="truncate text-[9px] text-ink-muted">{obj}</p>
+                </div>
+                <div className="flex justify-center"><Badge color={color}>{status}</Badge></div>
+                <button
+                  onClick={() => navigate("/works", { state: { work: name } })}
+                  className="shrink-0 rounded-md border border-primary/60 px-3 py-1 text-[9px] font-bold text-primary hover:bg-primary hover:text-white"
+                >
+                  Открыть
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-[1.38fr_.82fr]">
+        <Card className="overflow-hidden p-4 lg:h-[250px]">
+          <h2 className="text-[15px] font-bold">Посещаемость за неделю</h2>
+          <div className="mt-2 grid items-start gap-3 lg:grid-cols-[1fr_100px]">
+            <div className="h-[190px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={attendanceData} margin={{ top: 20, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                  <XAxis dataKey="day" tick={<DayTick />} height={32} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    cursor={{ fill: "rgba(30, 79, 122, 0.05)" }}
+                    contentStyle={{
+                      padding: "6px 9px",
+                      borderRadius: "8px",
+                      border: "1px solid #e5e7eb",
+                      background: "rgba(255,255,255,.97)",
+                      boxShadow: "0 6px 18px rgba(15,23,42,.10)",
+                      fontSize: "10px",
+                      lineHeight: 1.25,
+                    }}
+                    labelStyle={{ marginBottom: "3px", color: "#64748b", fontSize: "9px", fontWeight: 600 }}
+                    itemStyle={{ padding: 0, color: "#1e4f7a", fontSize: "10px", fontWeight: 700 }}
+                    separator=": "
+                  />
+                  <Bar dataKey="value" name="Посещаемость" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                    <LabelList dataKey="value" content={<BarValueLabel />} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-1">
+              {[
+                ["Норма", "100%", "text-ink"],
+                ["Факт", "92%", "text-green"],
+                ["Опоздания", "3", "text-warning"],
+                ["Пропуски", "2", "text-red"],
+              ].map(([a, b, c]) => (
+                <div key={a} className="flex h-[43px] flex-col justify-center rounded-lg border border-border px-2 py-1">
+                  <p className="text-[9px] text-ink-muted">{a}</p>
+                  <b className={cn("block text-[17px] leading-tight", c)}>{b}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[14px] font-bold">Краткая информация</h2>
+          </div>
+          <div className="mt-3 divide-y divide-border">
+            {(
+              [
+                [UserIcon, "Бригадир:", "Комрон Саидов", false],
+                [BuildingIcon, "Объект:", "ЖК «Сомон»", false],
+                [UserIcon, "Прораб:", "Комрон Саидов", false],
+                [CalendarIcon, "Следующая проверка:", "20 июля", false],
+                [AlertIcon, "Активных задач:", "5", false],
+                [AlertIcon, "Замечания:", "2", true],
+              ] as const
+            ).map(([Icon, a, b, danger], i) => (
+              <div key={String(a) + i} className="flex items-center gap-2 py-1.5 text-[10px]">
+                <Icon size={14} className="text-ink-muted" />
+                <span className="text-ink-secondary">{a}</span>
+                <b className={cn("ml-auto", danger && "text-red")}>{b}</b>
+              </div>
+            ))}
+          </div>
+          <a
+            href="tel:+992901112233"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-primary/60 py-2 text-[10px] font-bold text-primary hover:bg-primary hover:text-white"
+          >
+            <PhoneIcon size={15} /> Связаться с прорабом
+          </a>
         </Card>
       </div>
     </AppLayout>

@@ -2,6 +2,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { ChartTooltip } from "./ChartTooltip";
 import { formatCompact } from "../../utils/format";
 import { computeNiceTicks } from "../../utils/chart";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface ObjectBudgetPoint {
   objectName: string;
@@ -9,12 +10,12 @@ interface ObjectBudgetPoint {
   spent: number;
 }
 
-const SERIES = [
-  { key: "budget", label: "Бюджет", color: "#2869C9" },
-  { key: "spent", label: "Потрачено", color: "#FF6B00" },
-];
-
 export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
+  const { strings } = useLanguage();
+  const SERIES = [
+    { key: "budget", label: strings.objects.colBudget, color: "#2869C9" },
+    { key: "spent", label: strings.common.spentLabel, color: "#FF6B00" },
+  ];
   const maxValue = Math.max(0, ...data.map((d) => Math.max(d.budget, d.spent)));
   const ticks = computeNiceTicks(maxValue);
   const niceMax = ticks[ticks.length - 1];
@@ -42,8 +43,8 @@ export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
           iconSize={8}
           formatter={(value) => <span className="text-xs text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="budget" name="Бюджет" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} />
-        <Bar dataKey="spent" name="Потрачено" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="budget" name={strings.objects.colBudget} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="spent" name={strings.common.spentLabel} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} />
       </BarChart>
     </ResponsiveContainer>
   );
