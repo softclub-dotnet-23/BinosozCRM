@@ -1,6 +1,6 @@
 using Domain.Entities;
 
-namespace Application.Payroll;
+namespace Application.PayrollAdvances;
 
 public sealed record PayrollAdvanceDto(
     Guid Id,

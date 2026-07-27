@@ -28,12 +28,25 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    // MASTER §15 open question №9's implemented default: no Telegram for the
+    // Brigadir -> Prorab enters the day's attendance directly via API,
+    // EnteredManually = true. Prorab+, object-scoped (ProrabObjectAccess),
+    // not brigade-scoped -- Prorab has no linked Worker row to resolve an
+    // "own brigade" from the way Brigadir's check-in/check-out do.
     [HttpPost]
-    [Authorize(Roles = "Brigadir")]
-    public async Task<IActionResult> Create(CreateTimesheetRequest request, CancellationToken cancellationToken)
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> Create(CreateManualTimesheetRequest request, CancellationToken cancellationToken)
     {
-        var command = new CreateTimesheetCommand(request.WorkerId, request.ObjectId, request.Date, request.CheckInAt, request.CheckOutAt);
+        var command = new CreateManualTimesheetCommand(request.WorkerId, request.ObjectId, request.Date, request.CheckInAt, request.CheckOutAt);
         var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpGet("{timesheetId:guid}")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    public async Task<IActionResult> Get(Guid timesheetId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetTimesheetQuery(timesheetId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 
@@ -53,8 +66,12 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    // MASTER §12's literal role matrix: Timesheet | R | RA | ... — Owner is
+    // R only, no A. Corrected from the class-level Owner,Prorab default,
+    // same reasoning as the identical WorkOrderPayoutShare.Approve gap
+    // (merge Step 3, WorkOrders zone).
     [HttpPost("{timesheetId:guid}/approve")]
-    [Authorize(Roles = "Owner,Prorab")]
+    [Authorize(Roles = "Prorab")]
     public async Task<IActionResult> Approve(Guid timesheetId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new ApproveTimesheetCommand(timesheetId), cancellationToken);

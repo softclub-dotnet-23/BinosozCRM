@@ -14,9 +14,10 @@ namespace Application.Payroll;
 // configured that day, §8.1's "не 0!" rule) is excluded from the sum
 // rather than treated as 0 — counting it as zero would silently hide the
 // missing-configuration case this null exists to flag in the first place.
-// Not gated on ApprovedAt: §8.1 doesn't state that gate (unlike §8.0's
-// explicit "только принятые табели" for CalculatedAmount itself), so
-// nothing invented here.
+// Interpretation, flagged: restricted to ApprovedAt IS NOT NULL, same as
+// §8.0's Hourly formula, even though §8.1 doesn't state the gate as
+// explicitly — an unapproved timesheet's lateness hasn't been verified by
+// anyone either.
 internal static class LatenessDeductionCalculator
 {
     public static async Task<decimal> ComputeAsync(
@@ -29,9 +30,10 @@ internal static class LatenessDeductionCalculator
         var lateMinutesSum = await context.Timesheets
             .Where(t => t.WorkerId == worker.Id
                         && t.Date >= periodStart && t.Date <= periodEnd
+                        && t.ApprovedAt != null
                         && t.LateMinutes != null)
             .SumAsync(t => (int?)t.LateMinutes, cancellationToken) ?? 0;
 
-        return lateMinutesSum * (worker.PayRate / 60m);
+        return Math.Round(lateMinutesSum * (worker.PayRate / 60m), 2, MidpointRounding.AwayFromZero);
     }
 }

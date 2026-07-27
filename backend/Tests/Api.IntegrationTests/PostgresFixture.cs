@@ -27,6 +27,23 @@ public sealed class FixedCurrentUserService(Guid companyId, Guid? userId = null,
     public Role? Role => role;
 }
 
+// For tests that construct a handler directly (not through DI) but never
+// exercise its file-upload path — throws loudly if that assumption turns
+// out wrong, rather than silently returning a fake key/URL.
+public sealed class NotUsedFileStorageService : IFileStorageService
+{
+    public Task<string> SaveAsync(Stream content, string contentType, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();
+
+    public string GetSignedUrl(string key) => throw new NotImplementedException();
+
+    public bool TryValidateSignedUrl(string key, long expiresAtUnixSeconds, string signature) =>
+        throw new NotImplementedException();
+
+    public Task<(Stream Content, string ContentType)> OpenReadAsync(string key, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();
+}
+
 // One real Postgres container (Testcontainers, MASTER §2/§3 — no InMemory
 // provider) for the whole test assembly. Migrated once via the InitialCreate
 // migration (backend/Infrastructure/Migrations) so tests exercise the actual

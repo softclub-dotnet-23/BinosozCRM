@@ -1,21 +1,36 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Domain.Common;
+using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
-namespace Application.Payroll;
+namespace Application.PayrollAdvances;
 
-// MASTER §9.4: GET /payroll-advances — Accountant, Owner. Company-wide,
-// same reasoning as GET /payroll.
+// MASTER §12: PayrollAdvance is Owner:CRUA / Prorab:— / Brigadir:R ("свои")
+// / Accountant:CRUA — same shape as PayrollEntry (Step 3): Prorab has no
+// access at all, and "own" for Brigadir means their own advances (they're
+// a Worker too, via Worker.UserId), not their brigade's.
 public sealed record ListPayrollAdvancesQuery(int Page, int PageSize) : IRequest<Result<PagedResult<PayrollAdvanceDto>>>;
 
-public sealed class ListPayrollAdvancesQueryHandler(IApplicationDbContext context)
+public sealed class ListPayrollAdvancesQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     : IRequestHandler<ListPayrollAdvancesQuery, Result<PagedResult<PayrollAdvanceDto>>>
 {
     public async Task<Result<PagedResult<PayrollAdvanceDto>>> Handle(ListPayrollAdvancesQuery request, CancellationToken cancellationToken)
     {
-        var query = context.PayrollAdvances.OrderByDescending(a => a.IssuedAt).AsQueryable();
+        var query = context.PayrollAdvances.AsQueryable();
+
+        if (currentUser.Role == Role.Brigadir)
+        {
+            var ownWorkerId = await context.Workers
+                .Where(w => w.UserId == currentUser.UserId)
+                .Select(w => (Guid?)w.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            query = query.Where(a => a.WorkerId == ownWorkerId);
+        }
+
+        query = query.OrderByDescending(a => a.IssuedAt);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query

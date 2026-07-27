@@ -57,12 +57,11 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
     }
 
     // §8.10: "Piecework — прямо: WorkOrderPayoutShare.Amount ->
-    // WorkOrder.ObjectId." WorkOrderPayoutShare.Amount is never actually
-    // populated anywhere in this codebase yet (no handler calls
-    // WorkOrderPayoutShare.Approve — a real gap, not this step's to close)
-    // — recomputed directly from SharePercent × OrderTotal instead of
-    // trusting a field nothing sets, same formula
-    // CalculatedAmountCalculator's Piecework branch already uses.
+    // WorkOrder.ObjectId. Точно, без допущений." Reads the Amount snapshot
+    // WorkOrderPayoutShare.Approve() sets (WorkOrderPayoutShares zone, merge
+    // Step 3) directly, rather than recomputing from SharePercent × OrderTotal
+    // — a share with no Amount yet (Prorab hasn't approved it) contributes 0,
+    // same "not final until confirmed" spirit as ClosedPeriodsOnlyNote below.
     private async Task<decimal> ComputePieceworkCostAsync(Guid objectId, CancellationToken cancellationToken)
     {
         var orders = await context.WorkOrders
@@ -75,15 +74,8 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
         foreach (var order in orders)
         {
             var shares = await context.WorkOrderPayoutShares
-                .Where(s => s.WorkOrderId == order.Id)
+                .Where(s => s.WorkOrderId == order.Id && s.Amount != null)
                 .ToListAsync(cancellationToken);
-            if (shares.Count == 0)
-                continue;
-
-            var reportedQty = await context.WorkOrderProgresses
-                .Where(p => p.WorkOrderId == order.Id)
-                .SumAsync(p => (decimal?)p.ReportedQty, cancellationToken) ?? 0m;
-            var orderTotal = reportedQty * order.UnitPrice;
 
             foreach (var share in shares)
             {
@@ -95,7 +87,7 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
                 if (!isPaid)
                     continue;
 
-                total += orderTotal * (share.SharePercent / 100m);
+                total += share.Amount!.Value;
             }
         }
 

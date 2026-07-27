@@ -7,40 +7,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Payroll;
 
-// MASTER §9.4/§8.8: POST /payroll/{id}/approve — Accountant, Owner.
-// FinalAmount = CalculatedAmount - LatenessDeductionAmount + BonusAmount
-// - AdvanceDeductedAmount + AdjustmentAmount, computed exactly once here
-// by PayrollEntry.Approve() itself — "может быть отрицательным... это не
-// ошибка расчёта," never clamped to zero.
-//
-// §9.4 has no separate "/adjust" endpoint, and PayrollEntry.Adjust() is
-// Draft-only anyway (can't touch a number after Approve freezes it) — so
-// an optional AdjustmentAmount/AdjustmentReason rides on this same call,
-// applied via Adjust() immediately before Approve() in one transaction.
-// §9.2's PAYROLL_ADJUSTMENT_REASON_REQUIRED fires when AdjustmentAmount
-// != 0 with no reason.
-//
-// §8.8: "При Approve: каждому учтённому авансу проставляется
-// SettledInPayrollEntryId" — every PayrollAdvance that fed this entry's
-// AdvanceDeductedAmount (same criteria AdvanceDeductedAmountCalculator
-// used at draft time) gets stamped with this entry's id in the same
-// SaveChanges, so it stops counting toward any future period's draft.
-public sealed record ApprovePayrollEntryCommand(Guid PayrollEntryId, decimal? AdjustmentAmount, string? AdjustmentReason)
-    : IRequest<Result<PayrollEntryDto>>;
+// MASTER §8.8: FinalAmount = CalculatedAmount - LatenessDeductionAmount +
+// BonusAmount - AdvanceDeductedAmount ± AdjustmentAmount — already exactly
+// what PayrollEntry.Approve() computes (Domain, Phase 0); this command is
+// the missing caller plus §8.8's other Approve-time requirement: "каждому
+// учтённому авансу проставляется SettledInPayrollEntryId". A negative
+// FinalAmount is valid (an advance that outran what was earned) and is
+// never clamped to zero — Approve() already doesn't touch it beyond the
+// subtraction itself.
+public sealed record ApprovePayrollEntryCommand(Guid PayrollEntryId) : IRequest<Result<PayrollEntryDto>>;
 
 public sealed class ApprovePayrollEntryCommandValidator : AbstractValidator<ApprovePayrollEntryCommand>
 {
     public ApprovePayrollEntryCommandValidator()
     {
         RuleFor(x => x.PayrollEntryId).NotEmpty();
-
-        // The AdjustmentAmount != 0 -> AdjustmentReason required rule is
-        // NOT a FluentValidation rule — ValidationBehavior hardcodes every
-        // FluentValidation failure to the generic VALIDATION_FAILED code
-        // regardless of WithErrorCode() (same gotcha as Phase 5 Step 1's
-        // WORK_ORDER_SHARES_INVALID), but §9.2's catalog specifically
-        // calls for PAYROLL_ADJUSTMENT_REASON_REQUIRED here. Checked
-        // explicitly in the handler instead.
     }
 }
 
@@ -49,39 +30,38 @@ public sealed class ApprovePayrollEntryCommandHandler(IApplicationDbContext cont
 {
     public async Task<Result<PayrollEntryDto>> Handle(ApprovePayrollEntryCommand request, CancellationToken cancellationToken)
     {
-        var entry = await context.PayrollEntries.FirstOrDefaultAsync(p => p.Id == request.PayrollEntryId, cancellationToken);
+        var entry = await context.PayrollEntries.FirstOrDefaultAsync(e => e.Id == request.PayrollEntryId, cancellationToken);
         if (entry is null)
             return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ENTRY_NOT_FOUND", "Payroll entry not found."));
 
+        // §9.2's dedicated code for "правка после Paid" — Approve()'s own
+        // guard would reject this too, but as the generic
+        // PAYROLL_ENTRY_INVALID_TRANSITION, not the specific catalog entry.
         if (entry.Status == PayrollEntryStatus.Paid)
             return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ALREADY_PAID", "This payroll entry has already been paid."));
 
-        // §9.2's FluentValidation rule already rejects a missing reason
-        // for a nonzero amount — this is the code-level 400, not the
-        // 400-with-generic-VALIDATION_FAILED path, since ValidationBehavior
-        // hardcodes every FluentValidation failure to VALIDATION_FAILED
-        // regardless of WithErrorCode() (same gotcha caught in Phase 5
-        // Step 1). Re-checked explicitly here for that reason.
-        if (request.AdjustmentAmount is not null && request.AdjustmentAmount != 0 && string.IsNullOrWhiteSpace(request.AdjustmentReason))
-            return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ADJUSTMENT_REASON_REQUIRED", "AdjustmentReason is required when AdjustmentAmount is non-zero."));
+        // Same filter CreatePayrollEntryCommand used to compute
+        // AdvanceDeductedAmount. If a new advance was issued (or another
+        // entry raced to settle one) since the entry's own AdvanceDeductedAmount
+        // was last computed, the two sums diverge — approving now would
+        // lock in a FinalAmount that no longer matches reality. Reject and
+        // ask for a fresh POST /payroll instead of silently approving stale
+        // numbers.
+        var periodEndExclusiveUtc = new DateTimeOffset(entry.PeriodEnd.AddDays(1), TimeOnly.MinValue, TimeSpan.Zero);
+        var unsettledAdvances = await context.PayrollAdvances
+            .Where(a => a.WorkerId == entry.WorkerId && a.SettledInPayrollEntryId == null && a.IssuedAt < periodEndExclusiveUtc)
+            .ToListAsync(cancellationToken);
 
-        if (request.AdjustmentAmount is not null)
-        {
-            var adjustResult = entry.Adjust(request.AdjustmentAmount.Value, request.AdjustmentReason ?? string.Empty);
-            if (adjustResult.IsFailure)
-                return Result.Failure<PayrollEntryDto>(adjustResult.Error);
-        }
+        if (unsettledAdvances.Sum(a => a.Amount) != entry.AdvanceDeductedAmount)
+            return Result.Failure<PayrollEntryDto>(new Error(
+                "PAYROLL_ENTRY_RECALCULATION_REQUIRED",
+                "Unsettled advances have changed since this draft was last calculated — recalculate via POST /payroll before approving."));
 
         var approveResult = entry.Approve();
         if (approveResult.IsFailure)
             return Result.Failure<PayrollEntryDto>(approveResult.Error);
 
-        var periodEndBoundary = new DateTimeOffset(entry.PeriodEnd, TimeOnly.MaxValue, TimeSpan.Zero);
-        var advancesToSettle = await context.PayrollAdvances
-            .Where(a => a.WorkerId == entry.WorkerId && a.SettledInPayrollEntryId == null && a.IssuedAt <= periodEndBoundary)
-            .ToListAsync(cancellationToken);
-
-        foreach (var advance in advancesToSettle)
+        foreach (var advance in unsettledAdvances)
             advance.Settle(entry.Id);
 
         await context.SaveChangesAsync(cancellationToken);
