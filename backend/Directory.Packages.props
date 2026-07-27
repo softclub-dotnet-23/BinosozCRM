@@ -16,8 +16,8 @@
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.1" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
-
     <!-- Test-only (Api.IntegrationTests, MASTER §11.1/§5.27, Phase 0 Step 10) -->
     <!-- FluentAssertions pinned to 7.2.2, the last Apache-2.0 release before the
          v8 Xceed commercial license — avoids taking on a licensing question that
