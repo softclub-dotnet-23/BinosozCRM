@@ -14,17 +14,22 @@ function round(value: number, decimals = 2): number {
   return Math.round(value * factor) / factor;
 }
 
+// Anchored to UTC ("Z" suffix) throughout and mutated/read with the UTC-suffixed Date methods.
+// Parsing as local time and then reading back with toISOString() (always UTC) silently shifts
+// the date by a day in any timezone ahead of UTC — that mismatch was reproduced live (an
+// off-by-one first tick, "30 июн" instead of "1 июл", on the work-dynamics chart that calls
+// previousPeriod() downstream) before this fix.
 function daysBetween(fromIso: string, toIso: string): number {
-  const from = new Date(`${fromIso}T00:00:00`).getTime();
-  const to = new Date(`${toIso}T00:00:00`).getTime();
+  const from = new Date(`${fromIso}T00:00:00Z`).getTime();
+  const to = new Date(`${toIso}T00:00:00Z`).getTime();
   return Math.max(1, Math.round((to - from) / 86_400_000) + 1);
 }
 
 function eachDate(fromIso: string, toIso: string): string[] {
   const dates: string[] = [];
-  const from = new Date(`${fromIso}T00:00:00`);
-  const to = new Date(`${toIso}T00:00:00`);
-  for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+  const from = new Date(`${fromIso}T00:00:00Z`);
+  const to = new Date(`${toIso}T00:00:00Z`);
+  for (const d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
     dates.push(d.toISOString().slice(0, 10));
   }
   return dates;
@@ -33,10 +38,10 @@ function eachDate(fromIso: string, toIso: string): string[] {
 /** Shifts a [from, to] range back by its own length, for period-over-period comparison. */
 export function previousPeriod(dateFrom: string, dateTo: string): { from: string; to: string } {
   const span = daysBetween(dateFrom, dateTo);
-  const from = new Date(`${dateFrom}T00:00:00`);
-  from.setDate(from.getDate() - span);
-  const to = new Date(`${dateFrom}T00:00:00`);
-  to.setDate(to.getDate() - 1);
+  const from = new Date(`${dateFrom}T00:00:00Z`);
+  from.setUTCDate(from.getUTCDate() - span);
+  const to = new Date(`${dateFrom}T00:00:00Z`);
+  to.setUTCDate(to.getUTCDate() - 1);
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 

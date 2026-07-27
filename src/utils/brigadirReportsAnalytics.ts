@@ -5,15 +5,19 @@ function round(value: number): number {
   return Math.round(value);
 }
 
+// All date math here is anchored to UTC (the "Z" suffix) and mutated/read with the UTC-suffixed
+// Date methods throughout — parsing as local time and then reading back with toISOString() (UTC)
+// silently shifts the date by a day in any timezone ahead of UTC, which is exactly the bug that
+// produced an off-by-one first tick ("30 июн" instead of "1 июл") before this was fixed.
 function daysBetween(fromIso: string, toIso: string): number {
-  const from = new Date(`${fromIso}T00:00:00`).getTime();
-  const to = new Date(`${toIso}T00:00:00`).getTime();
+  const from = new Date(`${fromIso}T00:00:00Z`).getTime();
+  const to = new Date(`${toIso}T00:00:00Z`).getTime();
   return Math.max(1, Math.round((to - from) / 86_400_000));
 }
 
 function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + days);
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 

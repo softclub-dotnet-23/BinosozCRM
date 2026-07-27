@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -77,7 +78,7 @@ type TabKey = "overview" | "works" | "materials" | "finance" | "brigade" | "atte
 type BrigadirReportsStrings = AppStrings["brigadirReports"];
 
 const DEFAULT_DATE_FROM = "2026-07-01";
-const DEFAULT_DATE_TO = "2026-07-30";
+const DEFAULT_DATE_TO = "2026-07-31";
 
 function daysInclusive(fromIso: string, toIso: string): number {
   const from = new Date(`${fromIso}T00:00:00`).getTime();
@@ -832,6 +833,12 @@ function Row({ label, value, valueClassName }: { label: string; value: string; v
   );
 }
 
+const DYNAMICS_PLAN_COLOR = "#3B82F6";
+const DYNAMICS_FACT_COLOR = "#22B573";
+const DYNAMICS_RATE_COLOR = "#FF8A1F";
+const DYNAMICS_GRID_COLOR = "#E9EDF3";
+const DYNAMICS_AXIS_TEXT_COLOR = "#6B7280";
+
 function DynamicsTooltip({ active, payload, label, s }: TooltipContentProps & { s: BrigadirReportsStrings }) {
   if (!active || !payload || payload.length === 0) return null;
   const planned = payload.find((p) => p.dataKey === "planned")?.value as number | undefined;
@@ -842,17 +849,17 @@ function DynamicsTooltip({ active, payload, label, s }: TooltipContentProps & { 
       <p className="mb-2 text-xs font-semibold text-ink">{label}</p>
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-blue" />
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: DYNAMICS_PLAN_COLOR }} />
           <span className="text-ink-secondary">{s.seriesPlanned}:</span>
-          <span className="ml-auto font-semibold tabular text-ink">{planned}%</span>
+          <span className="ml-auto font-semibold tabular text-ink">{planned}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-green" />
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: DYNAMICS_FACT_COLOR }} />
           <span className="text-ink-secondary">{s.seriesActual}:</span>
-          <span className="ml-auto font-semibold tabular text-ink">{actual}%</span>
+          <span className="ml-auto font-semibold tabular text-ink">{actual}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: DYNAMICS_RATE_COLOR }} />
           <span className="text-ink-secondary">{s.seriesRate}:</span>
           <span className="ml-auto font-semibold tabular text-ink">{rate}%</span>
         </div>
@@ -866,25 +873,85 @@ function DynamicsChart({ data, s, reduceMotion }: { data: ReturnType<typeof comp
     <div className="min-w-0">
       <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-ink-secondary">
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-blue" /> {s.seriesPlanned}
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DYNAMICS_PLAN_COLOR }} /> {s.seriesPlanned}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-green" /> {s.seriesActual}
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DYNAMICS_FACT_COLOR }} /> {s.seriesActual}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-primary" /> {s.seriesRate}
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DYNAMICS_RATE_COLOR }} /> {s.seriesRate}
         </span>
       </div>
       <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={data} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
-          <CartesianGrid vertical={false} stroke="#EFEFED" strokeDasharray="3 3" />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} tickMargin={8} />
-          <YAxis tickLine={false} axisLine={false} domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: "#9CA3AF" }} width={40} />
-          <Tooltip cursor={{ stroke: "#EFEFED" }} isAnimationActive={false} wrapperStyle={{ zIndex: 30, outline: "none" }} content={(props) => <DynamicsTooltip {...props} s={s} />} />
-          <Line type="monotone" dataKey="planned" stroke="#2869C9" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={!reduceMotion} animationDuration={500} animationEasing="ease-out" />
-          <Line type="monotone" dataKey="actual" stroke="#22A447" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={!reduceMotion} animationDuration={500} animationEasing="ease-out" />
-          <Line type="monotone" dataKey="rate" stroke="#FF6B00" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={!reduceMotion} animationDuration={500} animationEasing="ease-out" />
-        </LineChart>
+        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+          <defs>
+            <linearGradient id="dynamicsFactFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={DYNAMICS_FACT_COLOR} stopOpacity={0.16} />
+              <stop offset="100%" stopColor={DYNAMICS_FACT_COLOR} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke={DYNAMICS_GRID_COLOR} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: DYNAMICS_AXIS_TEXT_COLOR }} tickMargin={8} interval={0} />
+          <YAxis
+            yAxisId="pct"
+            orientation="left"
+            tickLine={false}
+            axisLine={false}
+            domain={[0, 100]}
+            ticks={[0, 25, 50, 75, 100]}
+            tickFormatter={(v: number) => `${v}%`}
+            tick={{ fontSize: 11, fill: DYNAMICS_AXIS_TEXT_COLOR }}
+            width={40}
+          />
+          <YAxis
+            yAxisId="num"
+            orientation="right"
+            tickLine={false}
+            axisLine={false}
+            domain={[0, 100]}
+            ticks={[0, 20, 40, 60, 80, 100]}
+            tick={{ fontSize: 11, fill: DYNAMICS_AXIS_TEXT_COLOR }}
+            width={32}
+          />
+          <Tooltip cursor={{ stroke: DYNAMICS_GRID_COLOR }} isAnimationActive={false} wrapperStyle={{ zIndex: 30, outline: "none" }} content={(props) => <DynamicsTooltip {...props} s={s} />} />
+          <Area
+            yAxisId="num"
+            type="monotone"
+            dataKey="actual"
+            stroke={DYNAMICS_FACT_COLOR}
+            strokeWidth={2.5}
+            fill="url(#dynamicsFactFill)"
+            dot={false}
+            activeDot={{ r: 4 }}
+            isAnimationActive={!reduceMotion}
+            animationDuration={500}
+            animationEasing="ease-out"
+          />
+          <Line
+            yAxisId="num"
+            type="monotone"
+            dataKey="planned"
+            stroke={DYNAMICS_PLAN_COLOR}
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={{ r: 4 }}
+            isAnimationActive={!reduceMotion}
+            animationDuration={500}
+            animationEasing="ease-out"
+          />
+          <Line
+            yAxisId="pct"
+            type="monotone"
+            dataKey="rate"
+            stroke={DYNAMICS_RATE_COLOR}
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={{ r: 4 }}
+            isAnimationActive={!reduceMotion}
+            animationDuration={500}
+            animationEasing="ease-out"
+          />
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
