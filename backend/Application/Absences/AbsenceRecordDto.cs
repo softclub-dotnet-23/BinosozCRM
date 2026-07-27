@@ -1,3 +1,4 @@
+using Application.Common.Interfaces;
 using Domain.Entities;
 using Domain.Enums;
 
@@ -14,7 +15,11 @@ public sealed record AbsenceRecordDto(
     string? DocumentUrl,
     Guid? ApprovedByUserId)
 {
-    public static AbsenceRecordDto FromEntity(AbsenceRecord record) => new(
+    // MASTER §11.9: DocumentUrl in the DB is a stable storage key, not a
+    // literal URL -- a signed URL saved permanently would go dead once its
+    // expiry passed, so a fresh one is minted on every read instead, same
+    // pattern as WorkOrderProgressDto.
+    public static AbsenceRecordDto FromEntity(AbsenceRecord record, IFileStorageService fileStorage) => new(
         record.Id,
         record.WorkerId,
         record.DateFrom,
@@ -22,6 +27,6 @@ public sealed record AbsenceRecordDto(
         record.Type,
         record.Reason,
         record.IsPaid,
-        record.DocumentUrl,
+        record.DocumentUrl is null ? null : fileStorage.GetSignedUrl(record.DocumentUrl),
         record.ApprovedByUserId);
 }

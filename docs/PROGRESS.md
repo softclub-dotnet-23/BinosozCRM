@@ -3,6 +3,32 @@
 Каждый шаг ссылается на раздел `docs/MASTER.md` — читать нужно **только его**, не весь файл.
 Теги: `[BE]` backend · `[BOT]` Telegram · `[FULL]` несколько сразу (backend + Telegram).
 
+## Phase summaries from the `shahrom` branch
+
+This file is `origin/master`'s own PROGRESS.md, kept as the base — it's
+the more complete/current journal (through Phase 6, vs. the `shahrom`
+branch's own journal stopping at Phase 5 Step 11). The two branches wrote
+independent implementations of the same phases after diverging at
+`0b2ccf8`; rather than interleave two journals line-by-line, this section
+points at where the `shahrom` branch's own narrative lives.
+
+- **Full journal:** `git show shahrom:docs/PROGRESS.md`, or
+  `git log shahrom` for the commit-by-commit history (77 commits from
+  `42d45ed` Phase 0 scaffold through `661706f`, 2026-07-19).
+- **Diverged at:** `0b2ccf8` (last point the two branches shared).
+- **Covers:** Phase 3 (Timesheet, AbsenceRecord, Worker termination),
+  Phase 4 (MaterialConsumptionReport, MaterialRequest, MaterialDelivery),
+  Phase 5 (WorkOrderPayoutShare, PayrollEntry, PayrollAdvance) — all
+  independently implemented in parallel with what this file's own Phase
+  3-5 entries describe.
+- **Reconciliation record:** branch `merge-shahrom-master`, commits
+  `85f9060`..`c87c061` — the actual step-by-step comparison of both
+  implementations (endpoints, roles, formulas) with the reasoning for
+  what was kept from each side. That's the readable summary of what
+  `shahrom` had that this journal's own Phase 3-5 entries don't mention;
+  reading those commit messages is faster than diffing the two full
+  journals.
+
 ## Current Status
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.

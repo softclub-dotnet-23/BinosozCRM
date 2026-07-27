@@ -1,5 +1,6 @@
 using System.Text;
 using Api.Auth;
+using Api.BackgroundJobs;
 using Api.BackgroundServices;
 using Api.Common;
 using Api.Hubs;
@@ -9,6 +10,7 @@ using Api.Realtime;
 using Application;
 using Application.Common.Interfaces;
 using Application.Common.Options;
+using Application.Payroll;
 using Application.Seed;
 using Application.Workers;
 using Domain.Entities;
@@ -41,6 +43,41 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
+
+// Swagger/OpenAPI — dev-only interactive API explorer. Lets anyone on the
+// team browse every controller's endpoints (Shahrom's Zone B + Ahmad's
+// Zone A) in one place and try them out with a real JWT, instead of
+// guessing routes/DTOs from source or hand-building Postman requests.
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
+    {
+        Title = "БригадаCRM API",
+        Version = "v1"
+    });
+
+    var jwtScheme = new Microsoft.OpenApi.OpenApiSecurityScheme
+    {
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.SecuritySchemeType.Http,
+        Description = "Введите JWT токен, полученный от POST /auth/login (без слова 'Bearer' — Swagger добавит его сам)."
+    };
+    options.AddSecurityDefinition("Bearer", jwtScheme);
+
+    // Microsoft.OpenApi 2.x dropped the generic OpenApiReference/Reference-property
+    // pattern in favor of per-type reference classes — the security-scheme
+    // requirement now needs an OpenApiSecuritySchemeReference bound to the
+    // in-progress document, so AddSecurityRequirement hands one in via a factory
+    // instead of taking a ready-made OpenApiSecurityRequirement.
+    options.AddSecurityRequirement(document => new Microsoft.OpenApi.OpenApiSecurityRequirement
+    {
+        [new Microsoft.OpenApi.OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+});
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("Jwt configuration section is missing.");
@@ -89,6 +126,7 @@ builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNot
 builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
 builder.Services.AddScoped<IPasswordResetDeliveryService, LoggingPasswordResetDeliveryService>();
 
+builder.Services.AddScoped<PayrollDraftGenerator>();
 builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
@@ -197,6 +235,15 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>();
 
 var app = builder.Build();
+
+// Dev-only — Swagger UI at /swagger, browsing + trying every controller's
+// endpoints. Not exposed outside Development on purpose (no reason to ship
+// an interactive API map to production).
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 using (var scope = app.Services.CreateScope())
 {

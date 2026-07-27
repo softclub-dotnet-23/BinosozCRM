@@ -14,7 +14,7 @@ namespace Application.Absences;
 // reading. Company-wide list for any Prorab+/Accountant, not per-object.
 public sealed record ListAbsenceRecordsQuery(int Page, int PageSize) : IRequest<Result<PagedResult<AbsenceRecordDto>>>;
 
-public sealed class ListAbsenceRecordsQueryHandler(IApplicationDbContext context)
+public sealed class ListAbsenceRecordsQueryHandler(IApplicationDbContext context, IFileStorageService fileStorage)
     : IRequestHandler<ListAbsenceRecordsQuery, Result<PagedResult<AbsenceRecordDto>>>
 {
     public async Task<Result<PagedResult<AbsenceRecordDto>>> Handle(ListAbsenceRecordsQuery request, CancellationToken cancellationToken)
@@ -27,7 +27,7 @@ public sealed class ListAbsenceRecordsQueryHandler(IApplicationDbContext context
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = items.Select(AbsenceRecordDto.FromEntity).ToList();
+        var dtos = items.Select(a => AbsenceRecordDto.FromEntity(a, fileStorage)).ToList();
 
         return Result.Success(new PagedResult<AbsenceRecordDto>(dtos, request.Page, request.PageSize, totalCount));
     }

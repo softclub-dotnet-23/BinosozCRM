@@ -138,7 +138,13 @@ public sealed class IndividualTaskStateMachineTests
     [Fact]
     public void ProposeBonus_then_ApproveBonus_succeeds_once_done()
     {
-        var task = DriveTo(IndividualTaskStatus.Done);
+        // BONUS_NOT_ELIGIBLE (§9.2) requires CompletedEarly == true --
+        // DriveTo's default (no DueAt) completes on-time, not early, so
+        // this needs an explicit future DueAt to be eligible at all.
+        var dueAt = DateTimeOffset.UtcNow.AddDays(1);
+        var task = NewTask(dueAt);
+        task.Start(DateTimeOffset.UtcNow);
+        task.Complete(dueAt.AddHours(-1));
 
         task.ProposeBonus(500m).IsSuccess.Should().BeTrue();
         task.BonusAmount.Should().Be(500m);

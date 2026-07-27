@@ -1,0 +1,533 @@
+.settings-page{width:100%}.settings-tabs{height:40px;display:flex;align-items:flex-end;gap:26px;border-bottom:1px solid #eceef1;overflow-x:auto}.settings-tabs button{height:36px;position:relative;display:flex;align-items:center;gap:5px;color:#697386;font-size:10px;font-weight:650;white-space:nowrap}.settings-tabs button.active{color:#ff5a00}.settings-tabs button.active:after{content:"";position:absolute;right:0;bottom:-1px;left:0;height:2px;background:var(--color-primary);border-radius:2px}.settings-content-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;align-items:start;gap:14px;margin-top:12px}.settings-main{min-width:0}.settings-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.settings-card{min-width:0;padding:0 13px;border-radius:11px}.settings-card>header{height:42px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f1f3}.settings-card>header>div{display:flex;align-items:center;gap:8px;color:var(--color-primary)}.settings-card h2{color:#17191c;font-size:12px;font-weight:750}.settings-card>header>button{height:27px;padding:0 9px;display:flex;align-items:center;gap:4px;color:var(--color-primary);border:1px solid #ffd7bf;border-radius:6px;font-size:8px;font-weight:700}.settings-card-body{padding:4px 0 8px}.setting-row{min-height:43px;display:grid;grid-template-columns:minmax(0,1fr) 143px;align-items:center;gap:10px;border-bottom:1px solid #f3f4f5}.setting-row:last-child{border-bottom:0}.setting-label strong,.setting-label span{display:block}.setting-label strong{color:#344054;font-size:9px}.setting-label span{margin-top:3px;color:#8b95a5;font-size:7px}.setting-row [role=button][aria-haspopup=listbox]{height:28px;font-size:8px}.setting-input{width:100%;height:28px;padding:0 9px;color:#344054;border:1px solid #e4e7ec;border-radius:6px;background:#fff;outline:0;font-size:8px}.setting-input:focus{border-color:var(--color-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--color-primary) 14%,transparent)}.setting-switch{width:30px;height:17px;justify-self:end;padding:2px;border-radius:999px;background:#d6dae1;transition:.18s}.setting-switch span{display:block;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0002;transition:.18s}.setting-switch.on{background:var(--color-primary)}.setting-switch.on span{transform:translateX(13px)}.settings-block{min-height:62px;padding:7px 0;border-bottom:1px solid #f3f4f5}.theme-options{margin-top:7px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.theme-options button{height:43px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#667085;border:1px solid #e4e7ec;border-radius:7px;font-size:7px}.theme-options button.active,.segment-row>div button.active{color:var(--color-primary);border-color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 6%,#fff)}.color-setting{display:grid;grid-template-columns:1fr auto;align-items:center}.color-swatches{display:flex;gap:8px}.color-swatches button{width:20px;height:20px;display:grid;place-items:center;color:#fff;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #e4e7ec}.color-swatches button.active{box-shadow:0 0 0 2px var(--color-primary)}.segment-row>div{display:flex;justify-content:flex-end;gap:6px}.segment-row>div button{min-width:52px;height:25px;padding:0 8px;color:#667085;border:1px solid #e4e7ec;border-radius:6px;background:#fff;font-size:7px}.backup-actions{padding:12px 0;display:flex;gap:8px}.backup-actions button{height:34px;font-size:9px}.settings-info-panel{min-height:120px;padding:18px;display:flex;gap:12px;color:var(--color-primary);border-radius:11px}.settings-info-panel h2{font-size:14px}.settings-info-panel p{margin-top:8px;color:#697386;font-size:11px;line-height:1.6}.settings-aside{display:flex;flex-direction:column;gap:10px}.settings-aside>div{padding:14px;border-radius:11px}.settings-aside header{display:flex;align-items:center;gap:8px;color:#667085}.settings-aside h2{color:#17191c;font-size:12px;font-weight:750}.system-info-card dl{margin-top:14px;display:flex;flex-direction:column;gap:11px}.system-info-card dl div,.storage-label{display:flex;justify-content:space-between;gap:8px;font-size:8px}.system-info-card dt,.storage-label span{color:#697386}.system-info-card dd,.storage-label b{color:#344054;font-weight:700;text-align:right}.system-info-card dd span{padding:2px 5px;color:#159947;background:#eaf8ef;border-radius:4px}.storage-label{margin-top:15px}.storage-bar{height:5px;margin-top:8px;overflow:hidden;background:#edf0f3;border-radius:5px}.storage-bar span{display:block;height:100%;min-width:4%;background:var(--color-primary);border-radius:5px}.system-info-card>p{margin-top:7px;color:#697386;font-size:7px}.system-activity-card>div{margin-top:12px;display:flex;flex-direction:column;gap:11px}.system-activity-card article{display:flex;align-items:center;gap:7px}.system-activity-card article>span{width:25px;height:25px;display:grid;place-items:center;flex:0 0 auto;border-radius:50%}.system-activity-card article>span.green{color:#16a34a;background:#eaf8ef}.system-activity-card article>span.blue{color:#3182f6;background:#edf4ff}.system-activity-card article>span.red{color:#ef4444;background:#fff0f0}.system-activity-card article p{min-width:0;flex:1}.system-activity-card strong,.system-activity-card small{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.system-activity-card strong{color:#344054;font-size:8px}.system-activity-card small{margin-top:2px;color:#8b95a5;font-size:7px}.system-activity-card time{color:#697386;font-size:6px;white-space:nowrap}.system-activity-card>button{width:100%;height:30px;margin-top:13px;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 7%,#fff);font-size:8px;font-weight:700}.system-activity-card>button span{float:right;margin-left:20px}.settings-footer{height:36px;display:flex;align-items:end;justify-content:space-between;padding:0 6px;color:#7a8495;font-size:8px}.settings-footer>div{display:flex;align-items:center;gap:18px}.settings-footer button{display:flex;align-items:center;gap:5px}.settings-search-results{margin-top:10px;padding:12px;border-radius:10px}.settings-search-results>div{display:flex;align-items:center;gap:7px}.settings-search-results>button{width:100%;padding:7px 2px;display:flex;justify-content:space-between;color:#344054;border-bottom:1px solid #f0f1f3;font-size:10px}.settings-search-results>button span{color:var(--color-primary)}.settings-search-results>p{margin-top:8px;color:#697386;font-size:10px}
+html[data-app-theme=dark]{--color-app-bg:#101318;--color-card:#181c22;--color-ink:#f5f7fa;--color-ink-secondary:#a9b1bd;--color-ink-muted:#747e8c;--color-border:#2a3039;--color-border-strong:#343c47}html[data-app-theme=dark] .settings-page .settings-card h2,html[data-app-theme=dark] .settings-page .settings-aside h2,html[data-app-theme=dark] .settings-page .setting-label strong{color:#f5f7fa}html[data-app-theme=dark] .settings-page .setting-input,html[data-app-theme=dark] .settings-page .segment-row button,html[data-app-theme=dark] .settings-page .theme-options button{color:#d7dce3;border-color:#343c47;background:#181c22}html[data-interface-density=compact] .settings-page .setting-row{min-height:37px}html[data-interface-density=spacious] .settings-page .setting-row{min-height:50px}
+@media(min-width:1024px){body:has(.settings-page) aside[class*="w-[236px]"]{width:184px}body:has(.settings-page) aside[class*="w-[236px]"]>div:first-of-type{padding:18px 20px 16px}body:has(.settings-page) aside[class*="w-[236px]"] nav{padding-inline:8px}body:has(.settings-page) aside[class*="w-[236px]"] nav>*{font-size:11px}body:has(.settings-page) header{min-height:74px;padding:13px 22px}body:has(.settings-page) header h1{font-size:21px}body:has(.settings-page) header p{font-size:11px}body:has(.settings-page) main{padding:0 16px 12px}html[data-sidebar-mode=collapsed] body:has(.settings-page) aside[class*="w-[236px]"]{width:84px}}
+@media(max-width:1100px){.settings-content-grid{grid-template-columns:1fr}.settings-aside{display:grid;grid-template-columns:1fr 1fr}}@media(max-width:760px){.settings-card-grid{grid-template-columns:1fr}.settings-aside{grid-template-columns:1fr}.setting-row{grid-template-columns:1fr}.setting-row>:last-child{margin-top:6px}.settings-footer{height:auto;align-items:flex-start;flex-direction:column;gap:10px;padding:18px 4px}.settings-footer>div{flex-wrap:wrap}.color-setting{display:block}.color-swatches{margin-top:8px}.settings-tabs{gap:18px}.settings-tabs button svg{display:none}}
+
+/* Desktop proportions are intentionally compact to match the 1280 × 720 CRM layout. */
+@media (min-width: 1024px) {
+  body:has(.settings-page) .settings-card > header,
+  body:has(.settings-page) .settings-aside header {
+    min-height: 0;
+    padding: 0;
+  }
+
+  body:has(.settings-page) .settings-card > header {
+    height: 42px;
+  }
+
+  .settings-tabs {
+    height: 34px;
+  }
+
+  .settings-tabs button {
+    height: 32px;
+  }
+
+  .settings-content-grid {
+    margin-top: 8px;
+  }
+
+  .settings-card-grid {
+    align-items: start;
+  }
+
+  .settings-card-grid > .settings-card:nth-child(2) .settings-block {
+    min-height: 55px;
+  }
+
+  .settings-card-grid > .settings-card:nth-child(2) .setting-row {
+    min-height: 39px;
+  }
+
+  .settings-card-grid > .settings-card:nth-child(n + 3) .setting-row {
+    min-height: 35px;
+  }
+}
+
+/* Large desktop: keep the dashboard readable instead of leaving a tiny 720p UI
+   floating inside a 1600–1920px workspace. */
+@media (min-width: 1500px) {
+  body:has(.settings-page) aside[class*="w-[236px]"] {
+    width: 216px;
+  }
+
+  body:has(.settings-page) aside[class*="w-[236px]"] > div:first-of-type {
+    padding: 20px 22px 18px;
+  }
+
+  body:has(.settings-page) aside[class*="w-[236px]"] > div:first-of-type img {
+    height: 52px;
+  }
+
+  body:has(.settings-page) aside[class*="w-[236px]"] nav {
+    padding-inline: 10px;
+  }
+
+  body:has(.settings-page) aside[class*="w-[236px]"] nav > * {
+    font-size: 13px;
+  }
+
+  body:has(.settings-page) > div > header,
+  body:has(.settings-page) main {
+    padding-inline: 26px;
+  }
+
+  body:has(.settings-page) header h1 {
+    font-size: 24px;
+  }
+
+  body:has(.settings-page) header p {
+    font-size: 12px;
+  }
+
+  .settings-tabs {
+    height: 42px;
+    gap: 32px;
+  }
+
+  .settings-tabs button {
+    height: 39px;
+    gap: 7px;
+    font-size: 11.5px;
+  }
+
+  .settings-content-grid {
+    grid-template-columns: minmax(0, 1fr) 292px;
+    gap: 16px;
+    margin-top: 10px;
+  }
+
+  .settings-card-grid {
+    gap: 14px;
+  }
+
+  .settings-card {
+    padding-inline: 16px;
+    border-radius: 13px;
+  }
+
+  body:has(.settings-page) .settings-card > header {
+    height: 48px;
+  }
+
+  .settings-card h2,
+  .settings-aside h2 {
+    font-size: 14px;
+  }
+
+  .settings-card > header > button {
+    height: 31px;
+    padding-inline: 11px;
+    font-size: 9px;
+  }
+
+  .setting-row,
+  .settings-card-grid > .settings-card:nth-child(2) .setting-row {
+    min-height: 51px;
+    grid-template-columns: minmax(0, 1fr) 180px;
+  }
+
+  .settings-card-grid > .settings-card:nth-child(n + 3) .setting-row {
+    min-height: 45px;
+  }
+
+  .setting-label strong {
+    font-size: 11px;
+  }
+
+  .setting-label span {
+    font-size: 8.5px;
+  }
+
+  .setting-row [role="button"][aria-haspopup="listbox"],
+  .setting-input {
+    height: 34px;
+    font-size: 10px;
+  }
+
+  .setting-switch {
+    width: 36px;
+    height: 20px;
+  }
+
+  .setting-switch span {
+    width: 16px;
+    height: 16px;
+  }
+
+  .setting-switch.on span {
+    transform: translateX(16px);
+  }
+
+  .settings-card-grid > .settings-card:nth-child(2) .settings-block {
+    min-height: 67px;
+  }
+
+  .theme-options button {
+    height: 49px;
+    font-size: 9px;
+  }
+
+  .color-swatches button {
+    width: 24px;
+    height: 24px;
+  }
+
+  .segment-row > div button {
+    min-width: 63px;
+    height: 30px;
+    font-size: 8.5px;
+  }
+
+  .settings-aside {
+    gap: 12px;
+  }
+
+  .settings-aside > div {
+    padding: 17px;
+    border-radius: 13px;
+  }
+
+  .system-info-card dl {
+    gap: 13px;
+  }
+
+  .system-info-card dl div,
+  .storage-label {
+    font-size: 10px;
+  }
+
+  .system-info-card > p,
+  .system-activity-card small {
+    font-size: 8.5px;
+  }
+
+  .system-activity-card strong {
+    font-size: 10px;
+  }
+
+  .system-activity-card time {
+    font-size: 8px;
+  }
+
+  .system-activity-card article > span {
+    width: 30px;
+    height: 30px;
+  }
+
+  .system-activity-card > button {
+    height: 36px;
+    font-size: 10px;
+  }
+
+  .settings-footer {
+    height: 44px;
+    font-size: 10px;
+  }
+}
+
+/* Extra readable sizing for full-size desktop monitors. */
+@media (min-width: 1500px) {
+  body:has(.settings-page) aside[class*="w-[236px]"] {
+    width: 236px;
+  }
+
+  body:has(.settings-page) aside[class*="w-[236px]"] > div:first-of-type img {
+    height: 58px;
+  }
+
+  body:has(.settings-page) aside[class*="w-[236px]"] nav > * {
+    font-size: 14px;
+  }
+
+  body:has(.settings-page) header h1 {
+    font-size: 28px;
+  }
+
+  body:has(.settings-page) header p {
+    font-size: 13px;
+  }
+
+  .settings-tabs button {
+    font-size: 13px;
+  }
+
+  .settings-card h2,
+  .settings-aside h2 {
+    font-size: 16px;
+  }
+
+  .settings-card > header > button {
+    height: 34px;
+    font-size: 10px;
+  }
+
+  .setting-row,
+  .settings-card-grid > .settings-card:nth-child(2) .setting-row {
+    min-height: 56px;
+    grid-template-columns: minmax(0, 1fr) 202px;
+  }
+
+  .settings-card-grid > .settings-card:nth-child(n + 3) .setting-row {
+    min-height: 50px;
+  }
+
+  .setting-label strong {
+    font-size: 12px;
+  }
+
+  .setting-label span {
+    font-size: 9.5px;
+  }
+
+  .setting-row [role="button"][aria-haspopup="listbox"],
+  .setting-input {
+    height: 36px;
+    font-size: 11px;
+  }
+
+  .theme-options button {
+    height: 54px;
+    font-size: 10px;
+  }
+
+  .segment-row > div button {
+    min-width: 68px;
+    height: 32px;
+    font-size: 9.5px;
+  }
+
+  .system-info-card dl div,
+  .storage-label,
+  .system-activity-card strong,
+  .system-activity-card > button {
+    font-size: 11px;
+  }
+
+  .system-info-card > p,
+  .system-activity-card small {
+    font-size: 9px;
+  }
+
+  .system-activity-card time {
+    font-size: 8.5px;
+  }
+}
+
+/* Phone layout: vertical cards, comfortable tap targets and no horizontal page overflow. */
+@media (max-width: 760px) {
+  body:has(.settings-page) header {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  body:has(.settings-page) header h1 {
+    font-size: 21px;
+  }
+
+  body:has(.settings-page) header p {
+    max-width: 210px;
+    font-size: 10px;
+  }
+
+  body:has(.settings-page) main {
+    padding: 0 12px 18px;
+    overflow: hidden;
+  }
+
+  .settings-tabs {
+    width: calc(100% + 24px);
+    height: 48px;
+    margin-left: -12px;
+    padding-inline: 12px;
+    gap: 22px;
+    align-items: flex-end;
+    scrollbar-width: none;
+  }
+
+  .settings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-tabs button {
+    height: 44px;
+    flex: 0 0 auto;
+    font-size: 12px;
+  }
+
+  .settings-content-grid {
+    display: block;
+    margin-top: 12px;
+  }
+
+  .settings-card-grid,
+  .settings-aside {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .settings-aside {
+    margin-top: 14px;
+  }
+
+  .settings-card,
+  .settings-aside > div {
+    padding-inline: 15px;
+    border-radius: 13px;
+  }
+
+  body:has(.settings-page) .settings-card > header {
+    min-height: 54px;
+    padding: 0;
+  }
+
+  body:has(.settings-page) .settings-aside header {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .settings-card h2,
+  .settings-aside h2 {
+    font-size: 15px;
+  }
+
+  .settings-card > header > button {
+    height: 34px;
+    padding-inline: 10px;
+    font-size: 10px;
+  }
+
+  .settings-card-body {
+    padding-block: 5px 10px;
+  }
+
+  .setting-row {
+    min-height: 0;
+    padding: 12px 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .setting-row.switch-row {
+    min-height: 58px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .setting-row > :last-child,
+  .setting-row.switch-row > :last-child {
+    margin-top: 0;
+  }
+
+  .setting-label strong {
+    font-size: 13px;
+  }
+
+  .setting-label span {
+    margin-top: 4px;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .setting-row [role="button"][aria-haspopup="listbox"],
+  .setting-input {
+    width: 100%;
+    height: 42px;
+    font-size: 13px;
+  }
+
+  .setting-switch {
+    width: 40px;
+    height: 23px;
+  }
+
+  .setting-switch span {
+    width: 19px;
+    height: 19px;
+  }
+
+  .setting-switch.on span {
+    transform: translateX(17px);
+  }
+
+  .settings-block {
+    min-height: 0;
+    padding: 13px 0;
+  }
+
+  .theme-options {
+    gap: 8px;
+  }
+
+  .theme-options button {
+    height: 52px;
+    font-size: 10px;
+  }
+
+  .color-setting {
+    display: block;
+  }
+
+  .color-swatches {
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 11px;
+  }
+
+  .color-swatches button {
+    width: 27px;
+    height: 27px;
+  }
+
+  .segment-row > div {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 7px;
+  }
+
+  .segment-row > div button {
+    min-width: 0;
+    height: 38px;
+    padding-inline: 5px;
+    font-size: 10px;
+  }
+
+  .settings-aside > div {
+    padding: 17px;
+  }
+
+  .system-info-card dl div,
+  .storage-label {
+    font-size: 11px;
+  }
+
+  .system-info-card > p,
+  .system-activity-card small {
+    font-size: 9px;
+  }
+
+  .system-activity-card strong {
+    font-size: 11px;
+  }
+
+  .system-activity-card time {
+    font-size: 8px;
+  }
+
+  .system-activity-card article > span {
+    width: 32px;
+    height: 32px;
+  }
+
+  .system-activity-card > button {
+    height: 40px;
+    font-size: 11px;
+  }
+
+  .settings-footer {
+    padding-block: 18px 8px;
+    font-size: 10px;
+  }
+}
