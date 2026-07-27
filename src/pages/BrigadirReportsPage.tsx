@@ -1,17 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Area,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  type TooltipContentProps,
-} from "recharts";
-import {
   AlertTriangle,
   CircleCheck,
   ClipboardList,
@@ -31,6 +20,7 @@ import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { DonutChart } from "../components/charts/DonutChart";
+import { WorkCompletionDynamicsChart } from "../components/analytics/WorkCompletionDynamicsChart";
 import { ReportGenerateModal, type ReportGenerateOptions } from "../components/reports/ReportGenerateModal";
 import {
   worksRepository,
@@ -58,7 +48,6 @@ import { getMaterialStatus } from "../utils/materialAnalytics";
 import { WORK_STATUS_CONFIG, workStatusLabel } from "../utils/workStatus";
 import { previousPeriod } from "../utils/reportsAnalytics";
 import {
-  computeWorkDynamicsSeries,
   computeWorkStatusBreakdown,
   workStatusBucketToDonut,
   computeWorkPriorityBreakdown,
@@ -199,7 +188,6 @@ export default function BrigadirReportsPage() {
   );
 
   const kpis = useMemo(() => computeWorkAnalytics(brigadeWorks), [brigadeWorks]);
-  const dynamics = useMemo(() => computeWorkDynamicsSeries(brigadeWorks, dateFrom, dateTo), [brigadeWorks, dateFrom, dateTo]);
   const statusBreakdown = useMemo(() => computeWorkStatusBreakdown(brigadeWorks), [brigadeWorks]);
   const priorityRows = useMemo(() => computeWorkPriorityBreakdown(brigadeWorks), [brigadeWorks]);
   const topObjects = useMemo(() => computeTopObjectsProgress(brigadeWorks, dateFrom), [brigadeWorks, dateFrom]);
@@ -462,14 +450,7 @@ export default function BrigadirReportsPage() {
           </Card>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
-            <Card className="min-w-0 p-5">
-              <h2 className="text-lg font-bold text-ink">{s.dynamicsTitle}</h2>
-              {dynamics.length > 1 ? (
-                <DynamicsChart data={dynamics} s={s} reduceMotion={reduceMotion} />
-              ) : (
-                <p className="mt-4 text-sm text-ink-muted">{s.emptyChartData}</p>
-              )}
-            </Card>
+            <WorkCompletionDynamicsChart works={brigadeWorks} dateFrom={dateFrom} dateTo={dateTo} />
 
             <div className="grid gap-4">
               <Card className="p-5">

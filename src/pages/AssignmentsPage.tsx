@@ -330,7 +330,7 @@ export default function AssignmentsPage() {
                 { value: "all", label: a.statusAllLabel },
                 ...(Object.keys(ASSIGNMENT_STATUS_CONFIG) as AssignmentStatus[]).map((status) => ({
                   value: status,
-                  label: assignmentStatusLabel(br, status),
+                label: assignmentStatusLabel(br, status),
                 })),
               ]}
             />
