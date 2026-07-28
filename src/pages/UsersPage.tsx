@@ -37,6 +37,7 @@ const ROLE_CLASS_NAME: Record<UserRole, string> = {
   administrator: "role-admin",
   prorab: "role-prorab",
   brigadir: "role-brigadir",
+  worker: "role-worker",
   storekeeper: "role-supply",
   accountant: "role-accountant",
 };

@@ -11,6 +11,7 @@ export const DEMO_CREDENTIALS: Record<string, string> = {
   admin: "admin123",
   "firuz.rakhmonov": "prorab123",
   "shakhrom.mirzoev": "brigadir123",
+  "rustam.saidov": "worker123",
   "mekhriniso.karimova": "buh123",
   "said.khasanov": "sklad123",
   "inactive.demo": "demo123",

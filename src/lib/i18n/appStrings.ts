@@ -355,6 +355,61 @@ export interface AppStrings {
     attendanceTabPresent: string; attendanceTabLate: string; attendanceTabAbsent: string;
     vsPreviousPeriod: string; allObjectsLinkGeneric: string; expensesDetailsLink: string; specialtiesTitle: string;
   };
+  worker: {
+    sidebarDashboard: string; sidebarTasks: string; sidebarAttendance: string; sidebarSchedule: string; sidebarMaterials: string;
+    sidebarPhotoReports: string; sidebarNotifications: string; sidebarProfile: string; sidebarReportProblem: string;
+    greetingMorning: string; greetingDay: string; greetingEvening: string; dashboardSubtitle: string;
+    kpiTasksTitle: string; kpiTasksFooter: string; kpiInProgressTitle: string; kpiInProgressFooter: string;
+    kpiCompletedTitle: string; kpiCompletedFooter: string; kpiHoursTitle: string; kpiHoursFooter: string;
+    tasksTitle: string; tasksTabAll: (n: number) => string; tasksTabInProgress: (n: number) => string;
+    tasksTabReview: (n: number) => string; tasksTabCompleted: (n: number) => string; sortByPriority: string; viewAllTasks: string;
+    statusAssigned: string; statusInProgress: string; statusReview: string; statusCompleted: string; statusOverdue: string; statusPlanned: string; statusPaused: string; statusCancelled: string;
+    priorityLow: string; priorityMedium: string; priorityHigh: string; priorityCritical: string;
+    emptyTasks: string; emptySchedule: string; emptyNotifications: string; emptyDocuments: string;
+    colTotalWorks: string; colCompleted: string;
+    taskDetailTitle: string; taskDetailObject: string; taskDetailDates: string; taskDetailProgress: string;
+    taskDetailStatus: string; taskDetailPriority: string; taskDetailAssignedBy: string; taskDetailComments: string;
+    actionStart: string; actionSubmitReview: string; actionUploadPhoto: string; actionReportProblemLong: string; actionUpdateProgress: string; actionSaveProgress: string;
+    scheduleTitle: (date: string) => string; scheduleBreak: string; scheduleMeeting: string; viewFullSchedule: string;
+    notificationsTitle: string; notificationsAllLink: string;
+    statsTitle: string; statsHours: string; statsCompleted: string; statsRating: string; statsViolations: string;
+    ratingHigh: string; ratingMedium: string; ratingLow: string; violationsGood: string; violationsPresent: string;
+    documentsTitle: string; allDocumentsLink: string;
+    quickActionsTitle: string; actionPhotoReport: string; actionRequestMaterial: string; actionReportProblemShort: string;
+    actionMessageProrab: string; actionCall: string; actionViewSchedule: string;
+    photoModalTitle: string; photoModalTask: string; photoModalTaskPlaceholder: string; photoModalImage: string; photoModalComment: string; photoModalCommentPlaceholder: string; photoModalSubmit: string;
+    materialModalTitle: string; materialModalName: string; materialModalQty: string; materialModalUnit: string; materialModalNote: string; materialModalSubmit: string;
+    problemModalTitle: string; problemModalCategory: string; problemModalTask: string; problemModalNoTask: string; problemModalDescription: string; problemModalPriority: string; problemModalSubmit: string;
+    problemCategorySafety: string; problemCategoryMaterials: string; problemCategoryEquipment: string; problemCategoryOther: string;
+    messageModalTitle: string; messageModalText: string; messageModalPlaceholder: string; messageModalSubmit: string;
+    toastPhotoSubmitted: string; toastMaterialRequested: string; toastProblemReported: string; toastMessageSent: string; toastMarkedRead: string;
+    attendancePageTitle: string; attendancePageSubtitle: string; attendanceColDate: string; attendanceColArrival: string; attendanceColDeparture: string; attendanceColStatus: string; attendanceColHours: string;
+    attendanceColObject: string; attendanceColNote: string;
+    kpiAttendanceTotalTitle: string; kpiAttendanceTotalFooter: string; kpiPresentTitle: string; kpiPresentFooter: string; kpiLateTitle: string; kpiLateFooter: string; kpiAbsentTitle: string; kpiAbsentFooter: string;
+    attendanceHistoryTitle: string; attendanceTabAll: string; attendanceTabPresent: string; attendanceTabLate: string; attendanceTabAbsent: string;
+    statusDayOff: string; noteDayOff: string; attendanceStatusPresent: string; attendanceStatusLate: string; attendanceStatusAbsent: string; statusNoData: string;
+    weeklyAnalyticsTitle: string; normLabel: string; factLabel: string; latesLabel: string; absencesLabel: string;
+    tooltipStatusLabel: string; tooltipCheckIn: string; tooltipCheckOut: string; tooltipLate: string; tooltipWorked: string;
+    todayTimelineArrival: string; todayTimelineLunchStart: string; todayTimelineLunchEnd: string; todayTimelineDeparture: string; emptyTimeline: string;
+    dailySummaryTitle: string; dailySummaryPresence: string; dailySummaryLate: string; dailySummaryOvertime: string; dailySummaryAttendance: string; dailySummaryYes: string; dailySummaryNo: string;
+    remindersTitle: string; emptyReminders: string;
+    shortSummaryTitle: string; shortSummaryObject: string; shortSummaryProrab: string; shortSummaryNextCheck: string; shortSummaryActiveTasks: string; contactProrabButton: string;
+    emptyAttendance: string; thisMonth: string; lastSevenDays: string; lastThirtyDays: string;
+    schedulePageTitle: string; schedulePageSubtitle: string;
+    materialsPageTitle: string; materialsPageSubtitle: string; materialsRequestButton: string; materialsColMaterial: string; materialsColQty: string; materialsColStatus: string; materialsColDate: string; emptyMaterialRequests: string;
+    photoReportsPageTitle: string; photoReportsPageSubtitle: string; photoReportsNewButton: string; emptyPhotoReports: string;
+    notificationsPageTitle: string; notificationsPageSubtitle: string; markAllRead: string;
+    documentsPageTitle: string; documentsPageSubtitle: string;
+    profilePageTitle: string; profilePageSubtitle: string; profileBrigade: string; profileObject: string; profileSpecialty: string; profileGrade: string; profilePhone: string;
+    materialStatusNew: string; materialStatusApproved: string; materialStatusInTransit: string; materialStatusIssued: string; materialStatusRejected: string;
+    kpiTotalTasksTitle: string; kpiReviewTitle: string; kpiReviewFooter: string; kpiOverdueTitle: string; kpiOverdueFooter: string;
+    filterButton: string; sortByPriorityOption: string; sortByDueDate: string; sortByProgress: string; sortNewest: string; sortOldest: string;
+    filterPriorityLabel: string; filterObjectLabel: string; filterOverdueOnly: string; filterAllObjects: string; filterApply: string; filterReset: string;
+    tasksResultsSummary: (from: number, to: number, total: number) => string; paginationPrev: string; paginationNext: string;
+    monthlyStatsTitle: string; monthlyStatsCompletedTasks: string; monthlyStatsCompletedWorks: string; monthlyStatsHours: string; monthlyStatsAvgProgress: string;
+    upcomingTasksTitle: string; upcomingTasksAll: string; upcomingTasksEmpty: string;
+    tasksQuickActionsTitle: string;
+  };
   objects: {
     pageTitle: string; pageSubtitle: string; searchPlaceholder: string;
     tabAll: string; tabActive: string; tabAtRisk: string; tabCompleted: string;
@@ -610,7 +665,7 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       selectPlaceholder: "Выберите...", selectEmpty: "Ничего не найдено", selectSearch: "Поиск...", selectClear: "Очистить",
       placeholderTitle: "Раздел в разработке",
       placeholderNote: "Этот раздел скоро будет доступен. Мы работаем над тем, чтобы перенести сюда те же данные и интерактивность, что и на страницах «Обзор» и «Объекты».",
-      roleLabels: { owner: "Владелец", administrator: "Администратор", accountant: "Бухгалтер", prorab: "Прораб", brigadir: "Бригадир", storekeeper: "Снабженец" },
+      roleLabels: { owner: "Владелец", administrator: "Администратор", accountant: "Бухгалтер", prorab: "Прораб", brigadir: "Бригадир", worker: "Работник", storekeeper: "Снабженец" },
       profileTitle: "Профиль", profileRole: "Роль", profilePhone: "Телефон", profileEmail: "Email", profileRegisteredAt: "Дата регистрации",
       save: "Сохранить", delete: "Удалить", edit: "Редактировать", view: "Просмотр",
       tableActions: "Действия", editUnavailableInDemo: "Редактирование пока недоступно в демо",
@@ -906,6 +961,61 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       attendanceTabPresent: "Присутствовали", attendanceTabLate: "Опоздания", attendanceTabAbsent: "Отсутствия",
       vsPreviousPeriod: "к прошлому периоду", allObjectsLinkGeneric: "Все объекты →", expensesDetailsLink: "Подробнее о расходах →", specialtiesTitle: "Специальности",
     },
+    worker: {
+      sidebarDashboard: "Главная", sidebarTasks: "Мои работы", sidebarAttendance: "Посещаемость", sidebarSchedule: "График", sidebarMaterials: "Материалы",
+      sidebarPhotoReports: "Фотоотчёт", sidebarNotifications: "Уведомления", sidebarProfile: "Профиль", sidebarReportProblem: "Сообщить о проблеме",
+      greetingMorning: "Доброе утро", greetingDay: "Добрый день", greetingEvening: "Добрый вечер", dashboardSubtitle: "Вот что происходит сегодня на объекте",
+      kpiTasksTitle: "Мои задачи", kpiTasksFooter: "Всего назначено", kpiInProgressTitle: "В работе", kpiInProgressFooter: "Активные задачи",
+      kpiCompletedTitle: "Выполнено", kpiCompletedFooter: "За этот месяц", kpiHoursTitle: "Отработано часов", kpiHoursFooter: "За этот месяц",
+      tasksTitle: "Мои задачи", tasksTabAll: (n) => `Все (${n})`, tasksTabInProgress: (n) => `В работе (${n})`,
+      tasksTabReview: (n) => `На проверке (${n})`, tasksTabCompleted: (n) => `Завершено (${n})`, sortByPriority: "По приоритету", viewAllTasks: "Смотреть все задачи →",
+      statusAssigned: "Назначено", statusInProgress: "В работе", statusReview: "На проверке", statusCompleted: "Завершено", statusOverdue: "Просрочено", statusPlanned: "Запланировано", statusPaused: "Приостановлено", statusCancelled: "Отменено",
+      priorityLow: "Низкий", priorityMedium: "Средний", priorityHigh: "Высокий", priorityCritical: "Критический",
+      emptyTasks: "Нет назначенных задач", emptySchedule: "На сегодня задач не запланировано", emptyNotifications: "Нет новых уведомлений", emptyDocuments: "Нет доступных документов",
+      colTotalWorks: "Всего работ", colCompleted: "Выполнено",
+      taskDetailTitle: "Задача", taskDetailObject: "Объект", taskDetailDates: "Сроки", taskDetailProgress: "Прогресс",
+      taskDetailStatus: "Статус", taskDetailPriority: "Приоритет", taskDetailAssignedBy: "Назначил", taskDetailComments: "Комментарии",
+      actionStart: "Начать работу", actionSubmitReview: "Отправить на проверку", actionUploadPhoto: "Загрузить фото", actionReportProblemLong: "Сообщить о проблеме", actionUpdateProgress: "Обновить прогресс", actionSaveProgress: "Сохранить прогресс",
+      scheduleTitle: (date) => `Сегодня, ${date}`, scheduleBreak: "Перерыв", scheduleMeeting: "Планёрка с прорабом", viewFullSchedule: "Полный график →",
+      notificationsTitle: "Уведомления", notificationsAllLink: "Все",
+      statsTitle: "Моя статистика", statsHours: "Отработано часов", statsCompleted: "Выполнено задач", statsRating: "Рейтинг", statsViolations: "Нарушений",
+      ratingHigh: "Высокий уровень", ratingMedium: "Средний уровень", ratingLow: "Требует внимания", violationsGood: "Отлично!", violationsPresent: "Есть замечания",
+      documentsTitle: "Мои документы", allDocumentsLink: "Все документы →",
+      quickActionsTitle: "Быстрые действия", actionPhotoReport: "Фотоотчёт", actionRequestMaterial: "Запросить материал", actionReportProblemShort: "Сообщить о проблеме",
+      actionMessageProrab: "Написать прорабу", actionCall: "Позвонить", actionViewSchedule: "Узнать график",
+      photoModalTitle: "Фотоотчёт", photoModalTask: "Задача", photoModalTaskPlaceholder: "Выберите задачу", photoModalImage: "Фотография", photoModalComment: "Комментарий", photoModalCommentPlaceholder: "Опишите, что сделано...", photoModalSubmit: "Отправить отчёт",
+      materialModalTitle: "Запросить материал", materialModalName: "Материал", materialModalQty: "Количество", materialModalUnit: "Единица", materialModalNote: "Комментарий", materialModalSubmit: "Отправить заявку",
+      problemModalTitle: "Сообщить о проблеме", problemModalCategory: "Категория", problemModalTask: "Связанная задача", problemModalNoTask: "Не выбрана", problemModalDescription: "Описание проблемы", problemModalPriority: "Приоритет", problemModalSubmit: "Отправить",
+      problemCategorySafety: "Безопасность", problemCategoryMaterials: "Материалы", problemCategoryEquipment: "Оборудование", problemCategoryOther: "Другое",
+      messageModalTitle: "Написать прорабу", messageModalText: "Сообщение", messageModalPlaceholder: "Введите сообщение для прораба...", messageModalSubmit: "Отправить",
+      toastPhotoSubmitted: "Фотоотчёт отправлен", toastMaterialRequested: "Заявка на материал отправлена", toastProblemReported: "Сообщение о проблеме отправлено", toastMessageSent: "Сообщение прорабу отправлено", toastMarkedRead: "Отмечено как прочитанное",
+      attendancePageTitle: "Посещаемость", attendancePageSubtitle: "Моя явка, опоздания и рабочее время", attendanceColDate: "Дата", attendanceColArrival: "Приход", attendanceColDeparture: "Уход", attendanceColStatus: "Статус", attendanceColHours: "Часов",
+      attendanceColObject: "Объект", attendanceColNote: "Примечание",
+      kpiAttendanceTotalTitle: "Всего отметок", kpiAttendanceTotalFooter: "за выбранный период", kpiPresentTitle: "Присутствовал", kpiPresentFooter: "рабочих дней", kpiLateTitle: "Опоздания", kpiLateFooter: "за выбранный период", kpiAbsentTitle: "Отсутствия", kpiAbsentFooter: "за выбранный период",
+      attendanceHistoryTitle: "Моя посещаемость", attendanceTabAll: "Все", attendanceTabPresent: "Присутствовал", attendanceTabLate: "Опоздания", attendanceTabAbsent: "Отсутствия",
+      statusDayOff: "Выходной", noteDayOff: "Выходной день", attendanceStatusPresent: "Присутствовал", attendanceStatusLate: "Опоздал", attendanceStatusAbsent: "Отсутствовал", statusNoData: "Нет данных",
+      weeklyAnalyticsTitle: "Посещаемость за неделю", normLabel: "Норма", factLabel: "Факт", latesLabel: "Опоздания", absencesLabel: "Пропуски",
+      tooltipStatusLabel: "Статус", tooltipCheckIn: "Приход", tooltipCheckOut: "Уход", tooltipLate: "Опоздание", tooltipWorked: "Отработано",
+      todayTimelineArrival: "Утренний приход", todayTimelineLunchStart: "Обеденный перерыв", todayTimelineLunchEnd: "Возвращение", todayTimelineDeparture: "Окончание смены", emptyTimeline: "Нет данных за сегодня",
+      dailySummaryTitle: "Сводка за день", dailySummaryPresence: "Присутствие", dailySummaryLate: "Опоздание", dailySummaryOvertime: "Переработка", dailySummaryAttendance: "Явка", dailySummaryYes: "Да", dailySummaryNo: "Нет",
+      remindersTitle: "Напоминания", emptyReminders: "Нет напоминаний",
+      shortSummaryTitle: "Краткая сводка", shortSummaryObject: "Объект", shortSummaryProrab: "Прораб", shortSummaryNextCheck: "Следующий рабочий день", shortSummaryActiveTasks: "Активных задач", contactProrabButton: "Связаться с прорабом",
+      emptyAttendance: "Нет записей за выбранный период", thisMonth: "Текущий месяц", lastSevenDays: "Последние 7 дней", lastThirtyDays: "Последние 30 дней",
+      schedulePageTitle: "График", schedulePageSubtitle: "Ваши задачи по дням",
+      materialsPageTitle: "Материалы", materialsPageSubtitle: "Ваши заявки на материалы", materialsRequestButton: "Запросить материал", materialsColMaterial: "Материал", materialsColQty: "Количество", materialsColStatus: "Статус", materialsColDate: "Дата", emptyMaterialRequests: "Нет заявок на материалы",
+      photoReportsPageTitle: "Фотоотчёт", photoReportsPageSubtitle: "Ваши фотоотчёты по задачам", photoReportsNewButton: "Новый фотоотчёт", emptyPhotoReports: "Пока нет фотоотчётов",
+      notificationsPageTitle: "Уведомления", notificationsPageSubtitle: "Все ваши уведомления", markAllRead: "Отметить все как прочитанные",
+      documentsPageTitle: "Мои документы", documentsPageSubtitle: "Документы по вашему объекту",
+      profilePageTitle: "Профиль", profilePageSubtitle: "Ваши личные данные", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Специальность", profileGrade: "Разряд", profilePhone: "Телефон",
+      materialStatusNew: "Новая", materialStatusApproved: "Одобрена", materialStatusInTransit: "В пути", materialStatusIssued: "Выдана", materialStatusRejected: "Отклонена",
+      kpiTotalTasksTitle: "Всего задач", kpiReviewTitle: "На проверке", kpiReviewFooter: "Ожидают проверки", kpiOverdueTitle: "Просрочено", kpiOverdueFooter: "Просроченных задач",
+      filterButton: "Фильтр", sortByPriorityOption: "По приоритету", sortByDueDate: "По сроку", sortByProgress: "По прогрессу", sortNewest: "Сначала новые", sortOldest: "Сначала старые",
+      filterPriorityLabel: "Приоритет", filterObjectLabel: "Объект", filterOverdueOnly: "Только просроченные", filterAllObjects: "Все объекты", filterApply: "Применить", filterReset: "Сбросить",
+      tasksResultsSummary: (from, to, total) => `Показано ${from}–${to} из ${total} задач`, paginationPrev: "Назад", paginationNext: "Далее",
+      monthlyStatsTitle: "Статистика за месяц", monthlyStatsCompletedTasks: "Выполнено задач", monthlyStatsCompletedWorks: "Выполнено работ", monthlyStatsHours: "Отработано часов", monthlyStatsAvgProgress: "Средний прогресс",
+      upcomingTasksTitle: "Ближайшие задачи", upcomingTasksAll: "Все", upcomingTasksEmpty: "Нет ближайших задач",
+      tasksQuickActionsTitle: "Быстрые действия",
+    },
     objects: {
       pageTitle: "Объекты", pageSubtitle: "Управление строительными объектами и их статусами", searchPlaceholder: "Поиск объектов, локаций, прораба...",
       tabAll: "Все", tabActive: "Активные", tabAtRisk: "С риском", tabCompleted: "Завершённые",
@@ -1175,7 +1285,7 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       selectPlaceholder: "Интихоб кунед...", selectEmpty: "Чизе ёфт нашуд", selectSearch: "Ҷустуҷӯ...", selectClear: "Пок кардан",
       placeholderTitle: "Бахш дар ҳоли таҳия",
       placeholderNote: "Ин бахш ба зудӣ дастрас мешавад. Мо кор мекунем, ки ҳамон маълумот ва интерактивиро, ки дар саҳифаҳои «Хулоса» ва «Объектҳо» ҳастанд, ба ин ҷо интиқол диҳем.",
-      roleLabels: { owner: "Соҳиб", administrator: "Маъмур", accountant: "Бухгалтер", prorab: "Прораб", brigadir: "Бригадир", storekeeper: "Анборчӣ" },
+      roleLabels: { owner: "Соҳиб", administrator: "Маъмур", accountant: "Бухгалтер", prorab: "Прораб", brigadir: "Бригадир", worker: "Коргар", storekeeper: "Анборчӣ" },
       profileTitle: "Профил", profileRole: "Нақш", profilePhone: "Телефон", profileEmail: "Email", profileRegisteredAt: "Санаи бақайдгирӣ",
       save: "Нигоҳ доштан", delete: "Нест кардан", edit: "Таҳрир кардан", view: "Дидан",
       tableActions: "Амалҳо", editUnavailableInDemo: "Таҳрир дар демо ҳоло дастрас нест",
@@ -1471,6 +1581,61 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       attendanceTabPresent: "Ҳозир буданд", attendanceTabLate: "Дер омадан", attendanceTabAbsent: "Ғоибӣ",
       vsPreviousPeriod: "нисбат ба давраи қаблӣ", allObjectsLinkGeneric: "Ҳамаи объектҳо →", expensesDetailsLink: "Дар бораи хароҷот бештар →", specialtiesTitle: "Ихтисосҳо",
     },
+    worker: {
+      sidebarDashboard: "Асосӣ", sidebarTasks: "Корҳои ман", sidebarAttendance: "Ҳозиршавӣ", sidebarSchedule: "Ҷадвал", sidebarMaterials: "Маводҳо",
+      sidebarPhotoReports: "Ҳисоботи фотоӣ", sidebarNotifications: "Огоҳиномаҳо", sidebarProfile: "Профил", sidebarReportProblem: "Хабар додан дар бораи мушкилот",
+      greetingMorning: "Субҳ ба хайр", greetingDay: "Рӯз ба хайр", greetingEvening: "Шом ба хайр", dashboardSubtitle: "Имрӯз дар объект чӣ рӯй медиҳад",
+      kpiTasksTitle: "Корҳои ман", kpiTasksFooter: "Ҳамагӣ таъингардида", kpiInProgressTitle: "Дар кор", kpiInProgressFooter: "Корҳои фаъол",
+      kpiCompletedTitle: "Иҷрошуда", kpiCompletedFooter: "Дар ин моҳ", kpiHoursTitle: "Соатҳои коркард", kpiHoursFooter: "Дар ин моҳ",
+      tasksTitle: "Корҳои ман", tasksTabAll: (n) => `Ҳама (${n})`, tasksTabInProgress: (n) => `Дар кор (${n})`,
+      tasksTabReview: (n) => `Дар тафтиш (${n})`, tasksTabCompleted: (n) => `Иҷрошуда (${n})`, sortByPriority: "Аз рӯи муҳимият", viewAllTasks: "Ҳамаи корҳоро дидан →",
+      statusAssigned: "Таъингардида", statusInProgress: "Дар кор", statusReview: "Дар тафтиш", statusCompleted: "Иҷрошуда", statusOverdue: "Мӯҳлаташ гузашта", statusPlanned: "Банақшагирифташуда", statusPaused: "Таваққуфшуда", statusCancelled: "Бекоршуда",
+      priorityLow: "Паст", priorityMedium: "Миёна", priorityHigh: "Баланд", priorityCritical: "Ҳалкунанда",
+      emptyTasks: "Корҳои таъингардида нест", emptySchedule: "Барои имрӯз кор банақша гирифта нашудааст", emptyNotifications: "Огоҳиномаи нав нест", emptyDocuments: "Ҳуҷҷат дастрас нест",
+      colTotalWorks: "Ҳамагӣ корҳо", colCompleted: "Иҷрошуда",
+      taskDetailTitle: "Кор", taskDetailObject: "Объект", taskDetailDates: "Мӯҳлатҳо", taskDetailProgress: "Пешрафт",
+      taskDetailStatus: "Ҳолат", taskDetailPriority: "Муҳимият", taskDetailAssignedBy: "Таъингар", taskDetailComments: "Шарҳҳо",
+      actionStart: "Кор сар кардан", actionSubmitReview: "Ба тафтиш фиристодан", actionUploadPhoto: "Сурат бор кардан", actionReportProblemLong: "Хабар додан дар бораи мушкилот", actionUpdateProgress: "Пешрафтро нав кардан", actionSaveProgress: "Пешрафтро нигоҳ доштан",
+      scheduleTitle: (date) => `Имрӯз, ${date}`, scheduleBreak: "Танаффус", scheduleMeeting: "Ҷаласа бо прораб", viewFullSchedule: "Ҷадвали пурра →",
+      notificationsTitle: "Огоҳиномаҳо", notificationsAllLink: "Ҳама",
+      statsTitle: "Омори ман", statsHours: "Соатҳои коркард", statsCompleted: "Корҳои иҷрошуда", statsRating: "Рейтинг", statsViolations: "Вайронкуниҳо",
+      ratingHigh: "Сатҳи баланд", ratingMedium: "Сатҳи миёна", ratingLow: "Диққат лозим", violationsGood: "Аъло!", violationsPresent: "Мулоҳиза мавҷуд",
+      documentsTitle: "Ҳуҷҷатҳои ман", allDocumentsLink: "Ҳамаи ҳуҷҷатҳо →",
+      quickActionsTitle: "Амалҳои зуд", actionPhotoReport: "Ҳисоботи фотоӣ", actionRequestMaterial: "Мавод дархост кардан", actionReportProblemShort: "Хабар додан дар бораи мушкилот",
+      actionMessageProrab: "Ба прораб навиштан", actionCall: "Занг задан", actionViewSchedule: "Ҷадвалро дидан",
+      photoModalTitle: "Ҳисоботи фотоӣ", photoModalTask: "Кор", photoModalTaskPlaceholder: "Корро интихоб кунед", photoModalImage: "Сурат", photoModalComment: "Шарҳ", photoModalCommentPlaceholder: "Тавсиф кунед, чӣ иҷро шуд...", photoModalSubmit: "Ҳисобот фиристодан",
+      materialModalTitle: "Мавод дархост кардан", materialModalName: "Мавод", materialModalQty: "Миқдор", materialModalUnit: "Воҳид", materialModalNote: "Шарҳ", materialModalSubmit: "Дархост фиристодан",
+      problemModalTitle: "Хабар додан дар бораи мушкилот", problemModalCategory: "Категория", problemModalTask: "Кори алоқаманд", problemModalNoTask: "Интихоб нашудааст", problemModalDescription: "Тавсифи мушкилот", problemModalPriority: "Муҳимият", problemModalSubmit: "Фиристодан",
+      problemCategorySafety: "Бехатарӣ", problemCategoryMaterials: "Маводҳо", problemCategoryEquipment: "Таҷҳизот", problemCategoryOther: "Дигар",
+      messageModalTitle: "Ба прораб навиштан", messageModalText: "Паём", messageModalPlaceholder: "Паёмро барои прораб нависед...", messageModalSubmit: "Фиристодан",
+      toastPhotoSubmitted: "Ҳисоботи фотоӣ фиристода шуд", toastMaterialRequested: "Дархости мавод фиристода шуд", toastProblemReported: "Хабар дар бораи мушкилот фиристода шуд", toastMessageSent: "Паём ба прораб фиристода шуд", toastMarkedRead: "Ҳамчун хондашуда қайд шуд",
+      attendancePageTitle: "Ҳозиршавӣ", attendancePageSubtitle: "Ҳозиршавӣ, дерравиҳо ва вақти корӣ", attendanceColDate: "Сана", attendanceColArrival: "Омадан", attendanceColDeparture: "Рафтан", attendanceColStatus: "Ҳолат", attendanceColHours: "Соатҳо",
+      attendanceColObject: "Объект", attendanceColNote: "Қайд",
+      kpiAttendanceTotalTitle: "Ҳамагӣ қайдҳо", kpiAttendanceTotalFooter: "барои давраи интихобшуда", kpiPresentTitle: "Ҳозир буд", kpiPresentFooter: "рӯзи корӣ", kpiLateTitle: "Дерравиҳо", kpiLateFooter: "барои давраи интихобшуда", kpiAbsentTitle: "Набудҳо", kpiAbsentFooter: "барои давраи интихобшуда",
+      attendanceHistoryTitle: "Ҳозиршавии ман", attendanceTabAll: "Ҳама", attendanceTabPresent: "Ҳозир буд", attendanceTabLate: "Дерравиҳо", attendanceTabAbsent: "Набудҳо",
+      statusDayOff: "Истироҳат", noteDayOff: "Рӯзи истироҳат", attendanceStatusPresent: "Ҳозир буд", attendanceStatusLate: "Дер монд", attendanceStatusAbsent: "Ҳозир набуд", statusNoData: "Маълумот нест",
+      weeklyAnalyticsTitle: "Ҳозиршавӣ дар як ҳафта", normLabel: "Меъёр", factLabel: "Воқеӣ", latesLabel: "Дерравиҳо", absencesLabel: "Набудҳо",
+      tooltipStatusLabel: "Ҳолат", tooltipCheckIn: "Омадан", tooltipCheckOut: "Рафтан", tooltipLate: "Дерравӣ", tooltipWorked: "Кор карда шуд",
+      todayTimelineArrival: "Омадани субҳ", todayTimelineLunchStart: "Танаффуси хӯрокхӯрӣ", todayTimelineLunchEnd: "Бозгашт", todayTimelineDeparture: "Хотимаи смена", emptyTimeline: "Барои имрӯз маълумот нест",
+      dailySummaryTitle: "Ҳисоботи рӯз", dailySummaryPresence: "Ҳузур", dailySummaryLate: "Дерравӣ", dailySummaryOvertime: "Кори иловагӣ", dailySummaryAttendance: "Ҳозиршавӣ", dailySummaryYes: "Ҳа", dailySummaryNo: "Не",
+      remindersTitle: "Ёдоварӣ", emptyReminders: "Ёдоварӣ нест",
+      shortSummaryTitle: "Хулосаи мухтасар", shortSummaryObject: "Объект", shortSummaryProrab: "Прораб", shortSummaryNextCheck: "Рӯзи кории оянда", shortSummaryActiveTasks: "Корҳои фаъол", contactProrabButton: "Бо прораб тамос гирифтан",
+      emptyAttendance: "Барои давраи интихобшуда сабт нест", thisMonth: "Моҳи ҷорӣ", lastSevenDays: "7 рӯзи охир", lastThirtyDays: "30 рӯзи охир",
+      schedulePageTitle: "Ҷадвал", schedulePageSubtitle: "Корҳои шумо аз рӯи рӯзҳо",
+      materialsPageTitle: "Маводҳо", materialsPageSubtitle: "Дархостҳои маводи шумо", materialsRequestButton: "Мавод дархост кардан", materialsColMaterial: "Мавод", materialsColQty: "Миқдор", materialsColStatus: "Ҳолат", materialsColDate: "Сана", emptyMaterialRequests: "Дархости мавод нест",
+      photoReportsPageTitle: "Ҳисоботи фотоӣ", photoReportsPageSubtitle: "Ҳисоботҳои фотоии шумо аз рӯи корҳо", photoReportsNewButton: "Ҳисоботи нав", emptyPhotoReports: "Ҳанӯз ҳисоботи фотоӣ нест",
+      notificationsPageTitle: "Огоҳиномаҳо", notificationsPageSubtitle: "Ҳамаи огоҳиномаҳои шумо", markAllRead: "Ҳамаро хондашуда қайд кардан",
+      documentsPageTitle: "Ҳуҷҷатҳои ман", documentsPageSubtitle: "Ҳуҷҷатҳо оид ба объекти шумо",
+      profilePageTitle: "Профил", profilePageSubtitle: "Маълумоти шахсии шумо", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Ихтисос", profileGrade: "Дараҷа", profilePhone: "Телефон",
+      materialStatusNew: "Нав", materialStatusApproved: "Тасдиқшуда", materialStatusInTransit: "Дар роҳ", materialStatusIssued: "Дода шуда", materialStatusRejected: "Радшуда",
+      kpiTotalTasksTitle: "Ҳамагӣ корҳо", kpiReviewTitle: "Дар тафтиш", kpiReviewFooter: "Мунтазири тафтиш", kpiOverdueTitle: "Мӯҳлаташ гузашта", kpiOverdueFooter: "Корҳои мӯҳлаташ гузашта",
+      filterButton: "Филтр", sortByPriorityOption: "Аз рӯи муҳимият", sortByDueDate: "Аз рӯи мӯҳлат", sortByProgress: "Аз рӯи пешрафт", sortNewest: "Аввал навҳо", sortOldest: "Аввал куҳнаҳо",
+      filterPriorityLabel: "Муҳимият", filterObjectLabel: "Объект", filterOverdueOnly: "Танҳо мӯҳлаташ гузашта", filterAllObjects: "Ҳамаи объектҳо", filterApply: "Татбиқ кардан", filterReset: "Бекор кардан",
+      tasksResultsSummary: (from, to, total) => `Нишон дода шуд ${from}–${to} аз ${total} кор`, paginationPrev: "Қафо", paginationNext: "Пеш",
+      monthlyStatsTitle: "Омори моҳона", monthlyStatsCompletedTasks: "Корҳои иҷрошуда", monthlyStatsCompletedWorks: "Вазифаҳои иҷрошуда", monthlyStatsHours: "Соатҳои коркард", monthlyStatsAvgProgress: "Пешрафти миёна",
+      upcomingTasksTitle: "Корҳои наздик", upcomingTasksAll: "Ҳама", upcomingTasksEmpty: "Кори наздик нест",
+      tasksQuickActionsTitle: "Амалҳои зуд",
+    },
     objects: {
       pageTitle: "Объектҳо", pageSubtitle: "Идоракунии объектҳои сохтмонӣ ва ҳолати онҳо", searchPlaceholder: "Ҷустуҷӯи объектҳо, минтақаҳо, прораб...",
       tabAll: "Ҳама", tabActive: "Фаъол", tabAtRisk: "Бо хатар", tabCompleted: "Анҷомёфта",
@@ -1740,7 +1905,7 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       selectPlaceholder: "Select...", selectEmpty: "Nothing found", selectSearch: "Search...", selectClear: "Clear",
       placeholderTitle: "Section under construction",
       placeholderNote: "This section will be available soon. We're working on bringing the same data and interactivity here as on the Overview and Objects pages.",
-      roleLabels: { owner: "Owner", administrator: "Administrator", accountant: "Accountant", prorab: "Foreman", brigadir: "Crew lead", storekeeper: "Storekeeper" },
+      roleLabels: { owner: "Owner", administrator: "Administrator", accountant: "Accountant", prorab: "Foreman", brigadir: "Crew lead", worker: "Worker", storekeeper: "Storekeeper" },
       profileTitle: "Profile", profileRole: "Role", profilePhone: "Phone", profileEmail: "Email", profileRegisteredAt: "Registered",
       save: "Save", delete: "Delete", edit: "Edit", view: "View",
       tableActions: "Actions", editUnavailableInDemo: "Editing isn't available in this demo yet",
@@ -2035,6 +2200,61 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       brigadeTabTitle: "Crew composition", brigadeTabMembers: "Members", brigadeTabEfficiency: "Efficiency", brigadeTabForeman: "Foreman", brigadeTabObject: "Object",
       attendanceTabPresent: "Present", attendanceTabLate: "Late", attendanceTabAbsent: "Absent",
       vsPreviousPeriod: "vs. previous period", allObjectsLinkGeneric: "All objects →", expensesDetailsLink: "More about expenses →", specialtiesTitle: "Specialties",
+    },
+    worker: {
+      sidebarDashboard: "Home", sidebarTasks: "My tasks", sidebarAttendance: "Attendance", sidebarSchedule: "Schedule", sidebarMaterials: "Materials",
+      sidebarPhotoReports: "Photo report", sidebarNotifications: "Notifications", sidebarProfile: "Profile", sidebarReportProblem: "Report a problem",
+      greetingMorning: "Good morning", greetingDay: "Good afternoon", greetingEvening: "Good evening", dashboardSubtitle: "Here's what's happening on site today",
+      kpiTasksTitle: "My tasks", kpiTasksFooter: "Total assigned", kpiInProgressTitle: "In progress", kpiInProgressFooter: "Active tasks",
+      kpiCompletedTitle: "Completed", kpiCompletedFooter: "This month", kpiHoursTitle: "Hours worked", kpiHoursFooter: "This month",
+      tasksTitle: "My tasks", tasksTabAll: (n) => `All (${n})`, tasksTabInProgress: (n) => `In progress (${n})`,
+      tasksTabReview: (n) => `In review (${n})`, tasksTabCompleted: (n) => `Completed (${n})`, sortByPriority: "By priority", viewAllTasks: "View all tasks →",
+      statusAssigned: "Assigned", statusInProgress: "In progress", statusReview: "In review", statusCompleted: "Completed", statusOverdue: "Overdue", statusPlanned: "Planned", statusPaused: "Paused", statusCancelled: "Cancelled",
+      priorityLow: "Low", priorityMedium: "Medium", priorityHigh: "High", priorityCritical: "Critical",
+      emptyTasks: "No assigned tasks", emptySchedule: "No tasks planned for today", emptyNotifications: "No new notifications", emptyDocuments: "No documents available",
+      colTotalWorks: "Total tasks", colCompleted: "Completed",
+      taskDetailTitle: "Task", taskDetailObject: "Object", taskDetailDates: "Dates", taskDetailProgress: "Progress",
+      taskDetailStatus: "Status", taskDetailPriority: "Priority", taskDetailAssignedBy: "Assigned by", taskDetailComments: "Comments",
+      actionStart: "Start task", actionSubmitReview: "Submit for review", actionUploadPhoto: "Upload photo", actionReportProblemLong: "Report a problem", actionUpdateProgress: "Update progress", actionSaveProgress: "Save progress",
+      scheduleTitle: (date) => `Today, ${date}`, scheduleBreak: "Break", scheduleMeeting: "Meeting with foreman", viewFullSchedule: "Full schedule →",
+      notificationsTitle: "Notifications", notificationsAllLink: "All",
+      statsTitle: "My statistics", statsHours: "Hours worked", statsCompleted: "Tasks completed", statsRating: "Rating", statsViolations: "Violations",
+      ratingHigh: "High level", ratingMedium: "Average level", ratingLow: "Needs attention", violationsGood: "Excellent!", violationsPresent: "Some issues",
+      documentsTitle: "My documents", allDocumentsLink: "All documents →",
+      quickActionsTitle: "Quick actions", actionPhotoReport: "Photo report", actionRequestMaterial: "Request material", actionReportProblemShort: "Report a problem",
+      actionMessageProrab: "Message foreman", actionCall: "Call", actionViewSchedule: "View schedule",
+      photoModalTitle: "Photo report", photoModalTask: "Task", photoModalTaskPlaceholder: "Select a task", photoModalImage: "Photo", photoModalComment: "Comment", photoModalCommentPlaceholder: "Describe what was done...", photoModalSubmit: "Submit report",
+      materialModalTitle: "Request material", materialModalName: "Material", materialModalQty: "Quantity", materialModalUnit: "Unit", materialModalNote: "Comment", materialModalSubmit: "Submit request",
+      problemModalTitle: "Report a problem", problemModalCategory: "Category", problemModalTask: "Related task", problemModalNoTask: "Not selected", problemModalDescription: "Problem description", problemModalPriority: "Priority", problemModalSubmit: "Submit",
+      problemCategorySafety: "Safety", problemCategoryMaterials: "Materials", problemCategoryEquipment: "Equipment", problemCategoryOther: "Other",
+      messageModalTitle: "Message foreman", messageModalText: "Message", messageModalPlaceholder: "Write a message to the foreman...", messageModalSubmit: "Send",
+      toastPhotoSubmitted: "Photo report submitted", toastMaterialRequested: "Material request submitted", toastProblemReported: "Problem report submitted", toastMessageSent: "Message sent to foreman", toastMarkedRead: "Marked as read",
+      attendancePageTitle: "Attendance", attendancePageSubtitle: "Your attendance, lateness and hours worked", attendanceColDate: "Date", attendanceColArrival: "Arrival", attendanceColDeparture: "Departure", attendanceColStatus: "Status", attendanceColHours: "Hours",
+      attendanceColObject: "Object", attendanceColNote: "Note",
+      kpiAttendanceTotalTitle: "Total records", kpiAttendanceTotalFooter: "for the selected period", kpiPresentTitle: "Present", kpiPresentFooter: "workdays", kpiLateTitle: "Late", kpiLateFooter: "for the selected period", kpiAbsentTitle: "Absent", kpiAbsentFooter: "for the selected period",
+      attendanceHistoryTitle: "My attendance", attendanceTabAll: "All", attendanceTabPresent: "Present", attendanceTabLate: "Late", attendanceTabAbsent: "Absent",
+      statusDayOff: "Day off", noteDayOff: "Day off", attendanceStatusPresent: "Present", attendanceStatusLate: "Late", attendanceStatusAbsent: "Absent", statusNoData: "No data",
+      weeklyAnalyticsTitle: "Weekly attendance", normLabel: "Target", factLabel: "Actual", latesLabel: "Late days", absencesLabel: "Absences",
+      tooltipStatusLabel: "Status", tooltipCheckIn: "Check-in", tooltipCheckOut: "Check-out", tooltipLate: "Late by", tooltipWorked: "Worked",
+      todayTimelineArrival: "Morning check-in", todayTimelineLunchStart: "Lunch break", todayTimelineLunchEnd: "Back from break", todayTimelineDeparture: "Shift end", emptyTimeline: "No data for today",
+      dailySummaryTitle: "Today's summary", dailySummaryPresence: "Presence", dailySummaryLate: "Late by", dailySummaryOvertime: "Overtime", dailySummaryAttendance: "Attendance", dailySummaryYes: "Yes", dailySummaryNo: "No",
+      remindersTitle: "Reminders", emptyReminders: "No reminders",
+      shortSummaryTitle: "Short summary", shortSummaryObject: "Object", shortSummaryProrab: "Site manager", shortSummaryNextCheck: "Next workday", shortSummaryActiveTasks: "Active tasks", contactProrabButton: "Contact site manager",
+      emptyAttendance: "No records for the selected period", thisMonth: "This month", lastSevenDays: "Last 7 days", lastThirtyDays: "Last 30 days",
+      schedulePageTitle: "Schedule", schedulePageSubtitle: "Your tasks by day",
+      materialsPageTitle: "Materials", materialsPageSubtitle: "Your material requests", materialsRequestButton: "Request material", materialsColMaterial: "Material", materialsColQty: "Quantity", materialsColStatus: "Status", materialsColDate: "Date", emptyMaterialRequests: "No material requests",
+      photoReportsPageTitle: "Photo report", photoReportsPageSubtitle: "Your photo reports by task", photoReportsNewButton: "New photo report", emptyPhotoReports: "No photo reports yet",
+      notificationsPageTitle: "Notifications", notificationsPageSubtitle: "All your notifications", markAllRead: "Mark all as read",
+      documentsPageTitle: "My documents", documentsPageSubtitle: "Documents for your object",
+      profilePageTitle: "Profile", profilePageSubtitle: "Your personal details", profileBrigade: "Brigade", profileObject: "Object", profileSpecialty: "Specialty", profileGrade: "Grade", profilePhone: "Phone",
+      materialStatusNew: "New", materialStatusApproved: "Approved", materialStatusInTransit: "In transit", materialStatusIssued: "Issued", materialStatusRejected: "Rejected",
+      kpiTotalTasksTitle: "Total tasks", kpiReviewTitle: "In review", kpiReviewFooter: "Awaiting review", kpiOverdueTitle: "Overdue", kpiOverdueFooter: "Overdue tasks",
+      filterButton: "Filter", sortByPriorityOption: "By priority", sortByDueDate: "By due date", sortByProgress: "By progress", sortNewest: "Newest first", sortOldest: "Oldest first",
+      filterPriorityLabel: "Priority", filterObjectLabel: "Object", filterOverdueOnly: "Overdue only", filterAllObjects: "All objects", filterApply: "Apply", filterReset: "Reset",
+      tasksResultsSummary: (from, to, total) => `Showing ${from}–${to} of ${total} tasks`, paginationPrev: "Previous", paginationNext: "Next",
+      monthlyStatsTitle: "Monthly statistics", monthlyStatsCompletedTasks: "Tasks completed", monthlyStatsCompletedWorks: "Works completed", monthlyStatsHours: "Hours worked", monthlyStatsAvgProgress: "Average progress",
+      upcomingTasksTitle: "Upcoming tasks", upcomingTasksAll: "All", upcomingTasksEmpty: "No upcoming tasks",
+      tasksQuickActionsTitle: "Quick actions",
     },
     objects: {
       pageTitle: "Objects", pageSubtitle: "Manage construction objects and their statuses", searchPlaceholder: "Search objects, locations, foreman...",

@@ -94,7 +94,7 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action, c
           value={search ? search.value : localSearch}
           onChange={(e) => (search ? search.onChange(e.target.value) : setLocalSearch(e.target.value))}
           placeholder={search?.placeholder ?? strings.header.searchPlaceholder}
-          containerClassName={compact ? "min-w-[180px] max-w-[360px] flex-1" : "hidden min-w-[220px] max-w-xs flex-1 md:block"}
+          containerClassName={compact ? "min-w-0 sm:min-w-[180px] max-w-[360px] flex-1" : "hidden min-w-[220px] max-w-xs flex-1 md:block"}
           aria-label={strings.header.searchPlaceholder}
         />
 

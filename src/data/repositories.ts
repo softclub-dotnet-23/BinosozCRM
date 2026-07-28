@@ -13,11 +13,16 @@ import type {
   MaterialWriteOff,
   ConstructionObject,
   PayrollRecord,
+  PhotoReport,
+  ProblemReport,
   StaffMember,
   StockAdjustment,
   StockReservation,
   UserAccount,
   Work,
+  WorkerDocument,
+  WorkerMessage,
+  WorkerNotification,
 } from "../types";
 import { mockObjects } from "./mockObjects";
 import { mockEstimates } from "./mockEstimates";
@@ -37,6 +42,11 @@ import { mockStockReservations } from "./mockStockReservations";
 import { mockStockAdjustments } from "./mockStockAdjustments";
 import { mockPayroll } from "./mockPayroll";
 import { mockUsers } from "./mockUsers";
+import { mockNotifications } from "./mockNotifications";
+import { mockWorkerDocuments } from "./mockWorkerDocuments";
+import { mockProblemReports } from "./mockProblemReports";
+import { mockWorkerMessages } from "./mockWorkerMessages";
+import { mockPhotoReports } from "./mockPhotoReports";
 
 /**
  * Single source of truth for every persisted entity collection in the app.
@@ -51,7 +61,11 @@ import { mockUsers } from "./mockUsers";
 export const objectsRepository = createCollectionRepository<ConstructionObject>("objects.v1", mockObjects);
 export const estimatesRepository = createCollectionRepository<Estimate>("estimates.v1", mockEstimates);
 export const budgetsRepository = createCollectionRepository<BudgetLine>("budgets.v1", mockBudgetLines);
-export const worksRepository = createCollectionRepository<Work>("works.v1", mockWorks);
+// v2: brigade/object assignment in the generated seed rows was fixed (previously every brigade's
+// generated works were pinned to a single object because the object/brigade cycles were correlated)
+// and three more featured works were added — browsers that had already cached "works.v1" would
+// otherwise keep seeing the old, single-object dataset forever.
+export const worksRepository = createCollectionRepository<Work>("works.v2", mockWorks);
 export const brigadesRepository = createCollectionRepository<Brigade>("brigades.v1", mockBrigades);
 export const employeesRepository = createCollectionRepository<Employee>("employees.v1", mockEmployees);
 export const assignmentsRepository = createCollectionRepository<Assignment>("assignments.v1", mockAssignments);
@@ -98,4 +112,15 @@ export const stockAdjustmentsRepository = createCollectionRepository<StockAdjust
 export const payrollRepository = createCollectionRepository<PayrollRecord>("payroll.v1", mockPayroll);
 // v2: seed data gained phone/email fields after some browsers had already cached the v1
 // shape, which rendered as permanently-blank Phone/Email columns on the Users page.
-export const usersRepository = createCollectionRepository<UserAccount>("users.v2", mockUsers);
+// v3: added the Worker demo account (rustam.saidov) — browsers that had already cached "users.v2"
+// would otherwise never see it, so the login would fail with "invalid login or password" even
+// though the credentials are correct, because the account simply isn't in their cached list yet.
+export const usersRepository = createCollectionRepository<UserAccount>("users.v3", mockUsers);
+
+// Worker role collections — notifications, documents, problem reports, messages to the Прораб,
+// and photo reports. None of these existed anywhere in the app before the Worker role.
+export const notificationsRepository = createCollectionRepository<WorkerNotification>("notifications.v1", mockNotifications);
+export const workerDocumentsRepository = createCollectionRepository<WorkerDocument>("worker-documents.v1", mockWorkerDocuments);
+export const problemReportsRepository = createCollectionRepository<ProblemReport>("problem-reports.v1", mockProblemReports);
+export const workerMessagesRepository = createCollectionRepository<WorkerMessage>("worker-messages.v1", mockWorkerMessages);
+export const photoReportsRepository = createCollectionRepository<PhotoReport>("photo-reports.v1", mockPhotoReports);

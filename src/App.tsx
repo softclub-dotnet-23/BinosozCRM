@@ -28,6 +28,15 @@ import ReportsPage from "./pages/ReportsPage";
 import UsersPage from "./pages/UsersPage";
 import SettingsPage from "./pages/SettingsPage";
 import BrigadirProfilePage from "./pages/BrigadirProfilePage";
+import WorkerDashboardPage from "./pages/worker/WorkerDashboardPage";
+import WorkerTasksPage from "./pages/worker/WorkerTasksPage";
+import WorkerAttendancePage from "./pages/worker/WorkerAttendancePage";
+import WorkerSchedulePage from "./pages/worker/WorkerSchedulePage";
+import WorkerMaterialsPage from "./pages/worker/WorkerMaterialsPage";
+import WorkerPhotoReportsPage from "./pages/worker/WorkerPhotoReportsPage";
+import WorkerNotificationsPage from "./pages/worker/WorkerNotificationsPage";
+import WorkerProfilePage from "./pages/worker/WorkerProfilePage";
+import WorkerDocumentsPage from "./pages/worker/WorkerDocumentsPage";
 
 /**
  * "/profile" is currently only a real page for the Brigadir role (see BrigadirProfilePage).
@@ -38,6 +47,14 @@ import BrigadirProfilePage from "./pages/BrigadirProfilePage";
 function ProfileRoute() {
   const { user } = useAuth();
   if (user?.role === "brigadir") return <BrigadirProfilePage />;
+  return <Navigate to={ROLE_HOME[user!.role]} replace />;
+}
+
+/** "/" always used to jump straight to "/dashboard" — fine while every role's home page lived
+ * there, but the Worker role's home page is "/worker/dashboard" (its own route namespace, not a
+ * branch of the shared "/dashboard"), so this resolves the real per-role landing page instead. */
+function HomeRedirect() {
+  const { user } = useAuth();
   return <Navigate to={ROLE_HOME[user!.role]} replace />;
 }
 
@@ -62,8 +79,18 @@ function App() {
               }
             />
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/worker" element={<Navigate to="/worker/dashboard" replace />} />
+              <Route path="/worker/dashboard" element={<WorkerDashboardPage />} />
+              <Route path="/worker/tasks" element={<WorkerTasksPage />} />
+              <Route path="/worker/attendance" element={<WorkerAttendancePage />} />
+              <Route path="/worker/schedule" element={<WorkerSchedulePage />} />
+              <Route path="/worker/materials" element={<WorkerMaterialsPage />} />
+              <Route path="/worker/photo-reports" element={<WorkerPhotoReportsPage />} />
+              <Route path="/worker/notifications" element={<WorkerNotificationsPage />} />
+              <Route path="/worker/profile" element={<WorkerProfilePage />} />
+              <Route path="/worker/documents" element={<WorkerDocumentsPage />} />
               <Route path="/objects" element={<ObjectsPage />} />
               <Route path="/estimates" element={<EstimatesPage />} />
               <Route path="/budgets" element={<BudgetsPage />} />
@@ -84,7 +111,7 @@ function App() {
               <Route path="/users" element={<UsersPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/profile" element={<ProfileRoute />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<HomeRedirect />} />
             </Route>
           </Routes>
         </ToastProvider>

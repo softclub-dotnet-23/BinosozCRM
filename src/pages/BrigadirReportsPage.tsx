@@ -19,6 +19,7 @@ import { MetricCard } from "../components/ui/MetricCard";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ProgressBar } from "../components/ui/ProgressBar";
+import { ObjectImage } from "../components/ui/ObjectImage";
 import { DonutChart } from "../components/charts/DonutChart";
 import { WorkCompletionDynamicsChart } from "../components/analytics/WorkCompletionDynamicsChart";
 import { ReportGenerateModal, type ReportGenerateOptions } from "../components/reports/ReportGenerateModal";
@@ -53,6 +54,7 @@ import {
   computeWorkPriorityBreakdown,
   computeTopObjectsProgress,
   computeExpensesByCategory,
+  categorizeMaterialName,
   computePeriodDeltas,
   computeWorkingDays,
   isWorkInPeriod,
@@ -190,7 +192,10 @@ export default function BrigadirReportsPage() {
   const kpis = useMemo(() => computeWorkAnalytics(brigadeWorks), [brigadeWorks]);
   const statusBreakdown = useMemo(() => computeWorkStatusBreakdown(brigadeWorks), [brigadeWorks]);
   const priorityRows = useMemo(() => computeWorkPriorityBreakdown(brigadeWorks), [brigadeWorks]);
-  const topObjects = useMemo(() => computeTopObjectsProgress(brigadeWorks, dateFrom), [brigadeWorks, dateFrom]);
+  const topObjects = useMemo(
+    () => computeTopObjectsProgress(brigadeWorks, brigadeWorksAll, dateFrom, dateTo),
+    [brigadeWorks, brigadeWorksAll, dateFrom, dateTo],
+  );
 
   const materialsActual = useMemo(
     () => brigadeReceipts.reduce((sum, r) => sum + r.lines.reduce((s2, l) => s2 + l.lineTotal, 0), 0) + brigadeWriteOffs.reduce((sum, w) => sum + w.lines.reduce((s2, l) => s2 + l.lineTotal, 0), 0),
@@ -216,9 +221,27 @@ export default function BrigadirReportsPage() {
     return budget.totalBudget * (periodDays / projectDurationDays);
   }, [budget, object, dateFrom, dateTo]);
 
+  const expenseCategoryActuals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const r of brigadeReceipts) {
+      for (const line of r.lines) {
+        const category = categorizeMaterialName(line.materialName);
+        totals[category] = (totals[category] ?? 0) + line.lineTotal;
+      }
+    }
+    for (const w of brigadeWriteOffs) {
+      for (const line of w.lines) {
+        const category = categorizeMaterialName(line.materialName);
+        totals[category] = (totals[category] ?? 0) + line.lineTotal;
+      }
+    }
+    if (laborActual > 0) totals["Оплата труда"] = laborActual;
+    return totals;
+  }, [brigadeReceipts, brigadeWriteOffs, laborActual]);
+
   const expensesByCategory = useMemo(
-    () => computeExpensesByCategory(materialsActual, laborActual, plannedForPeriod),
-    [materialsActual, laborActual, plannedForPeriod],
+    () => computeExpensesByCategory(expenseCategoryActuals, plannedForPeriod),
+    [expenseCategoryActuals, plannedForPeriod],
   );
 
   const deltas = useMemo(
@@ -263,7 +286,7 @@ export default function BrigadirReportsPage() {
       },
       {
         header: [s.colObject, s.colTotalWorks, s.colCompleted, s.colProgress, s.colChange],
-        rows: topObjects.map((r) => [r.objectName, r.totalWorks, r.completedWorks, `${r.averageProgress}%`, `${r.changePoints >= 0 ? "+" : ""}${r.changePoints}%`]),
+        rows: topObjects.map((r) => [r.objectName, r.totalWorks, r.completedWorks, `${r.averageProgress}%`, formatChangePoints(r.changePoints)]),
       },
       {
         header: [s.colCategory, s.financeTabPlanLabel, s.financeTabActualLabel, s.financeTabVarianceLabel],
@@ -506,118 +529,166 @@ export default function BrigadirReportsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Card className="overflow-hidden p-0">
-              <div className="flex items-center justify-between p-5 pb-0">
-                <h2 className="text-base font-bold text-ink">{s.topObjectsTitle}</h2>
-                <button type="button" onClick={() => setObjectFilter("all")} className="text-xs font-semibold text-primary">
+          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1.25fr)_minmax(240px,0.72fr)]">
+            <Card className="overflow-hidden rounded-[10px] p-0 shadow-sm">
+              <div className="flex items-center justify-between px-4 pt-4 pb-3">
+                <h2 className="text-sm font-semibold text-ink">{s.topObjectsTitle}</h2>
+                <button type="button" onClick={() => setObjectFilter("all")} className="shrink-0 text-xs font-semibold text-primary hover:text-primary-hover">
                   {s.allObjectsLink}
                 </button>
               </div>
               {topObjects.length > 0 ? (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[420px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs text-ink-secondary">
-                        <th className="px-5 py-2.5 font-medium">{s.colObject}</th>
-                        <th className="px-2 py-2.5 text-right font-medium">{s.colTotalWorks}</th>
-                        <th className="px-2 py-2.5 text-right font-medium">{s.colCompleted}</th>
-                        <th className="px-2 py-2.5 font-medium">{s.colProgress}</th>
-                        <th className="px-5 py-2.5 text-right font-medium">{s.colChange}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {topObjects.map((r, i) => (
-                        <tr key={r.objectName} className="border-b border-border last:border-0" style={rowInStyle(i)}>
-                          <td className="max-w-[140px] truncate px-5 py-2.5 text-ink">{r.objectName}</td>
-                          <td className="px-2 py-2.5 text-right tabular text-ink-secondary">{r.totalWorks}</td>
-                          <td className="px-2 py-2.5 text-right tabular text-ink-secondary">{r.completedWorks}</td>
-                          <td className="px-2 py-2.5">
-                            <div className="flex items-center gap-2">
-                              <ProgressBar value={r.averageProgress} className="w-14" />
-                              <span className="shrink-0 tabular text-xs font-semibold text-ink">{r.averageProgress}%</span>
+                <div>
+                  {/* Table layout — only once the card has enough width for 2 count columns, a
+                      progress bar and a change badge without crushing the object name to nothing. */}
+                  <div className="hidden sm:block">
+                    <div className="grid grid-cols-[minmax(0,2fr)_54px_64px_minmax(84px,1fr)_58px] gap-2 border-b border-border px-4 pb-2 text-[11px] font-medium text-ink-secondary">
+                      <span>{s.colObject}</span>
+                      <span className="text-right leading-tight">{s.colTotalWorks}</span>
+                      <span className="text-right leading-tight">{s.colCompleted}</span>
+                      <span>{s.colProgress}</span>
+                      <span className="text-right">{s.colChange}</span>
+                    </div>
+                    <div className="max-h-[430px] divide-y divide-border overflow-y-auto">
+                      {topObjects.map((r, i) => {
+                        const obj = objects.find((o) => o.name === r.objectName);
+                        const changeTone = changeToneClass(r.changePoints);
+                        return (
+                          <div
+                            key={r.objectName}
+                            className="grid grid-cols-[minmax(0,2fr)_54px_64px_minmax(84px,1fr)_58px] items-center gap-2 px-4 py-2.5"
+                            style={rowInStyle(i)}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <ObjectImage
+                                src={obj?.imageUrl ?? ""}
+                                type={obj?.objectType ?? "residential"}
+                                alt={r.objectName}
+                                className="h-7 w-7 shrink-0 rounded-[6px]"
+                              />
+                              <span className="min-w-0 truncate text-xs font-medium text-ink">{r.objectName}</span>
+                            </span>
+                            <span className="text-right text-xs tabular text-ink-secondary">{r.totalWorks}</span>
+                            <span className="text-right text-xs tabular text-ink-secondary">{r.completedWorks}</span>
+                            <span className="flex items-center gap-1.5">
+                              <ProgressBar value={r.averageProgress} className="h-1.5 w-full max-w-16" tone={r.averageProgress >= 66 ? "green" : r.averageProgress >= 33 ? "orange" : "red"} />
+                              <span className="shrink-0 text-xs font-semibold tabular text-ink">{r.averageProgress}%</span>
+                            </span>
+                            <span className={cn("justify-self-end rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular", changeTone)}>
+                              {formatChangePoints(r.changePoints)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Compact stacked cards below sm — a 5-column table has no room left for the
+                      object name once real counts/progress/change columns each need their own space. */}
+                  <div className="max-h-[430px] divide-y divide-border overflow-y-auto sm:hidden">
+                    {topObjects.map((r, i) => {
+                      const obj = objects.find((o) => o.name === r.objectName);
+                      const changeTone = changeToneClass(r.changePoints);
+                      return (
+                        <div key={r.objectName} className="flex min-h-11 items-center gap-3 px-4 py-3" style={rowInStyle(i)}>
+                          <ObjectImage
+                            src={obj?.imageUrl ?? ""}
+                            type={obj?.objectType ?? "residential"}
+                            alt={r.objectName}
+                            className="h-9 w-9 shrink-0 rounded-[6px]"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate text-xs font-medium text-ink">{r.objectName}</span>
+                              <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular", changeTone)}>
+                                {formatChangePoints(r.changePoints)}
+                              </span>
                             </div>
-                          </td>
-                          <td className={cn("px-5 py-2.5 text-right tabular font-semibold", r.changePoints > 0 ? "text-green" : r.changePoints < 0 ? "text-red" : "text-ink-secondary")}>
-                            {r.changePoints >= 0 ? "+" : ""}
-                            {r.changePoints}%
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <ProgressBar value={r.averageProgress} className="h-1.5 w-full" tone={r.averageProgress >= 66 ? "green" : r.averageProgress >= 33 ? "orange" : "red"} />
+                              <span className="shrink-0 text-xs font-semibold tabular text-ink">{r.averageProgress}%</span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-ink-secondary">
+                              {s.colTotalWorks} {r.totalWorks} · {s.colCompleted} {r.completedWorks}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <p className="px-5 py-8 text-center text-sm text-ink-muted">{s.emptyTableData}</p>
+                <p className="px-4 py-8 text-center text-sm text-ink-muted">{s.emptyTableData}</p>
               )}
             </Card>
 
-            <Card className="overflow-hidden p-0">
-              <div className="flex items-center justify-between p-5 pb-0">
-                <h2 className="text-base font-bold text-ink">{s.expensesByCategoryTitle}</h2>
-                <button type="button" onClick={() => setTab("finance")} className="text-xs font-semibold text-primary">
+            <Card className="overflow-hidden rounded-[10px] p-0 shadow-sm">
+              <div className="flex items-center justify-between px-4 pt-4 pb-3">
+                <h2 className="text-sm font-semibold text-ink">{s.expensesByCategoryTitle}</h2>
+                <button type="button" onClick={() => setTab("finance")} className="shrink-0 text-xs font-semibold text-primary hover:text-primary-hover">
                   {s.expensesDetailsLink}
                 </button>
               </div>
               {expensesByCategory.length > 0 ? (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[340px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs text-ink-secondary">
-                        <th className="px-5 py-2.5 font-medium">{s.colCategory}</th>
-                        <th className="px-2 py-2.5 text-right font-medium">{s.financeTabPlanLabel}</th>
-                        <th className="px-2 py-2.5 text-right font-medium">{s.financeTabActualLabel}</th>
-                        <th className="px-5 py-2.5 text-right font-medium">{s.financeTabVarianceLabel}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {expensesByCategory.map((row, i) => (
-                        <tr key={row.category} className="border-b border-border last:border-0" style={rowInStyle(i)}>
-                          <td className="px-5 py-2.5 text-ink">{row.category}</td>
-                          <td className="px-2 py-2.5 text-right tabular text-ink-secondary">{formatNumber(row.planned)}</td>
-                          <td className="px-2 py-2.5 text-right tabular text-ink-secondary">{formatNumber(row.actual)}</td>
-                          <td className={cn("px-5 py-2.5 text-right tabular font-semibold", row.variance > 0 ? "text-red" : row.variance < 0 ? "text-green" : "text-ink-secondary")}>
-                            {row.variance >= 0 ? "+" : ""}
-                            {formatNumber(row.variance)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div>
+                  <div className="grid grid-cols-[minmax(0,1.3fr)_74px_74px_82px] gap-2 border-b border-border px-4 pb-2 text-[11px] font-medium text-ink-secondary">
+                    <span>{s.colCategory}</span>
+                    <span className="text-right">{s.financeTabPlanLabel}</span>
+                    <span className="text-right">{s.financeTabActualLabel}</span>
+                    <span className="text-right">{s.financeTabVarianceLabel}</span>
+                  </div>
+                  <div className="max-h-[430px] divide-y divide-border overflow-y-auto">
+                    {expensesByCategory.map((row, i) => (
+                      <div key={row.category} className="grid grid-cols-[minmax(0,1.3fr)_74px_74px_82px] items-center gap-2 px-4 py-2.5" style={rowInStyle(i)}>
+                        <span className="truncate text-xs text-ink">{row.category}</span>
+                        <span className="text-right text-xs tabular text-ink-secondary">{formatNumber(row.planned)}</span>
+                        <span className="text-right text-xs tabular text-ink-secondary">{formatNumber(row.actual)}</span>
+                        <span
+                          className={cn(
+                            "justify-self-end rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular",
+                            row.variance > 0 ? "text-red bg-red-soft" : row.variance < 0 ? "text-green bg-green-soft" : "text-ink-secondary bg-surface-3",
+                          )}
+                        >
+                          {row.variance >= 0 ? "+" : ""}
+                          {formatNumber(row.variance)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <p className="px-5 py-8 text-center text-sm text-ink-muted">{s.emptyTableData}</p>
+                <p className="px-4 py-8 text-center text-sm text-ink-muted">{s.emptyTableData}</p>
               )}
             </Card>
 
-            <div className="grid gap-4">
-              <Card className="p-5">
-                <h2 className="text-base font-bold text-ink">{s.periodSummaryTitle}</h2>
-                <dl className="mt-3.5 space-y-2 text-sm">
-                  <Row label={s.summaryPeriod} value={`${formatDateShort(dateFrom)} – ${formatDateShort(dateTo)}`} />
-                  <Row label={s.summaryObjects} value={String(distinctObjects)} />
-                  <Row label={s.summaryBrigades} value="1" />
-                  <Row label={s.summaryWorkers} value={String(distinctEmployees)} />
-                  <Row label={s.summaryWorkDays} value={String(workingDays)} />
+            <div className="grid gap-3 lg:col-span-2 xl:col-span-1">
+              <Card className="rounded-[10px] p-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-ink">{s.periodSummaryTitle}</h2>
+                <dl className="mt-2.5 space-y-1.5">
+                  <SummaryRow label={s.summaryPeriod} value={`${formatDateShort(dateFrom)} – ${formatDateShort(dateTo)}`} />
+                  <SummaryRow label={s.summaryObjects} value={String(distinctObjects)} />
+                  <SummaryRow label={s.summaryBrigades} value="1" />
+                  <SummaryRow label={s.summaryWorkers} value={String(distinctEmployees)} />
+                  <SummaryRow label={s.summaryWorkDays} value={String(workingDays)} />
                 </dl>
               </Card>
 
-              <Card className="p-5">
-                <h2 className="text-base font-bold text-ink">{s.exportPanelTitle}</h2>
-                <p className="mt-1 text-xs text-ink-muted">{s.exportPanelHint}</p>
-                <div className="mt-3.5 grid grid-cols-3 gap-2">
-                  <button type="button" onClick={handlePrint} className="flex flex-col items-center gap-1 rounded-lg border border-border-strong py-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-3">
-                    <FileText size={16} className="text-red" /> {s.exportPdf}
+              <Card className="rounded-[10px] p-4 shadow-sm">
+                <h2 className="text-sm font-semibold text-ink">{s.exportPanelTitle}</h2>
+                <p className="mt-0.5 text-xs text-ink-muted">{s.exportPanelHint}</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button type="button" onClick={handlePrint} className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border border-border-strong text-[11px] font-medium text-ink-secondary hover:bg-surface-3">
+                    <FileText size={15} className="text-red" /> {s.exportPdf}
                   </button>
-                  <button type="button" onClick={handleExportCsv} className="flex flex-col items-center gap-1 rounded-lg border border-border-strong py-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-3">
-                    <FileSpreadsheet size={16} className="text-green" /> {s.exportExcel}
+                  <button type="button" onClick={handleExportCsv} className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border border-border-strong text-[11px] font-medium text-ink-secondary hover:bg-surface-3">
+                    <FileSpreadsheet size={15} className="text-green" /> {s.exportExcel}
                   </button>
-                  <button type="button" onClick={handleExportCsv} className="flex flex-col items-center gap-1 rounded-lg border border-border-strong py-2.5 text-xs font-medium text-ink-secondary hover:bg-surface-3">
-                    <Download size={16} className="text-blue" /> {s.exportCsv}
+                  <button type="button" onClick={handleExportCsv} className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border border-border-strong text-[11px] font-medium text-ink-secondary hover:bg-surface-3">
+                    <Download size={15} className="text-purple" /> {s.exportCsv}
                   </button>
                 </div>
-                <Button className="mt-3.5 w-full" onClick={() => setGenerateOpen(true)}>
-                  <Settings2 size={15} /> {s.configureReportButton}
+                <Button variant="outline" className="mt-3 h-10 w-full" onClick={() => setGenerateOpen(true)}>
+                  <Settings2 size={14} /> {s.configureReportButton}
                 </Button>
               </Card>
             </div>
@@ -814,126 +885,26 @@ function Row({ label, value, valueClassName }: { label: string; value: string; v
   );
 }
 
-const DYNAMICS_PLAN_COLOR = "#3B82F6";
-const DYNAMICS_FACT_COLOR = "#22B573";
-const DYNAMICS_RATE_COLOR = "#FF8A1F";
-const DYNAMICS_GRID_COLOR = "#E9EDF3";
-const DYNAMICS_AXIS_TEXT_COLOR = "#6B7280";
-
-function DynamicsTooltip({ active, payload, label, s }: TooltipContentProps & { s: BrigadirReportsStrings }) {
-  if (!active || !payload || payload.length === 0) return null;
-  const planned = payload.find((p) => p.dataKey === "planned")?.value as number | undefined;
-  const actual = payload.find((p) => p.dataKey === "actual")?.value as number | undefined;
-  const rate = payload.find((p) => p.dataKey === "rate")?.value as number | undefined;
-  return (
-    <div className="min-w-40 rounded-xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-popover)]">
-      <p className="mb-2 text-xs font-semibold text-ink">{label}</p>
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: DYNAMICS_PLAN_COLOR }} />
-          <span className="text-ink-secondary">{s.seriesPlanned}:</span>
-          <span className="ml-auto font-semibold tabular text-ink">{planned}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: DYNAMICS_FACT_COLOR }} />
-          <span className="text-ink-secondary">{s.seriesActual}:</span>
-          <span className="ml-auto font-semibold tabular text-ink">{actual}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: DYNAMICS_RATE_COLOR }} />
-          <span className="text-ink-secondary">{s.seriesRate}:</span>
-          <span className="ml-auto font-semibold tabular text-ink">{rate}%</span>
-        </div>
-      </div>
-    </div>
-  );
+/** Shared formatting for the Top Objects "Изменение" badge — `null` means there is no real
+ * previous-period work record to diff against (see computeTopObjectsProgress), so it renders as
+ * an em dash instead of a fabricated 0-baseline percentage. */
+function formatChangePoints(changePoints: number | null): string {
+  if (changePoints === null) return "—";
+  return `${changePoints >= 0 ? "+" : ""}${changePoints}%`;
 }
 
-function DynamicsChart({ data, s, reduceMotion }: { data: ReturnType<typeof computeWorkDynamicsSeries>; s: BrigadirReportsStrings; reduceMotion: boolean }) {
+function changeToneClass(changePoints: number | null): string {
+  if (changePoints === null || changePoints === 0) return "text-ink-secondary bg-surface-3";
+  return changePoints > 0 ? "text-green bg-green-soft" : "text-red bg-red-soft";
+}
+
+/** Compact label-left/value-right row for the period summary card — unlike Row above (which
+ * stacks label over value for the wider Finance/Brigade tab cards), this keeps both on one line. */
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
-      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-ink-secondary">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DYNAMICS_PLAN_COLOR }} /> {s.seriesPlanned}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DYNAMICS_FACT_COLOR }} /> {s.seriesActual}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DYNAMICS_RATE_COLOR }} /> {s.seriesRate}
-        </span>
-      </div>
-      <ResponsiveContainer width="100%" height={260}>
-        <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
-          <defs>
-            <linearGradient id="dynamicsFactFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={DYNAMICS_FACT_COLOR} stopOpacity={0.16} />
-              <stop offset="100%" stopColor={DYNAMICS_FACT_COLOR} stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid vertical={false} stroke={DYNAMICS_GRID_COLOR} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: DYNAMICS_AXIS_TEXT_COLOR }} tickMargin={8} interval={0} />
-          <YAxis
-            yAxisId="pct"
-            orientation="left"
-            tickLine={false}
-            axisLine={false}
-            domain={[0, 100]}
-            ticks={[0, 25, 50, 75, 100]}
-            tickFormatter={(v: number) => `${v}%`}
-            tick={{ fontSize: 11, fill: DYNAMICS_AXIS_TEXT_COLOR }}
-            width={40}
-          />
-          <YAxis
-            yAxisId="num"
-            orientation="right"
-            tickLine={false}
-            axisLine={false}
-            domain={[0, 100]}
-            ticks={[0, 20, 40, 60, 80, 100]}
-            tick={{ fontSize: 11, fill: DYNAMICS_AXIS_TEXT_COLOR }}
-            width={32}
-          />
-          <Tooltip cursor={{ stroke: DYNAMICS_GRID_COLOR }} isAnimationActive={false} wrapperStyle={{ zIndex: 30, outline: "none" }} content={(props) => <DynamicsTooltip {...props} s={s} />} />
-          <Area
-            yAxisId="num"
-            type="monotone"
-            dataKey="actual"
-            stroke={DYNAMICS_FACT_COLOR}
-            strokeWidth={2.5}
-            fill="url(#dynamicsFactFill)"
-            dot={false}
-            activeDot={{ r: 4 }}
-            isAnimationActive={!reduceMotion}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-          <Line
-            yAxisId="num"
-            type="monotone"
-            dataKey="planned"
-            stroke={DYNAMICS_PLAN_COLOR}
-            strokeWidth={2.5}
-            dot={false}
-            activeDot={{ r: 4 }}
-            isAnimationActive={!reduceMotion}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-          <Line
-            yAxisId="pct"
-            type="monotone"
-            dataKey="rate"
-            stroke={DYNAMICS_RATE_COLOR}
-            strokeWidth={2.5}
-            dot={false}
-            activeDot={{ r: 4 }}
-            isAnimationActive={!reduceMotion}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
+    <div className="flex items-center justify-between gap-3 text-xs">
+      <dt className="text-ink-secondary">{label}</dt>
+      <dd className="shrink-0 font-semibold tabular text-ink">{value}</dd>
     </div>
   );
 }

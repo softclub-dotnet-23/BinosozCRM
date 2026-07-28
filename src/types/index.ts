@@ -694,7 +694,7 @@ export interface PayrollFilters {
 // Auth / accounts
 // ---------------------------------------------------------------------------
 
-export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "accountant" | "storekeeper";
+export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "worker" | "accountant" | "storekeeper";
 
 export type UserAccountStatus = "active" | "inactive" | "blocked";
 
@@ -724,3 +724,72 @@ export interface SessionUser {
 }
 
 export type PayrollRole = "accountant" | "owner" | "prorab";
+
+// ---------------------------------------------------------------------------
+// Worker role — rank-and-file crew member (Employee.memberRole "worker"/"helper"),
+// distinct from Brigadir (crew lead). Adds a few small, purpose-built collections
+// that didn't exist anywhere else in the app: notifications, documents, problem
+// reports, messages to the Прораб, and photo reports.
+// ---------------------------------------------------------------------------
+
+export type WorkerNotificationType = "task_assigned" | "materials_delivered" | "task_completed" | "task_review" | "problem_update" | "schedule_change";
+
+export interface WorkerNotification {
+  id: string;
+  userId: string;
+  type: WorkerNotificationType;
+  title: string;
+  description: string;
+  date: string;
+  read: boolean;
+  relatedWorkId: string | null;
+}
+
+export type WorkerDocumentType = "pdf" | "spreadsheet" | "drawing" | "image";
+
+export interface WorkerDocument {
+  id: string;
+  objectId: string;
+  title: string;
+  fileName: string;
+  fileType: WorkerDocumentType;
+  sizeLabel: string;
+  uploadedDate: string;
+}
+
+export type ProblemReportPriority = "low" | "medium" | "high";
+export type ProblemReportStatus = "new" | "in_review" | "resolved";
+
+export interface ProblemReport {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  category: string;
+  relatedWorkId: string | null;
+  relatedWorkTitle: string | null;
+  description: string;
+  priority: ProblemReportPriority;
+  status: ProblemReportStatus;
+  createdDate: string;
+}
+
+export interface WorkerMessage {
+  id: string;
+  fromEmployeeId: string;
+  fromEmployeeName: string;
+  toRole: "prorab";
+  text: string;
+  createdDate: string;
+}
+
+export interface PhotoReport {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  workId: string;
+  workTitle: string;
+  objectName: string;
+  imageUrl: string;
+  comment: string;
+  createdDate: string;
+}

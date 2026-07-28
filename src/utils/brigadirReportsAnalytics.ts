@@ -5,79 +5,23 @@ function round(value: number): number {
   return Math.round(value);
 }
 
-// All date math here is anchored to UTC (the "Z" suffix) and mutated/read with the UTC-suffixed
-// Date methods throughout — parsing as local time and then reading back with toISOString() (UTC)
-// silently shifts the date by a day in any timezone ahead of UTC, which is exactly the bug that
-// produced an off-by-one first tick ("30 июн" instead of "1 июл") before this was fixed.
-function daysBetween(fromIso: string, toIso: string): number {
-  const from = new Date(`${fromIso}T00:00:00Z`).getTime();
-  const to = new Date(`${toIso}T00:00:00Z`).getTime();
-  return Math.max(1, Math.round((to - from) / 86_400_000));
-}
-
-function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 /** A work is "in scope" for a period when its planned schedule overlaps that period at all —
  * the same overlap test used to scope every KPI/chart/table on the page to the selected date range. */
 export function isWorkInPeriod(work: Work, dateFrom: string, dateTo: string): boolean {
   return work.plannedStart <= dateTo && work.plannedEnd >= dateFrom;
 }
 
-/** Expected cumulative progress (0-100) for a single work on a given day, based on its own planned schedule. */
-function plannedProgressOn(work: Work, dayIso: string): number {
-  if (dayIso <= work.plannedStart) return 0;
-  if (dayIso >= work.plannedEnd) return 100;
-  const span = daysBetween(work.plannedStart, work.plannedEnd);
-  const elapsed = daysBetween(work.plannedStart, dayIso);
-  return Math.min(100, Math.max(0, round((elapsed / span) * 100)));
-}
-
 /** Actual progress for a work on a given day, read from its real progressHistory (the latest
  * entry at or before that day). Falls back to 0 before the work started, or its current
- * progress once past the last recorded history entry (no history = flat line at current progress). */
+ * progress once past the last recorded history entry (no history = flat line at current progress).
+ * Also used by workCompletionAnalytics.ts's own local copy for the dynamics chart — kept here too
+ * since computeTopObjectsProgress below needs it and the two analytics modules are deliberately
+ * decoupled (matching this file's own existing pattern vs. reportsAnalytics.ts). */
 function actualProgressOn(work: Work, dayIso: string): number {
   if (!work.actualStart || dayIso < work.actualStart) return 0;
   const entries = [...work.progressHistory].filter((h) => h.date <= dayIso).sort((a, b) => (a.date < b.date ? -1 : 1));
   if (entries.length > 0) return entries[entries.length - 1].progress;
   return work.progressHistory.length === 0 ? work.progress : 0;
-}
-
-export interface WorkDynamicsPoint {
-  date: string;
-  label: string;
-  planned: number;
-  actual: number;
-  rate: number;
-}
-
-/** Planned vs. actual completion curve for a set of works over a period, sampled at ~7 evenly
- * spaced points — computed from each work's own plannedStart/plannedEnd and real progressHistory,
- * not a fixed mock series, so it reflects whichever works the current brigade actually has and
- * whatever date range is selected (not hardcoded to any particular month). */
-export function computeWorkDynamicsSeries(works: Work[], dateFrom: string, dateTo: string): WorkDynamicsPoint[] {
-  const totalDays = daysBetween(dateFrom, dateTo);
-  const steps = Math.min(7, Math.max(2, totalDays + 1));
-  const stride = totalDays / (steps - 1);
-
-  const points: WorkDynamicsPoint[] = [];
-  for (let i = 0; i < steps; i++) {
-    const dayIso = i === steps - 1 ? dateTo : addDays(dateFrom, Math.round(stride * i));
-    const planned = works.length > 0 ? round(works.reduce((sum, w) => sum + plannedProgressOn(w, dayIso), 0) / works.length) : 0;
-    const actual = works.length > 0 ? round(works.reduce((sum, w) => sum + actualProgressOn(w, dayIso), 0) / works.length) : 0;
-    const rate = planned > 0 ? Math.min(100, round((actual / planned) * 100)) : 0;
-    points.push({
-      date: dayIso,
-      label: `${dayIso.slice(8, 10)} ${["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"][Number(dayIso.slice(5, 7)) - 1]}`,
-      planned,
-      actual,
-      rate,
-    });
-  }
-  return points;
 }
 
 /** Distributes `counts` across percentages that sum to exactly 100 (when total > 0), using the
@@ -175,25 +119,41 @@ export interface TopObjectProgressRow {
   totalWorks: number;
   completedWorks: number;
   averageProgress: number;
-  changePoints: number;
+  /** null when the object had no works scheduled in the equivalent preceding period at all —
+   * there is no real baseline to diff against, so the row should render "—", not a number. */
+  changePoints: number | null;
 }
 
-/** Per-object progress with a real period-over-period delta: the average progress each work had
- * recorded (via progressHistory) at the start of the period, versus its progress now. */
-export function computeTopObjectsProgress(works: Work[], periodStart: string): TopObjectProgressRow[] {
+/**
+ * Per-object progress with a real period-over-period delta — the object's average progress *as of
+ * the end of the equivalent preceding period* (derived from each work's dated progressHistory),
+ * versus its average progress now. This deliberately compares against the previous calendar
+ * period (same technique as computePeriodDeltas below), not against this period's own start date:
+ * diffing against "progress at this period's start" collapses to "0 vs current" for any work that
+ * both started and progressed within the selected period — which is most of this seed data — making
+ * the badge silently mirror current progress instead of showing a real change.
+ * If an object has zero works overlapping the previous period, there is no real historical data
+ * point to compare against; `changePoints` is `null` rather than a fabricated 0 baseline.
+ */
+export function computeTopObjectsProgress(currentWorks: Work[], allBrigadeWorks: Work[], dateFrom: string, dateTo: string): TopObjectProgressRow[] {
+  const { from: prevFrom, to: prevTo } = previousPeriod(dateFrom, dateTo);
   const byObject = new Map<string, Work[]>();
-  for (const w of works) byObject.set(w.objectName, [...(byObject.get(w.objectName) ?? []), w]);
+  for (const w of currentWorks) byObject.set(w.objectName, [...(byObject.get(w.objectName) ?? []), w]);
 
   return Array.from(byObject.entries())
     .map(([objectName, rows]) => {
       const averageProgress = round(rows.reduce((sum, w) => sum + w.progress, 0) / rows.length);
-      const startProgress = round(rows.reduce((sum, w) => sum + actualProgressOn(w, periodStart), 0) / rows.length);
+      const previousRows = allBrigadeWorks.filter((w) => w.objectName === objectName && isWorkInPeriod(w, prevFrom, prevTo));
+      const changePoints =
+        previousRows.length === 0
+          ? null
+          : averageProgress - round(previousRows.reduce((sum, w) => sum + actualProgressOn(w, prevTo), 0) / previousRows.length);
       return {
         objectName,
         totalWorks: rows.length,
         completedWorks: rows.filter((w) => w.status === "completed").length,
         averageProgress,
-        changePoints: averageProgress - startProgress,
+        changePoints,
       };
     })
     .sort((a, b) => b.averageProgress - a.averageProgress);
@@ -206,28 +166,78 @@ export interface ExpenseCategoryRow {
   variance: number;
 }
 
-/**
- * Категория/План/Факт/Отклонение. Real "Факт" per category (materials from receipts+write-offs,
- * labor from payroll). There is no per-category budget line anywhere in this app — BudgetLine is
- * tracked per object only (confirmed: no `category` field) — so a per-category "План" doesn't
- * exist as a stored fact. Rather than invent one, this allocates the object's own real budget,
- * time-prorated for the selected period (the same straight-line technique already used by
- * computeDailyFinanceSeries for object-level income), across categories in proportion to how the
- * period's real spend actually split between them. It's a documented modeling choice built
- * entirely from real inputs (real budget, real dates, real actual amounts) — not a random or
- * hardcoded number, and categories with zero real spend are omitted rather than padded.
+/** Real material name → its real catalog category (the same 9 categories mockMaterials.ts's
+ * MATERIAL_CATEGORIES already defines). Receipt/write-off lines only carry a free-form
+ * `materialName` string (confirmed: no `category` field on MaterialReceiptLine/MaterialWriteOffLine),
+ * and most line items are name *variants* of the 9 seeded catalog materials (e.g. "Цемент М500" vs
+ * the catalog's "Цемент М400") rather than exact matches, so an exact-name join against
+ * materialsRepository would miss most lines. Keyword matching against the same real category
+ * vocabulary is the honest bridge: it classifies real line items into real, existing categories —
+ * it does not invent any new category name. Every material name currently seeded across
+ * mockMaterialReceipts.ts/mockMaterialWriteOffs.ts matches one of these keywords; "Прочие материалы"
+ * only appears if a future line item genuinely doesn't fit any of the 9.
  */
-export function computeExpensesByCategory(materialsActual: number, laborActual: number, plannedForPeriod: number): ExpenseCategoryRow[] {
-  const rows: { category: string; actual: number }[] = [];
-  if (materialsActual > 0) rows.push({ category: "Материалы", actual: materialsActual });
-  if (laborActual > 0) rows.push({ category: "Оплата труда", actual: laborActual });
-  const totalActual = rows.reduce((sum, r) => sum + r.actual, 0);
-  if (rows.length === 0 || totalActual === 0) return [];
-  return rows.map((r) => {
-    const planned = round(plannedForPeriod * (r.actual / totalActual));
-    const actual = round(r.actual);
-    return { category: r.category, planned, actual, variance: actual - planned };
-  });
+const MATERIAL_CATEGORY_KEYWORDS: [keyword: string, category: string][] = [
+  ["цемент", "Цемент"],
+  ["кирпич", "Кирпич"],
+  ["арматура", "Металл"],
+  ["уголок", "Металл"],
+  ["швеллер", "Металл"],
+  ["проволока", "Металл"],
+  ["песок", "Сыпучие"],
+  ["щебень", "Сыпучие"],
+  ["отсев", "Сыпучие"],
+  ["гравий", "Сыпучие"],
+  ["доска", "Дерево"],
+  ["брус", "Дерево"],
+  ["фанера", "Дерево"],
+  ["труба", "Сантехника"],
+  ["сантехник", "Сантехника"],
+  ["краска", "Отделочные"],
+  ["грунтовка", "Отделочные"],
+  ["шпакл", "Отделочные"],
+  ["штукатур", "Отделочные"],
+  ["плитка", "Отделочные"],
+  ["провод", "Электрика"],
+  ["кабель", "Электрика"],
+  ["электрощит", "Электрика"],
+  ["утеплитель", "Изоляция"],
+  ["пенопласт", "Изоляция"],
+  ["минвата", "Изоляция"],
+];
+
+export function categorizeMaterialName(materialName: string): string {
+  const lower = materialName.toLowerCase();
+  for (const [keyword, category] of MATERIAL_CATEGORY_KEYWORDS) {
+    if (lower.includes(keyword)) return category;
+  }
+  return "Прочие материалы";
+}
+
+/**
+ * Категория/План/Факт/Отклонение. Real "Факт" per category, built entirely from real records:
+ * each material receipt/write-off line is classified into its real catalog category (see
+ * categorizeMaterialName above) and summed, and labor comes from real payroll totals. There is no
+ * per-category budget line anywhere in this app — BudgetLine is tracked per object only (confirmed:
+ * no `category` field) — so a per-category "План" doesn't exist as a stored fact. Rather than
+ * invent one, this allocates the object's own real budget, time-prorated for the selected period
+ * (the same straight-line technique already used by computeDailyFinanceSeries for object-level
+ * income), across categories in proportion to how the period's real spend actually split between
+ * them — computed against the *full* category set before capping to `maxRows`, so trimming small
+ * categories from the display never inflates the visible ones' planned share.
+ */
+export function computeExpensesByCategory(categoryActuals: Record<string, number>, plannedForPeriod: number, maxRows = 8): ExpenseCategoryRow[] {
+  const entries = Object.entries(categoryActuals).filter(([, amount]) => amount > 0);
+  const totalActual = entries.reduce((sum, [, amount]) => sum + amount, 0);
+  if (entries.length === 0 || totalActual === 0) return [];
+  return entries
+    .map(([category, rawActual]) => {
+      const planned = round(plannedForPeriod * (rawActual / totalActual));
+      const actual = round(rawActual);
+      return { category, planned, actual, variance: actual - planned };
+    })
+    .sort((a, b) => b.actual - a.actual)
+    .slice(0, maxRows);
 }
 
 export interface PeriodDeltas {

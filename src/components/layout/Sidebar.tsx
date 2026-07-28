@@ -5,15 +5,21 @@ import {
   Building2,
   Calculator,
   Calendar,
+  CalendarCheck,
+  CalendarDays,
+  Camera,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   HardHat,
   Home,
   LifeBuoy,
   LogOut,
   Package,
   Settings,
+  TriangleAlert,
   User,
+  UserRound,
   Users,
   Wallet,
   BarChart3,
@@ -26,6 +32,9 @@ import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useToast } from "../../hooks/useToast";
 import { isRouteAllowed } from "../../lib/auth/roleAccess";
+import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { notificationsRepository } from "../../data/repositories";
+import { WorkerProblemModal } from "../worker/WorkerProblemModal";
 import type { AppStrings } from "../../lib/i18n/appStrings";
 
 /**
@@ -52,6 +61,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: typeof Home;
+  badge?: number;
 }
 
 interface NavAction {
@@ -133,6 +143,19 @@ function buildBrigadirNavItems(s: AppStrings["sidebar"], onNotYetAvailable: (lab
   ];
 }
 
+function buildWorkerNavItems(s: AppStrings["worker"], unreadCount: number): NavEntry[] {
+  return [
+    { to: "/worker/dashboard", label: s.sidebarDashboard, icon: Home },
+    { to: "/worker/tasks", label: s.sidebarTasks, icon: ClipboardList },
+    { to: "/worker/attendance", label: s.sidebarAttendance, icon: CalendarCheck },
+    { to: "/worker/schedule", label: s.sidebarSchedule, icon: CalendarDays },
+    { to: "/worker/materials", label: s.sidebarMaterials, icon: Package },
+    { to: "/worker/photo-reports", label: s.sidebarPhotoReports, icon: Camera },
+    { to: "/worker/notifications", label: s.sidebarNotifications, icon: Bell, badge: unreadCount || undefined },
+    { to: "/worker/profile", label: s.sidebarProfile, icon: UserRound },
+  ];
+}
+
 interface SidebarProps {
   collapsed?: boolean;
   mobileOpen?: boolean;
@@ -146,19 +169,28 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
   const { strings } = useLanguage();
   const { showToast } = useToast();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const [problemModalOpen, setProblemModalOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
+
+  const notifications = useRepositorySnapshot(notificationsRepository);
+  const unreadCount = useMemo(
+    () => (user ? notifications.filter((n) => n.userId === user.id && !n.read).length : 0),
+    [notifications, user],
+  );
 
   const visibleNavItems = useMemo(
     () =>
       user
-        ? (user.role === "brigadir"
-            ? buildBrigadirNavItems(strings.sidebar, (label) => showToast(`«${label}» — раздел в разработке`, "info"))
-            : buildNavItems(strings.sidebar)
+        ? (user.role === "worker"
+            ? buildWorkerNavItems(strings.worker, unreadCount)
+            : user.role === "brigadir"
+              ? buildBrigadirNavItems(strings.sidebar, (label) => showToast(`«${label}» — раздел в разработке`, "info"))
+              : buildNavItems(strings.sidebar)
           ).map((entry) =>
             isNavGroup(entry) ? { ...entry, children: entry.children.filter((c) => isRouteAllowed(user.role, c.to)) } : entry,
           ).filter((entry) => (isNavGroup(entry) ? entry.children.length > 0 : isNavAction(entry) ? true : isRouteAllowed(user.role, entry.to)))
         : [],
-    [user, strings, showToast],
+    [user, strings, showToast, unreadCount],
   );
 
   useEffect(() => {
@@ -176,6 +208,18 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
     const active = navRef.current?.querySelector('[aria-current="page"]');
     active?.scrollIntoView({ block: "nearest" });
   }, [location.pathname, expandedGroups]);
+
+  // The mobile drawer's backdrop and X button already close it; Escape didn't (Modal/Drawer
+  // elsewhere in the app already treat Escape as a close key, this brought the mobile sidebar
+  // drawer in line with that same convention).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onCloseMobile?.();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen, onCloseMobile]);
 
   function handleLogout() {
     logout();
@@ -337,7 +381,14 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                     {isActive && (
                       <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                     )}
-                    <entry.icon size={18} className="shrink-0" />
+                    <span className="relative shrink-0">
+                      <entry.icon size={18} />
+                      {!!entry.badge && (
+                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
+                          {entry.badge}
+                        </span>
+                      )}
+                    </span>
                     {!collapsed && <span className="min-w-0 flex-1 leading-tight">{entry.label}</span>}
                   </>
                 )}
@@ -352,9 +403,9 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
               <SessionAvatar user={user} />
               {!collapsed && (
                 <div className="min-w-0 flex-1 leading-tight">
-                  <p className="truncate text-sm font-semibold text-ink">{user.role === "brigadir" ? "Комрон Саидов" : user.fullName}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{user.fullName}</p>
                   <p className="truncate text-xs text-ink-muted">{strings.common.roleLabels[user.role]}</p>
-                  {user.role === "brigadir" && (
+                  {(user.role === "brigadir" || user.role === "worker") && (
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-green">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green" /> Онлайн
                     </p>
@@ -373,6 +424,21 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
               </div>
             )}
 
+            {user.role === "worker" && (
+              <button
+                type="button"
+                onClick={() => setProblemModalOpen(true)}
+                className={cn(
+                  "mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink",
+                  collapsed && "px-0",
+                )}
+                title={collapsed ? strings.worker.sidebarReportProblem : undefined}
+              >
+                <TriangleAlert size={16} />
+                {!collapsed && strings.worker.sidebarReportProblem}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleLogout}
@@ -387,6 +453,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
           </div>
         )}
       </aside>
+      {user?.role === "worker" && <WorkerProblemModal open={problemModalOpen} onClose={() => setProblemModalOpen(false)} />}
     </>
   );
 }

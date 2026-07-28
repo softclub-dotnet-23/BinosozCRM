@@ -7,6 +7,7 @@ export const ROLE_HOME: Record<UserRole, string> = {
   accountant: "/payroll",
   prorab: "/works",
   brigadir: "/brigades",
+  worker: "/worker/dashboard",
   storekeeper: "/inventory/materials",
 };
 
@@ -34,6 +35,7 @@ const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   accountant: ["/dashboard", "/payroll", "/reports", "/budgets", "/estimates", "/objects"],
   prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/attendance", "/inventory/*", "/reports"],
   brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials", "/reports", "/payroll", "/profile"],
+  worker: ["/worker/*"],
   storekeeper: ["/dashboard", "/inventory/*", "/reports"],
 };
 
@@ -43,6 +45,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   accountant: "Бухгалтер",
   prorab: "Прораб",
   brigadir: "Бригадир",
+  worker: "Работник",
   storekeeper: "Снабженец",
 };
 

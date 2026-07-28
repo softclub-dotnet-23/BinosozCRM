@@ -8,7 +8,7 @@ export const WORK_COMPLETION_COLORS = {
   axisText: "#6B7280",
 } as const;
 
-interface WorkCompletionTooltipProps extends TooltipContentProps<number, string> {
+interface WorkCompletionTooltipProps extends TooltipContentProps {
   formatDayLabel: (iso: string) => string;
   planLabel: string;
   actualLabel: string;

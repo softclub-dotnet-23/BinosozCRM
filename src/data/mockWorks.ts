@@ -175,6 +175,52 @@ const FEATURED_RAW: RawWork[] = [
     actualEnd: null,
     priority: "low",
   },
+  // Additional real assignments for brigade-1 on other existing objects (obj-7/obj-8/obj-9),
+  // consistent with mockAssignments.ts already modelling this brigade working across obj-1,
+  // obj-2, obj-4 and obj-6 over time — a brigade taking on tasks at multiple sites is an
+  // established part of this data model, not a new invention.
+  {
+    code: "9.1",
+    title: "Штукатурка фасада",
+    sectionId: "finishing",
+    objectId: "obj-7",
+    brigadeId: "brigade-1",
+    status: "in_progress",
+    progress: 40,
+    plannedStart: "2026-07-08",
+    plannedEnd: "2026-07-22",
+    actualStart: "2026-07-08",
+    actualEnd: null,
+    priority: "medium",
+  },
+  {
+    code: "9.2",
+    title: "Монтаж колонн",
+    sectionId: "structure",
+    objectId: "obj-8",
+    brigadeId: "brigade-1",
+    status: "completed",
+    progress: 100,
+    plannedStart: "2026-07-02",
+    plannedEnd: "2026-07-14",
+    actualStart: "2026-07-02",
+    actualEnd: "2026-07-14",
+    priority: "high",
+  },
+  {
+    code: "9.3",
+    title: "Прокладка электропроводки",
+    sectionId: "engineering",
+    objectId: "obj-9",
+    brigadeId: "brigade-1",
+    status: "overdue",
+    progress: 25,
+    plannedStart: "2026-07-06",
+    plannedEnd: "2026-07-16",
+    actualStart: "2026-07-06",
+    actualEnd: null,
+    priority: "critical",
+  },
 ];
 
 const WORK_NAME_LIBRARY: Record<WorkSectionKey, string[]> = {
@@ -224,10 +270,9 @@ interface SectionPlan {
   overdue: number;
 }
 
-// Counts here plus the featured rows above add up exactly to the section totals
-// shown in "Работы по разделам" (6 / 10 / 14 / 16 / 6 / 4 = 56), and the
-// completed/inProgress/overdue counts plus the featured rows add up exactly to
-// the KPI totals (28 / 22 / 6).
+// Counts here plus the featured rows above add up to the section totals shown in
+// "Работы по разделам" (6 / 10 / 15 / 17 / 7 / 4 = 59), and the completed/inProgress/overdue
+// counts plus the featured rows add up to the KPI totals (29 / 23 / 7).
 const SECTION_PLANS: SectionPlan[] = [
   { sectionId: "prep", codePrefix: 1, codeStart: 3, completed: 4, inProgress: 0, overdue: 0 },
   { sectionId: "foundation", codePrefix: 2, codeStart: 2, completed: 7, inProgress: 1, overdue: 0 },
@@ -254,7 +299,12 @@ function generateSectionWorks(plan: SectionPlan, startIndex: number): RawWork[] 
   }
 
   function pushRow(status: WorkStatus, seed: number) {
-    const objectId = OBJECT_CYCLE[seed % OBJECT_CYCLE.length];
+    // OBJECT_CYCLE and BRIGADE_CYCLE are both length 6, so `seed % 6` alone would pick the same
+    // residue for both — every brigade would always land on exactly one fixed object across the
+    // whole generated set. The `Math.floor(seed / BRIGADE_CYCLE.length)` staircase offset keeps
+    // object selection deterministic while decorrelating it from brigade selection, so each
+    // brigade's works are spread across multiple real objects instead of just one.
+    const objectId = OBJECT_CYCLE[(seed + Math.floor(seed / BRIGADE_CYCLE.length)) % OBJECT_CYCLE.length];
     const brigadeId = BRIGADE_CYCLE[seed % BRIGADE_CYCLE.length];
     const priority = PRIORITY_CYCLE[seed % PRIORITY_CYCLE.length];
     const baseStart = addDays("2026-06-20", (seed * 3) % 60);
