@@ -1,23 +1,56 @@
-import { Mail, Phone } from "lucide-react";
+import { useMemo, useState } from "react";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { Card } from "../../components/ui/Card";
-import { Avatar } from "../../components/ui/Avatar";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useWorkerScope } from "../../utils/workerAccess";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
-import { usersRepository } from "../../data/repositories";
+import { useProfileSettings } from "../../hooks/useProfileSettings";
+import { attendanceRepository, employeeDocumentsRepository, materialRequestsRepository, photoReportsRepository, usersRepository } from "../../data/repositories";
+import { todayIso } from "../../utils/workerAnalytics";
+import { computeProfileActivity, computeProfileKpis, computeProfileStats } from "../../utils/workerProfileAnalytics";
+import { ProfileKpis } from "../../components/worker/profile/ProfileKpis";
+import { ProfileIdentityCard } from "../../components/worker/profile/ProfileIdentityCard";
+import { ProfessionalInfoCard } from "../../components/worker/profile/ProfessionalInfoCard";
+import { PersonalInfoCard } from "../../components/worker/profile/PersonalInfoCard";
+import { SkillsCard } from "../../components/worker/profile/SkillsCard";
+import { ProfileStatisticsCard } from "../../components/worker/profile/ProfileStatisticsCard";
+import { RecentActivityCard } from "../../components/worker/profile/RecentActivityCard";
+import { ProfileSettingsCard } from "../../components/worker/profile/ProfileSettingsCard";
+import { DocumentsCard } from "../../components/worker/profile/DocumentsCard";
+import { EditProfileModal } from "../../components/worker/profile/EditProfileModal";
+import { ChangePhotoModal } from "../../components/worker/profile/ChangePhotoModal";
 
 export default function WorkerProfilePage() {
   const { user } = useAuth();
   const { strings } = useLanguage();
   const s = strings.worker;
-  const { employee, brigade, object } = useWorkerScope(user);
+  const { employee, brigade, object, prorab, brigadeWorks } = useWorkerScope(user);
   const users = useRepositorySnapshot(usersRepository);
   const account = users.find((u) => u.id === user?.id);
+  const attendance = useRepositorySnapshot(attendanceRepository);
+  const allPhotoReports = useRepositorySnapshot(photoReportsRepository);
+  const allMaterialRequests = useRepositorySnapshot(materialRequestsRepository);
+  const allDocuments = useRepositorySnapshot(employeeDocumentsRepository);
+  const { settings, update: updateSettings } = useProfileSettings();
 
-  if (!user || !employee) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
+
+  const today = todayIso();
+
+  const myPhotoReports = useMemo(() => (employee ? allPhotoReports.filter((r) => r.employeeId === employee.id) : []), [allPhotoReports, employee]);
+  const myDocuments = useMemo(() => (employee ? allDocuments.filter((d) => d.employeeId === employee.id) : []), [allDocuments, employee]);
+
+  const kpis = useMemo(() => (employee ? computeProfileKpis(employee, brigadeWorks, attendance, today) : null), [employee, brigadeWorks, attendance, today]);
+  const stats = useMemo(() => (kpis ? computeProfileStats(brigadeWorks, myPhotoReports, kpis.attendancePercent) : null), [brigadeWorks, myPhotoReports, kpis]);
+  const activity = useMemo(
+    () => (employee ? computeProfileActivity(employee, brigade?.name ?? null, attendance, myPhotoReports, allMaterialRequests, brigadeWorks, today) : []),
+    [employee, brigade, attendance, myPhotoReports, allMaterialRequests, brigadeWorks, today],
+  );
+
+  if (!user || !employee || !kpis || !stats) {
     return (
       <AppLayout title={s.profilePageTitle} subtitle={s.profilePageSubtitle} titleBelowHeader contentMaxWidth="1600px">
         <Card className="p-0">
@@ -27,45 +60,29 @@ export default function WorkerProfilePage() {
     );
   }
 
-  const rows: [string, string][] = [
-    [s.profileBrigade, brigade?.name ?? "—"],
-    [s.profileObject, object?.name ?? "—"],
-    [s.profileSpecialty, employee.specialty],
-    [s.profileGrade, String(employee.qualificationGrade)],
-    [s.profilePhone, employee.phone],
-  ];
-
   return (
     <AppLayout title={s.profilePageTitle} subtitle={s.profilePageSubtitle} titleBelowHeader contentMaxWidth="1600px">
-      <Card className="p-5">
-        <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={user.fullName} size="md" className="h-16 w-16 text-lg" />
-          <div>
-            <p className="text-lg font-bold text-ink">{user.fullName}</p>
-            <p className="text-sm text-ink-secondary">{strings.common.roleLabels[user.role]}</p>
+      <div className="space-y-4">
+        <ProfileKpis kpis={kpis} />
+
+        <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <ProfileIdentityCard employee={employee} email={account?.email} onEdit={() => setEditOpen(true)} onChangePhoto={() => setPhotoOpen(true)} />
+          <ProfessionalInfoCard employee={employee} objectName={object?.name ?? null} brigadeName={brigade?.name ?? null} prorabName={prorab?.fullName ?? null} experienceYears={kpis.experienceYears} />
+          <ProfileStatisticsCard stats={stats} />
+
+          <PersonalInfoCard employee={employee} />
+          <SkillsCard skills={employee.skills ?? []} />
+          <RecentActivityCard items={activity} todayIso={today} />
+
+          <div className="lg:col-span-2">
+            <DocumentsCard documents={myDocuments} />
           </div>
+          <ProfileSettingsCard settings={settings} onUpdate={updateSettings} />
         </div>
+      </div>
 
-        <dl className="mt-5 grid grid-cols-1 gap-x-8 gap-y-3 border-t border-border pt-5 sm:grid-cols-2">
-          {rows.map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between gap-3 text-sm">
-              <dt className="text-ink-secondary">{label}</dt>
-              <dd className="font-medium text-ink">{value}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <div className="mt-5 flex flex-wrap gap-3 border-t border-border pt-5">
-          <a href={`tel:${employee.phone.replace(/\s+/g, "")}`} className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm font-medium text-ink hover:bg-surface-2">
-            <Phone size={15} /> {employee.phone}
-          </a>
-          {account?.email && (
-            <a href={`mailto:${account.email}`} className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm font-medium text-ink hover:bg-surface-2">
-              <Mail size={15} /> {account.email}
-            </a>
-          )}
-        </div>
-      </Card>
+      <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} employee={employee} account={account} />
+      <ChangePhotoModal open={photoOpen} onClose={() => setPhotoOpen(false)} employee={employee} />
     </AppLayout>
   );
 }

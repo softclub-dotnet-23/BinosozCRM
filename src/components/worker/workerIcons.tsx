@@ -1,4 +1,5 @@
 import {
+  Bell,
   BrickWall,
   CalendarClock,
   Camera,
@@ -58,6 +59,10 @@ export const NOTIFICATION_ICON: Record<WorkerNotificationType, LucideIcon> = {
   task_review: ListChecks,
   problem_update: TriangleAlert,
   schedule_change: CalendarClock,
+  photo_report_approved: CheckCircle2,
+  photo_report_rejected: TriangleAlert,
+  reminder: CalendarClock,
+  system: Bell,
 };
 
 export const NOTIFICATION_TONE_CLASS: Record<WorkerNotificationType, string> = {
@@ -67,6 +72,10 @@ export const NOTIFICATION_TONE_CLASS: Record<WorkerNotificationType, string> = {
   task_review: "bg-purple-soft text-purple",
   problem_update: "bg-red-soft text-red",
   schedule_change: "bg-warning-soft text-warning",
+  photo_report_approved: "bg-green-soft text-green",
+  photo_report_rejected: "bg-red-soft text-red",
+  reminder: "bg-blue-soft text-blue",
+  system: "bg-surface-4 text-ink-secondary",
 };
 
 /** Shared between the Dashboard's document grid and the full Documents page — each real file

@@ -12,8 +12,10 @@ import type {
   MaterialTransfer,
   MaterialWriteOff,
   ConstructionObject,
+  EmployeeDocument,
   PayrollRecord,
   PhotoReport,
+  PhotoReportComment,
   ProblemReport,
   StaffMember,
   StockAdjustment,
@@ -44,9 +46,11 @@ import { mockPayroll } from "./mockPayroll";
 import { mockUsers } from "./mockUsers";
 import { mockNotifications } from "./mockNotifications";
 import { mockWorkerDocuments } from "./mockWorkerDocuments";
+import { mockEmployeeDocuments } from "./mockEmployeeDocuments";
 import { mockProblemReports } from "./mockProblemReports";
 import { mockWorkerMessages } from "./mockWorkerMessages";
 import { mockPhotoReports } from "./mockPhotoReports";
+import { mockPhotoReportComments } from "./mockPhotoReportComments";
 
 /**
  * Single source of truth for every persisted entity collection in the app.
@@ -67,7 +71,10 @@ export const budgetsRepository = createCollectionRepository<BudgetLine>("budgets
 // otherwise keep seeing the old, single-object dataset forever.
 export const worksRepository = createCollectionRepository<Work>("works.v2", mockWorks);
 export const brigadesRepository = createCollectionRepository<Brigade>("brigades.v1", mockBrigades);
-export const employeesRepository = createCollectionRepository<Employee>("employees.v1", mockEmployees);
+// v2: added optional personnel-record fields (birthDate/address/passportNumber/hiredAt/
+// currentSection/emergencyContact/skills) for the Profile page — bump forces a reseed so the
+// worker demo account (employee-1) picks up its new real values.
+export const employeesRepository = createCollectionRepository<Employee>("employees.v2", mockEmployees);
 export const assignmentsRepository = createCollectionRepository<Assignment>("assignments.v1", mockAssignments);
 export const staffRepository = createCollectionRepository<StaffMember>("staff.v1", mockStaff);
 export const attendanceRepository = createCollectionRepository<AttendanceRecord>("attendance.v1", mockAttendance);
@@ -119,8 +126,15 @@ export const usersRepository = createCollectionRepository<UserAccount>("users.v3
 
 // Worker role collections — notifications, documents, problem reports, messages to the Прораб,
 // and photo reports. None of these existed anywhere in the app before the Worker role.
-export const notificationsRepository = createCollectionRepository<WorkerNotification>("notifications.v1", mockNotifications);
+// v2: widened with priority, photo_report_approved/rejected + reminder/system types, and
+// relatedPhotoReportId/relatedMaterialRequestId link fields for the Notifications page.
+export const notificationsRepository = createCollectionRepository<WorkerNotification>("notifications.v2", mockNotifications);
 export const workerDocumentsRepository = createCollectionRepository<WorkerDocument>("worker-documents.v1", mockWorkerDocuments);
+export const employeeDocumentsRepository = createCollectionRepository<EmployeeDocument>("employee-documents.v1", mockEmployeeDocuments);
 export const problemReportsRepository = createCollectionRepository<ProblemReport>("problem-reports.v1", mockProblemReports);
 export const workerMessagesRepository = createCollectionRepository<WorkerMessage>("worker-messages.v1", mockWorkerMessages);
-export const photoReportsRepository = createCollectionRepository<PhotoReport>("photo-reports.v1", mockPhotoReports);
+// v2: PhotoReport widened to a real multi-image + approval-status shape (images[], status,
+// reviewerComment) — the v1 shape (single imageUrl, no status) can't seed under the new type, so
+// this bump forces a clean reseed the same way other mock-data-shape changes in this app do.
+export const photoReportsRepository = createCollectionRepository<PhotoReport>("photo-reports.v2", mockPhotoReports);
+export const photoReportCommentsRepository = createCollectionRepository<PhotoReportComment>("photo-report-comments.v1", mockPhotoReportComments);

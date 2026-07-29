@@ -31,12 +31,15 @@ interface AvatarProps {
   name: string;
   size?: "sm" | "md";
   className?: string;
+  /** Explicit photo override (e.g. a real uploaded/data-URL avatar) — takes precedence over the
+   * name-based resolvePersonPhoto lookup when provided. */
+  src?: string | null;
 }
 
-export function Avatar({ name, size = "md", className }: AvatarProps) {
+export function Avatar({ name, size = "md", className, src }: AvatarProps) {
   const [photoFailed, setPhotoFailed] = useState(false);
   const sizeClass = size === "md" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs";
-  const photoSrc = resolvePersonPhoto(name);
+  const photoSrc = src ?? resolvePersonPhoto(name);
 
   if (photoSrc && !photoFailed) {
     return (

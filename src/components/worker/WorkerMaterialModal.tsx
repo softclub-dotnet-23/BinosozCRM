@@ -7,6 +7,7 @@ import { useToast } from "../../hooks/useToast";
 import { useWorkerScope } from "../../utils/workerAccess";
 import { materialRequestsRepository } from "../../data/repositories";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
+import { buildMaterialRequest, nextMaterialRequestNumber } from "../../utils/materialRequests";
 
 interface WorkerMaterialModalProps {
   open: boolean;
@@ -47,26 +48,22 @@ export function WorkerMaterialModal({ open, onClose, defaultWorkId = null }: Wor
     const qty = Number(quantity);
     if (!employee || !materialName.trim() || !qty || qty <= 0 || submitting) return;
     setSubmitting(true);
-    const nextNumber = requests.length > 0 ? Math.max(...requests.map((r) => r.number)) + 1 : 1;
-    const today = new Date().toISOString().slice(0, 10);
     const relatedWork = brigadeWorks.find((w) => w.id === workId);
     const noteWithTask = relatedWork ? [`${s.problemModalTask}: ${relatedWork.title}`, note].filter(Boolean).join(" — ") : note;
-    await materialRequestsRepository.create({
-      id: `req-${Date.now()}`,
-      number: nextNumber,
-      documentNumber: `3-${new Date().getFullYear()}-${String(nextNumber).padStart(3, "0")}`,
-      date: today,
-      materialName: materialName.trim(),
-      quantity: qty,
-      unit,
-      objectName: object?.name ?? "—",
-      brigadeName: brigade?.name ?? "—",
-      requestedBy: employee.fullName,
-      status: "new",
-      note: noteWithTask,
-      createdDate: new Date().toISOString(),
-      createdBy: employee.fullName,
-    });
+    await materialRequestsRepository.create(
+      buildMaterialRequest(
+        {
+          materialName: materialName.trim(),
+          quantity: qty,
+          unit,
+          objectName: object?.name ?? "—",
+          brigadeName: brigade?.name ?? "—",
+          requestedBy: employee.fullName,
+          note: noteWithTask,
+        },
+        nextMaterialRequestNumber(requests),
+      ),
+    );
     setSubmitting(false);
     showToast(s.toastMaterialRequested, "success");
     reset();

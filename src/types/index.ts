@@ -223,6 +223,17 @@ export interface Employee {
   shift: WorkShift;
   status: EmployeeStatus;
   assignedDate: string;
+  /** Personnel-record fields — optional because only a handful of featured employees (so far
+   * just employee-1, the worker demo account) have them seeded; the other ~130 generated staff
+   * rows don't need them for anything currently in the app. */
+  birthDate?: string;
+  address?: string;
+  passportNumber?: string;
+  hiredAt?: string;
+  currentSection?: string;
+  emergencyContact?: string;
+  skills?: string[];
+  avatarUrl?: string | null;
 }
 
 export interface CompositionChange {
@@ -732,7 +743,19 @@ export type PayrollRole = "accountant" | "owner" | "prorab";
 // reports, messages to the Прораб, and photo reports.
 // ---------------------------------------------------------------------------
 
-export type WorkerNotificationType = "task_assigned" | "materials_delivered" | "task_completed" | "task_review" | "problem_update" | "schedule_change";
+export type WorkerNotificationType =
+  | "task_assigned"
+  | "materials_delivered"
+  | "task_completed"
+  | "task_review"
+  | "problem_update"
+  | "schedule_change"
+  | "photo_report_approved"
+  | "photo_report_rejected"
+  | "reminder"
+  | "system";
+
+export type WorkerNotificationPriority = "normal" | "important" | "system";
 
 export interface WorkerNotification {
   id: string;
@@ -742,7 +765,10 @@ export interface WorkerNotification {
   description: string;
   date: string;
   read: boolean;
+  priority: WorkerNotificationPriority;
   relatedWorkId: string | null;
+  relatedPhotoReportId: string | null;
+  relatedMaterialRequestId: string | null;
 }
 
 export type WorkerDocumentType = "pdf" | "spreadsheet" | "drawing" | "image";
@@ -755,6 +781,20 @@ export interface WorkerDocument {
   fileType: WorkerDocumentType;
   sizeLabel: string;
   uploadedDate: string;
+}
+
+export type EmployeeDocumentType = "identity" | "safetyInstruction" | "contract";
+
+/** Personnel/HR documents tied to one employee (ID card, safety-training certificate, contract) —
+ * a distinct real concept from WorkerDocument above, which is project/object-scoped paperwork. */
+export interface EmployeeDocument {
+  id: string;
+  employeeId: string;
+  type: EmployeeDocumentType;
+  title: string;
+  fileName: string;
+  uploadedDate: string;
+  validUntil: string | null;
 }
 
 export type ProblemReportPriority = "low" | "medium" | "high";
@@ -782,6 +822,8 @@ export interface WorkerMessage {
   createdDate: string;
 }
 
+export type PhotoReportStatus = "pending" | "approved" | "rejected";
+
 export interface PhotoReport {
   id: string;
   employeeId: string;
@@ -789,7 +831,21 @@ export interface PhotoReport {
   workId: string;
   workTitle: string;
   objectName: string;
-  imageUrl: string;
+  sectionName: string;
+  images: string[];
   comment: string;
+  status: PhotoReportStatus;
+  reviewerComment: string | null;
+  createdDate: string;
+}
+
+/** A prorab's note on a specific PhotoReport — the review-side counterpart to the worker→prorab
+ * WorkerMessage channel above, which only flows the other direction. */
+export interface PhotoReportComment {
+  id: string;
+  photoReportId: string;
+  authorName: string;
+  authorRole: "prorab";
+  text: string;
   createdDate: string;
 }

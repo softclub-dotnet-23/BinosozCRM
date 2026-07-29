@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, X } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -7,6 +7,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useToast } from "../../hooks/useToast";
 import { useWorkerScope } from "../../utils/workerAccess";
 import { photoReportsRepository } from "../../data/repositories";
+import { buildPhotoReport } from "../../utils/photoReports";
 
 interface WorkerPhotoReportModalProps {
   open: boolean;
@@ -27,39 +28,43 @@ export function WorkerPhotoReportModal({ open, onClose, defaultWorkId = null }: 
 
   const [workId, setWorkId] = useState<string>(defaultWorkId ?? "");
   const [comment, setComment] = useState("");
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   function reset() {
     setWorkId(defaultWorkId ?? "");
     setComment("");
-    setImageDataUrl(null);
+    setImages([]);
     if (fileRef.current) fileRef.current.value = "";
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setImageDataUrl(typeof reader.result === "string" ? reader.result : null);
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files ?? []);
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") setImages((prev) => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   async function handleSubmit() {
     const work = brigadeWorks.find((w) => w.id === workId);
-    if (!employee || !work || !imageDataUrl || submitting) return;
+    if (!employee || !work || images.length === 0 || submitting) return;
     setSubmitting(true);
-    await photoReportsRepository.create({
-      id: `photo-${Date.now()}`,
-      employeeId: employee.id,
-      employeeName: employee.fullName,
-      workId: work.id,
-      workTitle: work.title,
-      objectName: object?.name ?? work.objectName,
-      imageUrl: imageDataUrl,
-      comment: comment.trim(),
-      createdDate: new Date().toISOString(),
-    });
+    await photoReportsRepository.create(
+      buildPhotoReport({
+        employeeId: employee.id,
+        employeeName: employee.fullName,
+        workId: work.id,
+        workTitle: work.title,
+        objectName: object?.name ?? work.objectName,
+        sectionName: work.sectionName,
+        images,
+        comment: comment.trim(),
+      }),
+    );
     setSubmitting(false);
     showToast(s.toastPhotoSubmitted, "success");
     reset();
@@ -80,7 +85,7 @@ export function WorkerPhotoReportModal({ open, onClose, defaultWorkId = null }: 
           <Button variant="outline" onClick={onClose}>
             {strings.common.cancelLabel}
           </Button>
-          <Button onClick={handleSubmit} disabled={!workId || !imageDataUrl || submitting}>
+          <Button onClick={handleSubmit} disabled={!workId || images.length === 0 || submitting}>
             {s.photoModalSubmit}
           </Button>
         </>
@@ -108,12 +113,33 @@ export function WorkerPhotoReportModal({ open, onClose, defaultWorkId = null }: 
 
         <div>
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">{s.photoModalImage}</span>
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="worker-photo-file" />
-          {imageDataUrl ? (
-            <button type="button" onClick={() => fileRef.current?.click()} className="block w-full overflow-hidden rounded-[10px] border border-border">
-              <img src={imageDataUrl} alt="" className="h-40 w-full object-cover" />
-            </button>
-          ) : (
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" id="worker-photo-file" />
+          {images.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {images.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt="" className="h-16 w-16 rounded-lg border border-border object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                    aria-label={strings.common.cancelLabel}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-ink text-white"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                aria-label={s.actionUploadPhoto}
+                className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-border-strong text-ink-secondary hover:bg-surface-2"
+              >
+                <ImagePlus size={18} />
+              </button>
+            </div>
+          )}
+          {images.length === 0 && (
             <button
               type="button"
               onClick={() => fileRef.current?.click()}

@@ -396,11 +396,53 @@ export interface AppStrings {
     shortSummaryTitle: string; shortSummaryObject: string; shortSummaryProrab: string; shortSummaryNextCheck: string; shortSummaryActiveTasks: string; contactProrabButton: string;
     emptyAttendance: string; thisMonth: string; lastSevenDays: string; lastThirtyDays: string;
     schedulePageTitle: string; schedulePageSubtitle: string;
+    kpiWorkdaysTitle: string; kpiWorkdaysFooter: string; kpiTodayShiftTitle: string; kpiTodayShiftFooter: string;
+    kpiNextDayOffTitle: string; kpiNextDayOffFooter: (days: number) => string; kpiWorkedHoursTitle: string; kpiWorkedHoursFooter: string;
+    calendarShiftsTitle: string; legendWorkday: string; legendDayOff: string; legendOvertime: string; legendBriefing: string;
+    weekScheduleTitle: string; weekScheduleColDay: string; weekScheduleColDate: string; weekScheduleColTime: string; weekScheduleColStatus: string; weekScheduleColObject: string;
+    statusFullShift: string; statusShortShift: string;
+    upcomingEventsTitle: string; hoursWorkedTitle: string; planHoursLabel: string; overtimeHoursLabel: string;
+    monthSummaryTitle: string; summaryWorkdays: string; summaryDaysOff: string; summaryOvertime: string; summaryAvgAttendance: string;
     materialsPageTitle: string; materialsPageSubtitle: string; materialsRequestButton: string; materialsColMaterial: string; materialsColQty: string; materialsColStatus: string; materialsColDate: string; emptyMaterialRequests: string;
-    photoReportsPageTitle: string; photoReportsPageSubtitle: string; photoReportsNewButton: string; emptyPhotoReports: string;
+    materialsTabAvailable: string; materialsTabMyRequests: string; materialsTabHistory: string;
+    materialsKpiTotalTitle: string; materialsKpiAvailableTitle: string; materialsKpiReservedTitle: string; materialsKpiExpectedTitle: string; materialsKpiFooter: (amount: string) => string; materialsUnitsSuffix: string; materialsCurrencySuffix: string;
+    materialsSearchPlaceholder: string; materialsAllCategories: string; materialsUnitFilterPlaceholder: string; materialsAvailabilityFilterLabel: string; materialsAllAvailability: string; materialsResetFilters: string;
+    materialsColCategory: string; materialsColUnit: string; materialsColInStock: string; materialsColReserved: string; materialsColAvailable: string; materialsColPrice: string;
+    materialsResultsSummary: (from: number, to: number, total: number) => string;
+    emptyMaterialsSearch: string; emptyMaterialsSearchDescription: string; emptyMaterialRequestsHistory: string;
+    materialsRequestCardTitle: string; materialsRequestMaterialPlaceholder: string; materialsRequestQtyPlaceholder: string; materialsRequestUnitPlaceholder: string; materialsRequestCommentPlaceholder: string;
+    materialsErrorMaterialRequired: string; materialsErrorQtyRequired: string;
+    categoryStockTitle: string; categoryStockCollapseAction: string;
+    recentRequestsTitle: string; recentRequestsAllAction: string;
+    photoReportsPageTitle: string; photoReportsPageSubtitle: string; photoReportsNewButton: string; emptyPhotoReports: string; photoReportsCardTitle: string;
+    photoKpiUploadedTitle: string; photoKpiUploadedFooter: string; photoKpiTodayTitle: string; photoKpiTodayFooter: string;
+    photoKpiPendingTitle: string; photoKpiPendingFooter: string; photoKpiApprovedTitle: string; photoKpiApprovedFooter: string;
+    photoStatusPending: string; photoStatusApproved: string; photoStatusRejected: string;
+    photoFilterAll: string; photoFilterToday: string; photoFilterAllWorks: string; photoUploadButton: string;
+    photoResultsSummary: (from: number, to: number, total: number) => string; photoViewAction: string;
+    emptyPhotoReportsFiltered: string; emptyPhotoReportsFilteredDescription: string; photoReviewerCommentLabel: string;
+    photoUploadCardTitle: string; photoDropzoneTitle: string; photoDropzoneSubtitle: string;
+    photoUploadWorkLabel: string; photoUploadWorkPlaceholder: string; photoUploadObjectLabel: string; photoUploadObjectPlaceholder: string;
+    photoErrorMaxImages: string; photoErrorFileType: string; photoErrorFileSize: string; photoErrorWorkRequired: string; photoErrorImagesRequired: string;
+    photoActivityTitle: string; photoActivityUploaded: string; photoActivityApproved: string;
+    photoCommentsTitle: string; photoCommentsToday: string; photoCommentsYesterday: string;
+    photoSummaryTitle: string; photoSummaryTotalTasks: string; photoSummaryPendingPhotos: string; photoSummaryNextCheck: string; photoSummaryRemarks: string; photoSummaryGoToTasks: string;
+    photoQuickActionsTitle: string; photoActionTakePhoto: string; photoActionChooseGallery: string; photoActionMyTasks: string; photoActionContactProrab: string;
     notificationsPageTitle: string; notificationsPageSubtitle: string; markAllRead: string;
     documentsPageTitle: string; documentsPageSubtitle: string;
     profilePageTitle: string; profilePageSubtitle: string; profileBrigade: string; profileObject: string; profileSpecialty: string; profileGrade: string; profilePhone: string;
+    profileStatusActive: string; profileStatusInactive: string; profileEditButton: string; profileChangePhotoButton: string; profileSaveButton: string;
+    profileErrorFirstNameRequired: string; profileErrorLastNameRequired: string; profileErrorPhoneInvalid: string; profileErrorEmailInvalid: string;
+    profileToastUpdated: string; profileToastPhotoUpdated: string;
+    profileFieldFirstName: string; profileFieldLastName: string; profileFieldEmail: string; profileFieldAddress: string; profileFieldEmergencyContact: string;
+    profileFieldBirthDate: string; profileFieldPassport: string; profileFieldHiredAt: string; profileFieldSection: string; profileFieldExperience: string; profileFieldForeman: string;
+    profileProfessionalInfoTitle: string; profilePersonalInfoTitle: string; profileSkillsTitle: string;
+    profileGradeValue: (grade: number) => string; profileYearsValue: (years: number) => string;
+    profileStatsTitle: string; profileStatsTotalLabel: string; profileStatCompletedTasks: string; profileStatPhotoReports: string; profileStatRemarks: string; profileStatAttendance: string;
+    profileActivityTitle: string; profileActivityAttendance: string; profileActivityPhoto: string; profileActivityMaterials: string; profileActivityTask: string;
+    profileSettingsTitle: string; profileSettingPush: string; profileSettingSms: string; profileSettingTelegram: string; profileSettingVisibility: string; profileSettingLanguage: string;
+    profileDocumentsTitle: string; profileDocumentValidUntil: (date: string) => string; profileDocumentUploaded: string; profileDocumentOpenButton: string; profileDocumentOpened: string; profileDocumentMissing: string;
+    profileKpiExperienceTitle: string; profileKpiTasksTitle: string; profileKpiTasksFooter: string; profileKpiHoursTitle: string; profileKpiHoursFooter: string; profileKpiAttendanceTitle: string; profileKpiAttendanceFooter: string;
     materialStatusNew: string; materialStatusApproved: string; materialStatusInTransit: string; materialStatusIssued: string; materialStatusRejected: string;
     kpiTotalTasksTitle: string; kpiReviewTitle: string; kpiReviewFooter: string; kpiOverdueTitle: string; kpiOverdueFooter: string;
     filterButton: string; sortByPriorityOption: string; sortByDueDate: string; sortByProgress: string; sortNewest: string; sortOldest: string;
@@ -1001,12 +1043,54 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       remindersTitle: "Напоминания", emptyReminders: "Нет напоминаний",
       shortSummaryTitle: "Краткая сводка", shortSummaryObject: "Объект", shortSummaryProrab: "Прораб", shortSummaryNextCheck: "Следующий рабочий день", shortSummaryActiveTasks: "Активных задач", contactProrabButton: "Связаться с прорабом",
       emptyAttendance: "Нет записей за выбранный период", thisMonth: "Текущий месяц", lastSevenDays: "Последние 7 дней", lastThirtyDays: "Последние 30 дней",
-      schedulePageTitle: "График", schedulePageSubtitle: "Ваши задачи по дням",
-      materialsPageTitle: "Материалы", materialsPageSubtitle: "Ваши заявки на материалы", materialsRequestButton: "Запросить материал", materialsColMaterial: "Материал", materialsColQty: "Количество", materialsColStatus: "Статус", materialsColDate: "Дата", emptyMaterialRequests: "Нет заявок на материалы",
-      photoReportsPageTitle: "Фотоотчёт", photoReportsPageSubtitle: "Ваши фотоотчёты по задачам", photoReportsNewButton: "Новый фотоотчёт", emptyPhotoReports: "Пока нет фотоотчётов",
+      schedulePageTitle: "График", schedulePageSubtitle: "Мои смены, рабочее время и план на неделю",
+      kpiWorkdaysTitle: "Рабочих дней", kpiWorkdaysFooter: "в этом месяце", kpiTodayShiftTitle: "Сегодня", kpiTodayShiftFooter: "текущая смена",
+      kpiNextDayOffTitle: "Следующий выходной", kpiNextDayOffFooter: (days) => (days <= 0 ? "сегодня" : `через ${days} ${days === 1 ? "день" : days < 5 ? "дня" : "дней"}`), kpiWorkedHoursTitle: "Отработано", kpiWorkedHoursFooter: "за этот месяц",
+      calendarShiftsTitle: "Календарь смен", legendWorkday: "Рабочий день", legendDayOff: "Выходной", legendOvertime: "Сверхурочно", legendBriefing: "Планёрка",
+      weekScheduleTitle: "График на неделю", weekScheduleColDay: "День", weekScheduleColDate: "Дата", weekScheduleColTime: "Время", weekScheduleColStatus: "Статус", weekScheduleColObject: "Объект",
+      statusFullShift: "Рабочая смена", statusShortShift: "Сокращённый день",
+      upcomingEventsTitle: "Ближайшие события", hoursWorkedTitle: "Отработанные часы", planHoursLabel: "План", overtimeHoursLabel: "Сверхурочно",
+      monthSummaryTitle: "Сводка за месяц", summaryWorkdays: "Рабочих дней", summaryDaysOff: "Выходных", summaryOvertime: "Сверхурочно", summaryAvgAttendance: "Средняя явка",
+      materialsPageTitle: "Материалы", materialsPageSubtitle: "Материалы на объекте и ваши заявки", materialsRequestButton: "Запросить материал", materialsColMaterial: "Материал", materialsColQty: "Количество", materialsColStatus: "Статус", materialsColDate: "Дата", emptyMaterialRequests: "Нет заявок на материалы",
+      materialsTabAvailable: "Доступные материалы", materialsTabMyRequests: "Мои заявки", materialsTabHistory: "История",
+      materialsKpiTotalTitle: "Всего на складе", materialsKpiAvailableTitle: "Доступно", materialsKpiReservedTitle: "В резерве", materialsKpiExpectedTitle: "Ожидается", materialsKpiFooter: (amount) => `на сумму ${amount} сом.`, materialsUnitsSuffix: "ед.", materialsCurrencySuffix: "сом.",
+      materialsSearchPlaceholder: "Поиск материала...", materialsAllCategories: "Все категории", materialsUnitFilterPlaceholder: "Ед. изм.", materialsAvailabilityFilterLabel: "В наличии", materialsAllAvailability: "Все материалы", materialsResetFilters: "Сбросить",
+      materialsColCategory: "Категория", materialsColUnit: "Ед. изм.", materialsColInStock: "В наличии", materialsColReserved: "Резерв", materialsColAvailable: "Доступно", materialsColPrice: "Цена",
+      materialsResultsSummary: (from, to, total) => `Показано ${from}–${to} из ${total} материалов`,
+      emptyMaterialsSearch: "Материалы не найдены", emptyMaterialsSearchDescription: "Попробуйте изменить параметры поиска или сбросить фильтры", emptyMaterialRequestsHistory: "История заявок пуста",
+      materialsRequestCardTitle: "Запросить материал", materialsRequestMaterialPlaceholder: "Выберите материал", materialsRequestQtyPlaceholder: "Количество", materialsRequestUnitPlaceholder: "Единица измерения", materialsRequestCommentPlaceholder: "Комментарий (необязательно)",
+      materialsErrorMaterialRequired: "Выберите материал", materialsErrorQtyRequired: "Укажите количество больше нуля",
+      categoryStockTitle: "Остатки по категориям", categoryStockCollapseAction: "Свернуть",
+      recentRequestsTitle: "Последние заявки", recentRequestsAllAction: "Все заявки",
+      photoReportsPageTitle: "Фотоотчёт", photoReportsPageSubtitle: "Фотографии выполненных работ, этапов и замечаний", photoReportsNewButton: "Новый фотоотчёт", emptyPhotoReports: "Пока нет фотоотчётов", photoReportsCardTitle: "Мои фотоотчёты",
+      photoKpiUploadedTitle: "Загружено фото", photoKpiUploadedFooter: "за этот месяц", photoKpiTodayTitle: "Сегодня", photoKpiTodayFooter: "новых фото",
+      photoKpiPendingTitle: "На проверке", photoKpiPendingFooter: "ожидают подтверждения", photoKpiApprovedTitle: "Одобрено", photoKpiApprovedFooter: "подтверждено прорабом",
+      photoStatusPending: "На проверке", photoStatusApproved: "Одобрено", photoStatusRejected: "Отклонено",
+      photoFilterAll: "Все", photoFilterToday: "Сегодня", photoFilterAllWorks: "Все работы", photoUploadButton: "Загрузить фото",
+      photoResultsSummary: (from, to, total) => `Показано ${from}–${to} из ${total} фотоотчётов`, photoViewAction: "Просмотреть",
+      emptyPhotoReportsFiltered: "Фотоотчёты не найдены", emptyPhotoReportsFilteredDescription: "Измените фильтры или загрузите новый фотоотчёт", photoReviewerCommentLabel: "Комментарий прораба",
+      photoUploadCardTitle: "Загрузить отчёт", photoDropzoneTitle: "Перетащите фото сюда", photoDropzoneSubtitle: "или нажмите для выбора",
+      photoUploadWorkLabel: "Работа", photoUploadWorkPlaceholder: "Выберите работу", photoUploadObjectLabel: "Объект", photoUploadObjectPlaceholder: "Определяется по работе",
+      photoErrorMaxImages: "Можно прикрепить не более 10 фото", photoErrorFileType: "Поддерживаются только JPG, PNG и WEBP", photoErrorFileSize: "Размер файла не должен превышать 10 МБ", photoErrorWorkRequired: "Выберите работу", photoErrorImagesRequired: "Добавьте хотя бы одно фото",
+      photoActivityTitle: "Активность по фотоотчётам", photoActivityUploaded: "Загружено", photoActivityApproved: "Одобрено",
+      photoCommentsTitle: "Последние комментарии", photoCommentsToday: "Сегодня", photoCommentsYesterday: "Вчера",
+      photoSummaryTitle: "Краткая сводка", photoSummaryTotalTasks: "Всего задач", photoSummaryPendingPhotos: "Фото к сдаче", photoSummaryNextCheck: "Следующая проверка", photoSummaryRemarks: "Замечания", photoSummaryGoToTasks: "Перейти к задачам",
+      photoQuickActionsTitle: "Быстрые действия", photoActionTakePhoto: "Сделать фото", photoActionChooseGallery: "Выбрать из галереи", photoActionMyTasks: "Мои задачи", photoActionContactProrab: "Связаться с прорабом",
       notificationsPageTitle: "Уведомления", notificationsPageSubtitle: "Все ваши уведомления", markAllRead: "Отметить все как прочитанные",
       documentsPageTitle: "Мои документы", documentsPageSubtitle: "Документы по вашему объекту",
-      profilePageTitle: "Профиль", profilePageSubtitle: "Ваши личные данные", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Специальность", profileGrade: "Разряд", profilePhone: "Телефон",
+      profilePageTitle: "Профиль", profilePageSubtitle: "Личные данные, настройки и информация о работнике", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Специализация", profileGrade: "Разряд", profilePhone: "Телефон",
+      profileStatusActive: "Активен", profileStatusInactive: "Неактивен", profileEditButton: "Редактировать профиль", profileChangePhotoButton: "Изменить фото", profileSaveButton: "Сохранить изменения",
+      profileErrorFirstNameRequired: "Укажите имя", profileErrorLastNameRequired: "Укажите фамилию", profileErrorPhoneInvalid: "Введите корректный номер телефона", profileErrorEmailInvalid: "Введите корректный email",
+      profileToastUpdated: "Профиль обновлён", profileToastPhotoUpdated: "Фото профиля обновлено",
+      profileFieldFirstName: "Имя", profileFieldLastName: "Фамилия", profileFieldEmail: "Email", profileFieldAddress: "Адрес", profileFieldEmergencyContact: "Экстренный контакт",
+      profileFieldBirthDate: "Дата рождения", profileFieldPassport: "Паспорт/ID", profileFieldHiredAt: "Дата найма", profileFieldSection: "Текущая секция", profileFieldExperience: "Опыт в строительстве", profileFieldForeman: "Прораб",
+      profileProfessionalInfoTitle: "Профессиональная информация", profilePersonalInfoTitle: "Личная информация", profileSkillsTitle: "Навыки",
+      profileGradeValue: (grade) => `${grade} разряд`, profileYearsValue: (years) => `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`,
+      profileStatsTitle: "Статистика профиля", profileStatsTotalLabel: "всего", profileStatCompletedTasks: "Завершено задач", profileStatPhotoReports: "Фотоотчёты", profileStatRemarks: "Замечания", profileStatAttendance: "Средняя явка",
+      profileActivityTitle: "Последняя активность", profileActivityAttendance: "Посещаемость отмечена", profileActivityPhoto: "Фотоотчёт загружен", profileActivityMaterials: "Запрошены материалы", profileActivityTask: "Задача завершена",
+      profileSettingsTitle: "Настройки", profileSettingPush: "Push-уведомления", profileSettingSms: "SMS-уведомления", profileSettingTelegram: "Telegram-уведомления", profileSettingVisibility: "Видимость профиля", profileSettingLanguage: "Язык интерфейса",
+      profileDocumentsTitle: "Документы и доступ", profileDocumentValidUntil: (date) => `Действует до ${date}`, profileDocumentUploaded: "Загружено", profileDocumentOpenButton: "Открыть", profileDocumentOpened: "Документ открыт", profileDocumentMissing: "Документ не загружен",
+      profileKpiExperienceTitle: "Стаж", profileKpiTasksTitle: "Мои задачи", profileKpiTasksFooter: "Активных задач", profileKpiHoursTitle: "Отработано часов", profileKpiHoursFooter: "За этот месяц", profileKpiAttendanceTitle: "Средняя явка", profileKpiAttendanceFooter: "За последний месяц",
       materialStatusNew: "Новая", materialStatusApproved: "Одобрена", materialStatusInTransit: "В пути", materialStatusIssued: "Выдана", materialStatusRejected: "Отклонена",
       kpiTotalTasksTitle: "Всего задач", kpiReviewTitle: "На проверке", kpiReviewFooter: "Ожидают проверки", kpiOverdueTitle: "Просрочено", kpiOverdueFooter: "Просроченных задач",
       filterButton: "Фильтр", sortByPriorityOption: "По приоритету", sortByDueDate: "По сроку", sortByProgress: "По прогрессу", sortNewest: "Сначала новые", sortOldest: "Сначала старые",
@@ -1621,12 +1705,54 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       remindersTitle: "Ёдоварӣ", emptyReminders: "Ёдоварӣ нест",
       shortSummaryTitle: "Хулосаи мухтасар", shortSummaryObject: "Объект", shortSummaryProrab: "Прораб", shortSummaryNextCheck: "Рӯзи кории оянда", shortSummaryActiveTasks: "Корҳои фаъол", contactProrabButton: "Бо прораб тамос гирифтан",
       emptyAttendance: "Барои давраи интихобшуда сабт нест", thisMonth: "Моҳи ҷорӣ", lastSevenDays: "7 рӯзи охир", lastThirtyDays: "30 рӯзи охир",
-      schedulePageTitle: "Ҷадвал", schedulePageSubtitle: "Корҳои шумо аз рӯи рӯзҳо",
-      materialsPageTitle: "Маводҳо", materialsPageSubtitle: "Дархостҳои маводи шумо", materialsRequestButton: "Мавод дархост кардан", materialsColMaterial: "Мавод", materialsColQty: "Миқдор", materialsColStatus: "Ҳолат", materialsColDate: "Сана", emptyMaterialRequests: "Дархости мавод нест",
-      photoReportsPageTitle: "Ҳисоботи фотоӣ", photoReportsPageSubtitle: "Ҳисоботҳои фотоии шумо аз рӯи корҳо", photoReportsNewButton: "Ҳисоботи нав", emptyPhotoReports: "Ҳанӯз ҳисоботи фотоӣ нест",
+      schedulePageTitle: "Ҷадвал", schedulePageSubtitle: "Сменаҳо, вақти корӣ ва нақшаи ҳафта",
+      kpiWorkdaysTitle: "Рӯзҳои корӣ", kpiWorkdaysFooter: "дар ин моҳ", kpiTodayShiftTitle: "Имрӯз", kpiTodayShiftFooter: "смени ҷорӣ",
+      kpiNextDayOffTitle: "Истироҳати оянда", kpiNextDayOffFooter: (days) => (days <= 0 ? "имрӯз" : `баъди ${days} рӯз`), kpiWorkedHoursTitle: "Кор карда шуд", kpiWorkedHoursFooter: "дар ин моҳ",
+      calendarShiftsTitle: "Тақвими сменаҳо", legendWorkday: "Рӯзи корӣ", legendDayOff: "Истироҳат", legendOvertime: "Кори иловагӣ", legendBriefing: "Ҷаласа",
+      weekScheduleTitle: "Ҷадвал барои ҳафта", weekScheduleColDay: "Рӯз", weekScheduleColDate: "Сана", weekScheduleColTime: "Вақт", weekScheduleColStatus: "Ҳолат", weekScheduleColObject: "Объект",
+      statusFullShift: "Смени корӣ", statusShortShift: "Рӯзи кӯтоҳ",
+      upcomingEventsTitle: "Рӯйдодҳои наздик", hoursWorkedTitle: "Соатҳои коркард", planHoursLabel: "Нақша", overtimeHoursLabel: "Кори иловагӣ",
+      monthSummaryTitle: "Ҳисоботи моҳ", summaryWorkdays: "Рӯзҳои корӣ", summaryDaysOff: "Рӯзҳои истироҳат", summaryOvertime: "Кори иловагӣ", summaryAvgAttendance: "Ҳозиршавии миёна",
+      materialsPageTitle: "Маводҳо", materialsPageSubtitle: "Маводҳо дар объект ва дархостҳои шумо", materialsRequestButton: "Мавод дархост кардан", materialsColMaterial: "Мавод", materialsColQty: "Миқдор", materialsColStatus: "Ҳолат", materialsColDate: "Сана", emptyMaterialRequests: "Дархости мавод нест",
+      materialsTabAvailable: "Маводҳои дастрас", materialsTabMyRequests: "Дархостҳои ман", materialsTabHistory: "Таърих",
+      materialsKpiTotalTitle: "Ҳамагӣ дар анбор", materialsKpiAvailableTitle: "Дастрас", materialsKpiReservedTitle: "Дар захира", materialsKpiExpectedTitle: "Интизорӣ", materialsKpiFooter: (amount) => `ба маблағи ${amount} сом.`, materialsUnitsSuffix: "адад", materialsCurrencySuffix: "сом.",
+      materialsSearchPlaceholder: "Ҷустуҷӯи мавод...", materialsAllCategories: "Ҳамаи категорияҳо", materialsUnitFilterPlaceholder: "Воҳиди ченак", materialsAvailabilityFilterLabel: "Дар дастрасӣ", materialsAllAvailability: "Ҳамаи маводҳо", materialsResetFilters: "Тоза кардан",
+      materialsColCategory: "Категория", materialsColUnit: "Воҳиди ченак", materialsColInStock: "Дар анбор", materialsColReserved: "Захира", materialsColAvailable: "Дастрас", materialsColPrice: "Нарх",
+      materialsResultsSummary: (from, to, total) => `Нишон дода шуд ${from}–${to} аз ${total} мавод`,
+      emptyMaterialsSearch: "Мавод ёфт нашуд", emptyMaterialsSearchDescription: "Параметрҳои ҷустуҷӯро тағир диҳед ё филтрҳоро тоза кунед", emptyMaterialRequestsHistory: "Таърихи дархостҳо холӣ аст",
+      materialsRequestCardTitle: "Мавод дархост кардан", materialsRequestMaterialPlaceholder: "Маводро интихоб кунед", materialsRequestQtyPlaceholder: "Миқдор", materialsRequestUnitPlaceholder: "Воҳиди ченак", materialsRequestCommentPlaceholder: "Шарҳ (ихтиёрӣ)",
+      materialsErrorMaterialRequired: "Маводро интихоб кунед", materialsErrorQtyRequired: "Миқдори аз сифр зиёдро нишон диҳед",
+      categoryStockTitle: "Мондаҳо аз рӯи категорияҳо", categoryStockCollapseAction: "Пинҳон кардан",
+      recentRequestsTitle: "Дархостҳои охирин", recentRequestsAllAction: "Ҳамаи дархостҳо",
+      photoReportsPageTitle: "Ҳисоботи фотоӣ", photoReportsPageSubtitle: "Суратҳои корҳои иҷрошуда, марҳилаҳо ва мулоҳизаҳо", photoReportsNewButton: "Ҳисоботи нав", emptyPhotoReports: "Ҳанӯз ҳисоботи фотоӣ нест", photoReportsCardTitle: "Ҳисоботҳои фотоии ман",
+      photoKpiUploadedTitle: "Сурат бор карда шуд", photoKpiUploadedFooter: "дар ин моҳ", photoKpiTodayTitle: "Имрӯз", photoKpiTodayFooter: "суратҳои нав",
+      photoKpiPendingTitle: "Дар тафтиш", photoKpiPendingFooter: "интизори тасдиқ", photoKpiApprovedTitle: "Тасдиқшуда", photoKpiApprovedFooter: "аз ҷониби прораб тасдиқ шуд",
+      photoStatusPending: "Дар тафтиш", photoStatusApproved: "Тасдиқшуда", photoStatusRejected: "Радшуда",
+      photoFilterAll: "Ҳама", photoFilterToday: "Имрӯз", photoFilterAllWorks: "Ҳамаи корҳо", photoUploadButton: "Сурат бор кардан",
+      photoResultsSummary: (from, to, total) => `Нишон дода шуд ${from}–${to} аз ${total} ҳисобот`, photoViewAction: "Дидан",
+      emptyPhotoReportsFiltered: "Ҳисобот ёфт нашуд", emptyPhotoReportsFilteredDescription: "Филтрҳоро тағир диҳед ё ҳисоботи нав бор кунед", photoReviewerCommentLabel: "Шарҳи прораб",
+      photoUploadCardTitle: "Ҳисобот бор кардан", photoDropzoneTitle: "Суратҳоро ба ин ҷо кашед", photoDropzoneSubtitle: "ё барои интихоб клик кунед",
+      photoUploadWorkLabel: "Кор", photoUploadWorkPlaceholder: "Корро интихоб кунед", photoUploadObjectLabel: "Объект", photoUploadObjectPlaceholder: "Аз рӯи кор муайян мешавад",
+      photoErrorMaxImages: "На бештар аз 10 сурат", photoErrorFileType: "Танҳо JPG, PNG ва WEBP дастгирӣ мешаванд", photoErrorFileSize: "Андозаи файл набояд аз 10 МБ зиёд бошад", photoErrorWorkRequired: "Корро интихоб кунед", photoErrorImagesRequired: "Ҳадди ақал як сурат илова кунед",
+      photoActivityTitle: "Фаъолият аз рӯи ҳисоботҳо", photoActivityUploaded: "Бор карда шуд", photoActivityApproved: "Тасдиқшуда",
+      photoCommentsTitle: "Шарҳҳои охирин", photoCommentsToday: "Имрӯз", photoCommentsYesterday: "Дирӯз",
+      photoSummaryTitle: "Хулосаи мухтасар", photoSummaryTotalTasks: "Ҳамагӣ корҳо", photoSummaryPendingPhotos: "Сурат лозим аст", photoSummaryNextCheck: "Тафтиши навбатӣ", photoSummaryRemarks: "Мулоҳизаҳо", photoSummaryGoToTasks: "Гузаштан ба корҳо",
+      photoQuickActionsTitle: "Амалҳои зуд", photoActionTakePhoto: "Сурат гирифтан", photoActionChooseGallery: "Аз галерея интихоб кардан", photoActionMyTasks: "Корҳои ман", photoActionContactProrab: "Бо прораб тамос гирифтан",
       notificationsPageTitle: "Огоҳиномаҳо", notificationsPageSubtitle: "Ҳамаи огоҳиномаҳои шумо", markAllRead: "Ҳамаро хондашуда қайд кардан",
       documentsPageTitle: "Ҳуҷҷатҳои ман", documentsPageSubtitle: "Ҳуҷҷатҳо оид ба объекти шумо",
-      profilePageTitle: "Профил", profilePageSubtitle: "Маълумоти шахсии шумо", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Ихтисос", profileGrade: "Дараҷа", profilePhone: "Телефон",
+      profilePageTitle: "Профил", profilePageSubtitle: "Маълумоти шахсӣ, танзимот ва иттилоот дар бораи корманд", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Ихтисос", profileGrade: "Дараҷа", profilePhone: "Телефон",
+      profileStatusActive: "Фаъол", profileStatusInactive: "Ғайрифаъол", profileEditButton: "Профилро таҳрир кардан", profileChangePhotoButton: "Суратро иваз кардан", profileSaveButton: "Тағиротро нигоҳ доштан",
+      profileErrorFirstNameRequired: "Номро нишон диҳед", profileErrorLastNameRequired: "Насабро нишон диҳед", profileErrorPhoneInvalid: "Рақами телефони дурустро ворид кунед", profileErrorEmailInvalid: "Email-и дурустро ворид кунед",
+      profileToastUpdated: "Профил нав карда шуд", profileToastPhotoUpdated: "Суратҳи профил нав карда шуд",
+      profileFieldFirstName: "Ном", profileFieldLastName: "Насаб", profileFieldEmail: "Email", profileFieldAddress: "Суроға", profileFieldEmergencyContact: "Тамоси фавқулодда",
+      profileFieldBirthDate: "Санаи таваллуд", profileFieldPassport: "Шиноснома/ID", profileFieldHiredAt: "Санаи қабул ба кор", profileFieldSection: "Секцияи ҷорӣ", profileFieldExperience: "Таҷриба дар сохтмон", profileFieldForeman: "Прораб",
+      profileProfessionalInfoTitle: "Маълумоти касбӣ", profilePersonalInfoTitle: "Маълумоти шахсӣ", profileSkillsTitle: "Малакаҳо",
+      profileGradeValue: (grade) => `дараҷаи ${grade}`, profileYearsValue: (years) => `${years} сол`,
+      profileStatsTitle: "Омори профил", profileStatsTotalLabel: "ҳамагӣ", profileStatCompletedTasks: "Корҳои иҷрошуда", profileStatPhotoReports: "Ҳисоботҳои фотоӣ", profileStatRemarks: "Мулоҳизаҳо", profileStatAttendance: "Ҳузури миёна",
+      profileActivityTitle: "Фаъолияти охирин", profileActivityAttendance: "Ҳозиршавӣ қайд шуд", profileActivityPhoto: "Ҳисоботи фотоӣ бор карда шуд", profileActivityMaterials: "Мавод дархост шуд", profileActivityTask: "Кор ба анҷом расид",
+      profileSettingsTitle: "Танзимот", profileSettingPush: "Огоҳиномаҳои Push", profileSettingSms: "Огоҳиномаҳои SMS", profileSettingTelegram: "Огоҳиномаҳои Telegram", profileSettingVisibility: "Намоёнии профил", profileSettingLanguage: "Забони интерфейс",
+      profileDocumentsTitle: "Ҳуҷҷатҳо ва дастрасӣ", profileDocumentValidUntil: (date) => `Эътибор то ${date}`, profileDocumentUploaded: "Бор карда шуд", profileDocumentOpenButton: "Кушодан", profileDocumentOpened: "Ҳуҷҷат кушода шуд", profileDocumentMissing: "Ҳуҷҷат бор карда нашудааст",
+      profileKpiExperienceTitle: "Собиқа", profileKpiTasksTitle: "Корҳои ман", profileKpiTasksFooter: "Корҳои фаъол", profileKpiHoursTitle: "Соатҳои корӣ", profileKpiHoursFooter: "Дар ин моҳ", profileKpiAttendanceTitle: "Ҳузури миёна", profileKpiAttendanceFooter: "Дар моҳи гузашта",
       materialStatusNew: "Нав", materialStatusApproved: "Тасдиқшуда", materialStatusInTransit: "Дар роҳ", materialStatusIssued: "Дода шуда", materialStatusRejected: "Радшуда",
       kpiTotalTasksTitle: "Ҳамагӣ корҳо", kpiReviewTitle: "Дар тафтиш", kpiReviewFooter: "Мунтазири тафтиш", kpiOverdueTitle: "Мӯҳлаташ гузашта", kpiOverdueFooter: "Корҳои мӯҳлаташ гузашта",
       filterButton: "Филтр", sortByPriorityOption: "Аз рӯи муҳимият", sortByDueDate: "Аз рӯи мӯҳлат", sortByProgress: "Аз рӯи пешрафт", sortNewest: "Аввал навҳо", sortOldest: "Аввал куҳнаҳо",
@@ -2241,12 +2367,54 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       remindersTitle: "Reminders", emptyReminders: "No reminders",
       shortSummaryTitle: "Short summary", shortSummaryObject: "Object", shortSummaryProrab: "Site manager", shortSummaryNextCheck: "Next workday", shortSummaryActiveTasks: "Active tasks", contactProrabButton: "Contact site manager",
       emptyAttendance: "No records for the selected period", thisMonth: "This month", lastSevenDays: "Last 7 days", lastThirtyDays: "Last 30 days",
-      schedulePageTitle: "Schedule", schedulePageSubtitle: "Your tasks by day",
-      materialsPageTitle: "Materials", materialsPageSubtitle: "Your material requests", materialsRequestButton: "Request material", materialsColMaterial: "Material", materialsColQty: "Quantity", materialsColStatus: "Status", materialsColDate: "Date", emptyMaterialRequests: "No material requests",
-      photoReportsPageTitle: "Photo report", photoReportsPageSubtitle: "Your photo reports by task", photoReportsNewButton: "New photo report", emptyPhotoReports: "No photo reports yet",
+      schedulePageTitle: "Schedule", schedulePageSubtitle: "My shifts, hours and weekly plan",
+      kpiWorkdaysTitle: "Workdays", kpiWorkdaysFooter: "this month", kpiTodayShiftTitle: "Today", kpiTodayShiftFooter: "current shift",
+      kpiNextDayOffTitle: "Next day off", kpiNextDayOffFooter: (days) => (days <= 0 ? "today" : `in ${days} day${days === 1 ? "" : "s"}`), kpiWorkedHoursTitle: "Worked", kpiWorkedHoursFooter: "this month",
+      calendarShiftsTitle: "Shift calendar", legendWorkday: "Workday", legendDayOff: "Day off", legendOvertime: "Overtime", legendBriefing: "Briefing",
+      weekScheduleTitle: "Weekly schedule", weekScheduleColDay: "Day", weekScheduleColDate: "Date", weekScheduleColTime: "Time", weekScheduleColStatus: "Status", weekScheduleColObject: "Object",
+      statusFullShift: "Full shift", statusShortShift: "Short day",
+      upcomingEventsTitle: "Upcoming events", hoursWorkedTitle: "Hours worked", planHoursLabel: "Plan", overtimeHoursLabel: "Overtime",
+      monthSummaryTitle: "Monthly summary", summaryWorkdays: "Workdays", summaryDaysOff: "Days off", summaryOvertime: "Overtime", summaryAvgAttendance: "Average attendance",
+      materialsPageTitle: "Materials", materialsPageSubtitle: "Site materials and your requests", materialsRequestButton: "Request material", materialsColMaterial: "Material", materialsColQty: "Quantity", materialsColStatus: "Status", materialsColDate: "Date", emptyMaterialRequests: "No material requests",
+      materialsTabAvailable: "Available materials", materialsTabMyRequests: "My requests", materialsTabHistory: "History",
+      materialsKpiTotalTitle: "Total in stock", materialsKpiAvailableTitle: "Available", materialsKpiReservedTitle: "Reserved", materialsKpiExpectedTitle: "Expected", materialsKpiFooter: (amount) => `worth ${amount} som.`, materialsUnitsSuffix: "units", materialsCurrencySuffix: "som.",
+      materialsSearchPlaceholder: "Search material...", materialsAllCategories: "All categories", materialsUnitFilterPlaceholder: "Unit", materialsAvailabilityFilterLabel: "In stock", materialsAllAvailability: "All materials", materialsResetFilters: "Reset",
+      materialsColCategory: "Category", materialsColUnit: "Unit", materialsColInStock: "In stock", materialsColReserved: "Reserved", materialsColAvailable: "Available", materialsColPrice: "Price",
+      materialsResultsSummary: (from, to, total) => `Showing ${from}–${to} of ${total} materials`,
+      emptyMaterialsSearch: "No materials found", emptyMaterialsSearchDescription: "Try changing the search or resetting the filters", emptyMaterialRequestsHistory: "Request history is empty",
+      materialsRequestCardTitle: "Request material", materialsRequestMaterialPlaceholder: "Select material", materialsRequestQtyPlaceholder: "Quantity", materialsRequestUnitPlaceholder: "Unit", materialsRequestCommentPlaceholder: "Comment (optional)",
+      materialsErrorMaterialRequired: "Select a material", materialsErrorQtyRequired: "Enter a quantity greater than zero",
+      categoryStockTitle: "Stock by category", categoryStockCollapseAction: "Collapse",
+      recentRequestsTitle: "Recent requests", recentRequestsAllAction: "All requests",
+      photoReportsPageTitle: "Photo report", photoReportsPageSubtitle: "Photos of completed work, stages and remarks", photoReportsNewButton: "New photo report", emptyPhotoReports: "No photo reports yet", photoReportsCardTitle: "My photo reports",
+      photoKpiUploadedTitle: "Photos uploaded", photoKpiUploadedFooter: "this month", photoKpiTodayTitle: "Today", photoKpiTodayFooter: "new photos",
+      photoKpiPendingTitle: "Pending", photoKpiPendingFooter: "awaiting approval", photoKpiApprovedTitle: "Approved", photoKpiApprovedFooter: "confirmed by foreman",
+      photoStatusPending: "Pending", photoStatusApproved: "Approved", photoStatusRejected: "Rejected",
+      photoFilterAll: "All", photoFilterToday: "Today", photoFilterAllWorks: "All works", photoUploadButton: "Upload photo",
+      photoResultsSummary: (from, to, total) => `Showing ${from}–${to} of ${total} photo reports`, photoViewAction: "View",
+      emptyPhotoReportsFiltered: "No photo reports found", emptyPhotoReportsFilteredDescription: "Change the filters or upload a new photo report", photoReviewerCommentLabel: "Foreman's comment",
+      photoUploadCardTitle: "Upload report", photoDropzoneTitle: "Drag photos here", photoDropzoneSubtitle: "or click to choose",
+      photoUploadWorkLabel: "Work", photoUploadWorkPlaceholder: "Select a work", photoUploadObjectLabel: "Object", photoUploadObjectPlaceholder: "Determined by the work",
+      photoErrorMaxImages: "You can attach up to 10 photos", photoErrorFileType: "Only JPG, PNG and WEBP are supported", photoErrorFileSize: "File size must not exceed 10 MB", photoErrorWorkRequired: "Select a work", photoErrorImagesRequired: "Add at least one photo",
+      photoActivityTitle: "Photo report activity", photoActivityUploaded: "Uploaded", photoActivityApproved: "Approved",
+      photoCommentsTitle: "Recent comments", photoCommentsToday: "Today", photoCommentsYesterday: "Yesterday",
+      photoSummaryTitle: "Short summary", photoSummaryTotalTasks: "Total tasks", photoSummaryPendingPhotos: "Photos due", photoSummaryNextCheck: "Next check", photoSummaryRemarks: "Remarks", photoSummaryGoToTasks: "Go to tasks",
+      photoQuickActionsTitle: "Quick actions", photoActionTakePhoto: "Take a photo", photoActionChooseGallery: "Choose from gallery", photoActionMyTasks: "My tasks", photoActionContactProrab: "Contact foreman",
       notificationsPageTitle: "Notifications", notificationsPageSubtitle: "All your notifications", markAllRead: "Mark all as read",
       documentsPageTitle: "My documents", documentsPageSubtitle: "Documents for your object",
-      profilePageTitle: "Profile", profilePageSubtitle: "Your personal details", profileBrigade: "Brigade", profileObject: "Object", profileSpecialty: "Specialty", profileGrade: "Grade", profilePhone: "Phone",
+      profilePageTitle: "Profile", profilePageSubtitle: "Personal details, settings and worker information", profileBrigade: "Brigade", profileObject: "Object", profileSpecialty: "Specialty", profileGrade: "Grade", profilePhone: "Phone",
+      profileStatusActive: "Active", profileStatusInactive: "Inactive", profileEditButton: "Edit profile", profileChangePhotoButton: "Change photo", profileSaveButton: "Save changes",
+      profileErrorFirstNameRequired: "Enter a first name", profileErrorLastNameRequired: "Enter a last name", profileErrorPhoneInvalid: "Enter a valid phone number", profileErrorEmailInvalid: "Enter a valid email",
+      profileToastUpdated: "Profile updated", profileToastPhotoUpdated: "Profile photo updated",
+      profileFieldFirstName: "First name", profileFieldLastName: "Last name", profileFieldEmail: "Email", profileFieldAddress: "Address", profileFieldEmergencyContact: "Emergency contact",
+      profileFieldBirthDate: "Date of birth", profileFieldPassport: "Passport/ID", profileFieldHiredAt: "Hire date", profileFieldSection: "Current section", profileFieldExperience: "Construction experience", profileFieldForeman: "Foreman",
+      profileProfessionalInfoTitle: "Professional information", profilePersonalInfoTitle: "Personal information", profileSkillsTitle: "Skills",
+      profileGradeValue: (grade) => `Grade ${grade}`, profileYearsValue: (years) => `${years} ${years === 1 ? "year" : "years"}`,
+      profileStatsTitle: "Profile statistics", profileStatsTotalLabel: "total", profileStatCompletedTasks: "Completed tasks", profileStatPhotoReports: "Photo reports", profileStatRemarks: "Remarks", profileStatAttendance: "Average attendance",
+      profileActivityTitle: "Recent activity", profileActivityAttendance: "Attendance marked", profileActivityPhoto: "Photo report uploaded", profileActivityMaterials: "Materials requested", profileActivityTask: "Task completed",
+      profileSettingsTitle: "Settings", profileSettingPush: "Push notifications", profileSettingSms: "SMS notifications", profileSettingTelegram: "Telegram notifications", profileSettingVisibility: "Profile visibility", profileSettingLanguage: "Interface language",
+      profileDocumentsTitle: "Documents and access", profileDocumentValidUntil: (date) => `Valid until ${date}`, profileDocumentUploaded: "Uploaded", profileDocumentOpenButton: "Open", profileDocumentOpened: "Document opened", profileDocumentMissing: "Document not uploaded",
+      profileKpiExperienceTitle: "Experience", profileKpiTasksTitle: "My tasks", profileKpiTasksFooter: "Active tasks", profileKpiHoursTitle: "Hours worked", profileKpiHoursFooter: "This month", profileKpiAttendanceTitle: "Average attendance", profileKpiAttendanceFooter: "Last month",
       materialStatusNew: "New", materialStatusApproved: "Approved", materialStatusInTransit: "In transit", materialStatusIssued: "Issued", materialStatusRejected: "Rejected",
       kpiTotalTasksTitle: "Total tasks", kpiReviewTitle: "In review", kpiReviewFooter: "Awaiting review", kpiOverdueTitle: "Overdue", kpiOverdueFooter: "Overdue tasks",
       filterButton: "Filter", sortByPriorityOption: "By priority", sortByDueDate: "By due date", sortByProgress: "By progress", sortNewest: "Newest first", sortOldest: "Oldest first",

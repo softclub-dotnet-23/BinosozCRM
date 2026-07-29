@@ -23,8 +23,8 @@ import { useWorkerScope } from "../../utils/workerAccess";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
 import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
 import { attendanceRepository, notificationsRepository } from "../../data/repositories";
-import { WorkerKpiCard } from "../../components/worker/WorkerKpiCard";
 import { WorkerAttendanceTooltip } from "../../components/worker/WorkerAttendanceTooltip";
+import { WorkerCircleKpiCard, WorkerCircleStat } from "../../components/worker/WorkerCircleKpiCard";
 import { WorkerMessageModal } from "../../components/worker/WorkerMessageModal";
 import { NOTIFICATION_ICON, NOTIFICATION_TONE_CLASS } from "../../components/worker/workerIcons";
 import {
@@ -195,10 +195,10 @@ export default function WorkerAttendancePage() {
     <AppLayout title={s.attendancePageTitle} subtitle={s.attendancePageSubtitle} titleBelowHeader contentMaxWidth="1600px">
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <WorkerKpiCard icon={CircleCheckBig} tone="blue" title={s.kpiAttendanceTotalTitle} value={String(summary?.totalRecords ?? 0)} footer={s.kpiAttendanceTotalFooter} />
-          <WorkerKpiCard icon={UserCheck} tone="green" title={s.kpiPresentTitle} value={String(summary?.presentDays ?? 0)} footer={s.kpiPresentFooter} />
-          <WorkerKpiCard icon={Clock3} tone="orange" title={s.kpiLateTitle} value={String(summary?.lateDays ?? 0)} footer={s.kpiLateFooter} />
-          <WorkerKpiCard icon={UserRoundX} tone="red" title={s.kpiAbsentTitle} value={String(summary?.absentDays ?? 0)} footer={s.kpiAbsentFooter} />
+          <WorkerCircleKpiCard icon={CircleCheckBig} tone="blue" title={s.kpiAttendanceTotalTitle} value={String(summary?.totalRecords ?? 0)} footer={s.kpiAttendanceTotalFooter} />
+          <WorkerCircleKpiCard icon={UserCheck} tone="green" title={s.kpiPresentTitle} value={String(summary?.presentDays ?? 0)} footer={s.kpiPresentFooter} />
+          <WorkerCircleKpiCard icon={Clock3} tone="orange" title={s.kpiLateTitle} value={String(summary?.lateDays ?? 0)} footer={s.kpiLateFooter} />
+          <WorkerCircleKpiCard icon={UserRoundX} tone="red" title={s.kpiAbsentTitle} value={String(summary?.absentDays ?? 0)} footer={s.kpiAbsentFooter} />
         </div>
 
         <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
@@ -286,18 +286,18 @@ export default function WorkerAttendancePage() {
                       <tbody>
                         {filteredRows.map((row) => (
                           <tr key={row.date} className="border-b border-border last:border-0">
-                            <td className={cn("px-4 py-2.5", row.displayStatus === "day_off" || row.displayStatus === "no_data" ? "text-ink-secondary" : "text-ink")}>
+                            <td className={cn("px-4 py-3", row.displayStatus === "day_off" || row.displayStatus === "no_data" ? "text-ink-secondary" : "text-ink")}>
                               {formatDateShort(row.date)}, {formatWeekdayShort(row.date)}
                             </td>
-                            <td className="px-3 py-2.5 text-ink-secondary">{row.record?.objectName ?? object?.name ?? "—"}</td>
-                            <td className="px-3 py-2.5 tabular text-ink-secondary">{row.record?.arrivalTime ?? "—"}</td>
-                            <td className="px-3 py-2.5 tabular text-ink-secondary">{row.record?.departureTime ?? "—"}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-3 text-ink-secondary">{row.record?.objectName ?? object?.name ?? "—"}</td>
+                            <td className="px-3 py-3 tabular text-ink-secondary">{row.record?.arrivalTime ?? "—"}</td>
+                            <td className="px-3 py-3 tabular text-ink-secondary">{row.record?.departureTime ?? "—"}</td>
+                            <td className="px-3 py-3">
                               <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold", STATUS_BADGE_CLASS[row.displayStatus])}>
                                 {statusLabel[row.displayStatus]}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-ink-secondary">{row.record?.note || (row.displayStatus === "day_off" ? s.noteDayOff : "—")}</td>
+                            <td className="px-4 py-3 text-ink-secondary">{row.record?.note || (row.displayStatus === "day_off" ? s.noteDayOff : "—")}</td>
                             {/* no_data intentionally falls through to "—": the status badge already reads "Нет данных" */}
                           </tr>
                         ))}
@@ -342,7 +342,7 @@ export default function WorkerAttendancePage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid stroke="#E9EDF3" strokeDasharray="0" vertical={false} />
-                      <XAxis dataKey="date" tickFormatter={(v: string) => formatWeekdayShort(v)} tick={{ fontSize: 11, fill: "#6B7280" }} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="date" tick={<WeekdayDateTick points={weeklyChart} />} axisLine={false} tickLine={false} height={38} interval={0} />
                       <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: "#6B7280" }} axisLine={false} tickLine={false} width={40} />
                       <Tooltip
                         cursor={{ fill: "rgba(0,0,0,0.03)" }}
@@ -368,10 +368,10 @@ export default function WorkerAttendancePage() {
                   </ResponsiveContainer>
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:flex md:flex-col">
-                  <WeeklyStat icon={CircleCheckBig} tone="blue" label={s.normLabel} value="100%" />
-                  <WeeklyStat icon={UserCheck} tone="green" label={s.factLabel} value={`${weeklyStats?.attendancePercent ?? 0}%`} />
-                  <WeeklyStat icon={Clock3} tone="orange" label={s.latesLabel} value={String(weeklyStats?.lateDays ?? 0)} />
-                  <WeeklyStat icon={UserRoundX} tone="red" label={s.absencesLabel} value={String(weeklyStats?.absentDays ?? 0)} />
+                  <WorkerCircleStat icon={CircleCheckBig} tone="blue" label={s.normLabel} value="100%" />
+                  <WorkerCircleStat icon={UserCheck} tone="green" label={s.factLabel} value={`${weeklyStats?.attendancePercent ?? 0}%`} />
+                  <WorkerCircleStat icon={Clock3} tone="orange" label={s.latesLabel} value={String(weeklyStats?.lateDays ?? 0)} />
+                  <WorkerCircleStat icon={UserRoundX} tone="red" label={s.absencesLabel} value={String(weeklyStats?.absentDays ?? 0)} />
                 </div>
               </div>
             </Card>
@@ -478,18 +478,27 @@ export default function WorkerAttendancePage() {
   );
 }
 
-function WeeklyStat({ icon: Icon, tone, label, value }: { icon: typeof Clock3; tone: "blue" | "green" | "orange" | "red"; label: string; value: string }) {
-  const toneClass = { blue: "bg-blue-soft text-blue", green: "bg-green-soft text-green", orange: "bg-warning-soft text-warning", red: "bg-red-soft text-red" }[tone];
+interface WeekdayDateTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+  points: { date: string; weekdayLabel: string; dateLabel: string }[];
+}
+
+/** Two-line X-axis tick (weekday bold on top, short date below) matching the reference's richer
+ * axis labels — Recharts' plain tickFormatter only supports a single line of text. */
+function WeekdayDateTick({ x = 0, y = 0, payload, points }: WeekdayDateTickProps) {
+  const point = points.find((p) => p.date === payload?.value);
+  if (!point) return null;
   return (
-    <div className="flex flex-1 items-center gap-2.5 rounded-xl bg-surface-1 p-2.5 md:flex-none">
-      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass)}>
-        <Icon size={14} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs text-ink-secondary">{label}</p>
-        <p className="text-sm font-bold text-ink">{value}</p>
-      </div>
-    </div>
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={12} textAnchor="middle" fontSize={11} fontWeight={600} fill="#171717">
+        {point.weekdayLabel}
+      </text>
+      <text x={0} y={0} dy={26} textAnchor="middle" fontSize={10} fill="#9CA3AF">
+        {point.dateLabel.slice(0, 5)}
+      </text>
+    </g>
   );
 }
 
