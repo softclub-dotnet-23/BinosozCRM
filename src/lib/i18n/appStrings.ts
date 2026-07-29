@@ -429,6 +429,15 @@ export interface AppStrings {
     photoSummaryTitle: string; photoSummaryTotalTasks: string; photoSummaryPendingPhotos: string; photoSummaryNextCheck: string; photoSummaryRemarks: string; photoSummaryGoToTasks: string;
     photoQuickActionsTitle: string; photoActionTakePhoto: string; photoActionChooseGallery: string; photoActionMyTasks: string; photoActionContactProrab: string;
     notificationsPageTitle: string; notificationsPageSubtitle: string; markAllRead: string;
+    notificationTabAll: string; notificationTabUnread: string; notificationTabImportant: string; notificationTabSystem: string;
+    emptyNotificationsFiltered: string; emptyNotificationsFilteredDescription: string; notificationUnreadLabel: string;
+    notificationPriorityImportant: string; notificationPriorityNormal: string; notificationPrioritySystem: string;
+    notificationsResultsSummary: (count: number) => string;
+    notificationFiltersTitle: string; notificationFilterTypeLabel: string; notificationAllTypes: string;
+    notificationTypeTask: string; notificationTypeMaterials: string; notificationTypeSchedule: string; notificationTypePhotoReport: string; notificationTypeReminder: string; notificationTypeSystem: string;
+    notificationFilterDateLabel: string; notificationFilterPriorityLabel: string; notificationAllPriorities: string; notificationResetFilters: string;
+    notificationSummaryTitle: string; notificationSummaryTotal: string; notificationSummaryUnread: string; notificationSummaryImportant: string; notificationSummarySystem: string;
+    notificationPushTitle: string; notificationPushDescription: string; notificationPushEnabled: string; notificationPushDenied: string; notificationPushUnsupported: string; notificationPushEnableButton: string;
     documentsPageTitle: string; documentsPageSubtitle: string;
     profilePageTitle: string; profilePageSubtitle: string; profileBrigade: string; profileObject: string; profileSpecialty: string; profileGrade: string; profilePhone: string;
     profileStatusActive: string; profileStatusInactive: string; profileEditButton: string; profileChangePhotoButton: string; profileSaveButton: string;
@@ -1076,7 +1085,17 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       photoCommentsTitle: "Последние комментарии", photoCommentsToday: "Сегодня", photoCommentsYesterday: "Вчера",
       photoSummaryTitle: "Краткая сводка", photoSummaryTotalTasks: "Всего задач", photoSummaryPendingPhotos: "Фото к сдаче", photoSummaryNextCheck: "Следующая проверка", photoSummaryRemarks: "Замечания", photoSummaryGoToTasks: "Перейти к задачам",
       photoQuickActionsTitle: "Быстрые действия", photoActionTakePhoto: "Сделать фото", photoActionChooseGallery: "Выбрать из галереи", photoActionMyTasks: "Мои задачи", photoActionContactProrab: "Связаться с прорабом",
-      notificationsPageTitle: "Уведомления", notificationsPageSubtitle: "Все ваши уведомления", markAllRead: "Отметить все как прочитанные",
+      notificationsPageTitle: "Уведомления", notificationsPageSubtitle: "Все важные уведомления и сообщения", markAllRead: "Отметить все как прочитанные",
+      notificationTabAll: "Все", notificationTabUnread: "Непрочитанные", notificationTabImportant: "Важные", notificationTabSystem: "Системные",
+      emptyNotificationsFiltered: "Уведомления не найдены", emptyNotificationsFilteredDescription: "Измените фильтры или проверьте другие категории", notificationUnreadLabel: "непрочитано",
+      notificationPriorityImportant: "Важное", notificationPriorityNormal: "Обычное", notificationPrioritySystem: "Системное",
+      notificationsResultsSummary: (count) => `Показано 1–${count} из ${count} уведомлений`,
+      notificationFiltersTitle: "Фильтры", notificationFilterTypeLabel: "Тип уведомления", notificationAllTypes: "Все типы",
+      notificationTypeTask: "Задачи", notificationTypeMaterials: "Материалы", notificationTypeSchedule: "График", notificationTypePhotoReport: "Фотоотчёты", notificationTypeReminder: "Напоминания", notificationTypeSystem: "Системные",
+      notificationFilterDateLabel: "Дата", notificationFilterPriorityLabel: "Приоритет", notificationAllPriorities: "Все приоритеты", notificationResetFilters: "Сбросить фильтры",
+      notificationSummaryTitle: "Сводка", notificationSummaryTotal: "Всего уведомлений", notificationSummaryUnread: "Непрочитанные", notificationSummaryImportant: "Важные", notificationSummarySystem: "Системные",
+      notificationPushTitle: "Не пропустите важное!", notificationPushDescription: "Включите push-уведомления, чтобы получать мгновенные оповещения о новых задачах и изменениях.",
+      notificationPushEnabled: "Уведомления включены", notificationPushDenied: "Уведомления заблокированы в браузере", notificationPushUnsupported: "Браузер не поддерживает push-уведомления", notificationPushEnableButton: "Включить уведомления",
       documentsPageTitle: "Мои документы", documentsPageSubtitle: "Документы по вашему объекту",
       profilePageTitle: "Профиль", profilePageSubtitle: "Личные данные, настройки и информация о работнике", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Специализация", profileGrade: "Разряд", profilePhone: "Телефон",
       profileStatusActive: "Активен", profileStatusInactive: "Неактивен", profileEditButton: "Редактировать профиль", profileChangePhotoButton: "Изменить фото", profileSaveButton: "Сохранить изменения",
@@ -1738,7 +1757,17 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       photoCommentsTitle: "Шарҳҳои охирин", photoCommentsToday: "Имрӯз", photoCommentsYesterday: "Дирӯз",
       photoSummaryTitle: "Хулосаи мухтасар", photoSummaryTotalTasks: "Ҳамагӣ корҳо", photoSummaryPendingPhotos: "Сурат лозим аст", photoSummaryNextCheck: "Тафтиши навбатӣ", photoSummaryRemarks: "Мулоҳизаҳо", photoSummaryGoToTasks: "Гузаштан ба корҳо",
       photoQuickActionsTitle: "Амалҳои зуд", photoActionTakePhoto: "Сурат гирифтан", photoActionChooseGallery: "Аз галерея интихоб кардан", photoActionMyTasks: "Корҳои ман", photoActionContactProrab: "Бо прораб тамос гирифтан",
-      notificationsPageTitle: "Огоҳиномаҳо", notificationsPageSubtitle: "Ҳамаи огоҳиномаҳои шумо", markAllRead: "Ҳамаро хондашуда қайд кардан",
+      notificationsPageTitle: "Огоҳиномаҳо", notificationsPageSubtitle: "Ҳамаи огоҳиномаҳои муҳим ва паёмҳо", markAllRead: "Ҳамаро хондашуда қайд кардан",
+      notificationTabAll: "Ҳама", notificationTabUnread: "Хонданашуда", notificationTabImportant: "Муҳим", notificationTabSystem: "Системавӣ",
+      emptyNotificationsFiltered: "Огоҳинома ёфт нашуд", emptyNotificationsFilteredDescription: "Филтрҳоро тағир диҳед ё категорияҳои дигарро санҷед", notificationUnreadLabel: "хонда нашудааст",
+      notificationPriorityImportant: "Муҳим", notificationPriorityNormal: "Оддӣ", notificationPrioritySystem: "Системавӣ",
+      notificationsResultsSummary: (count) => `Нишон дода шуд 1–${count} аз ${count} огоҳинома`,
+      notificationFiltersTitle: "Филтрҳо", notificationFilterTypeLabel: "Навъи огоҳинома", notificationAllTypes: "Ҳамаи навъҳо",
+      notificationTypeTask: "Корҳо", notificationTypeMaterials: "Маводҳо", notificationTypeSchedule: "Ҷадвал", notificationTypePhotoReport: "Ҳисоботҳои фотоӣ", notificationTypeReminder: "Хотиррасонӣ", notificationTypeSystem: "Системавӣ",
+      notificationFilterDateLabel: "Сана", notificationFilterPriorityLabel: "Аҳамият", notificationAllPriorities: "Ҳамаи аҳамиятҳо", notificationResetFilters: "Тоза кардани филтрҳо",
+      notificationSummaryTitle: "Хулоса", notificationSummaryTotal: "Ҳамагӣ огоҳиномаҳо", notificationSummaryUnread: "Хонданашуда", notificationSummaryImportant: "Муҳим", notificationSummarySystem: "Системавӣ",
+      notificationPushTitle: "Муҳимро аз даст надиҳед!", notificationPushDescription: "Огоҳиномаҳои push-ро фаъол кунед, то дар бораи корҳои нав ва тағиротҳо фавран огоҳ шавед.",
+      notificationPushEnabled: "Огоҳиномаҳо фаъол аст", notificationPushDenied: "Огоҳиномаҳо дар браузер баста шудаанд", notificationPushUnsupported: "Браузер огоҳиномаҳои push-ро дастгирӣ намекунад", notificationPushEnableButton: "Фаъол кардани огоҳиномаҳо",
       documentsPageTitle: "Ҳуҷҷатҳои ман", documentsPageSubtitle: "Ҳуҷҷатҳо оид ба объекти шумо",
       profilePageTitle: "Профил", profilePageSubtitle: "Маълумоти шахсӣ, танзимот ва иттилоот дар бораи корманд", profileBrigade: "Бригада", profileObject: "Объект", profileSpecialty: "Ихтисос", profileGrade: "Дараҷа", profilePhone: "Телефон",
       profileStatusActive: "Фаъол", profileStatusInactive: "Ғайрифаъол", profileEditButton: "Профилро таҳрир кардан", profileChangePhotoButton: "Суратро иваз кардан", profileSaveButton: "Тағиротро нигоҳ доштан",
@@ -2400,7 +2429,17 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
       photoCommentsTitle: "Recent comments", photoCommentsToday: "Today", photoCommentsYesterday: "Yesterday",
       photoSummaryTitle: "Short summary", photoSummaryTotalTasks: "Total tasks", photoSummaryPendingPhotos: "Photos due", photoSummaryNextCheck: "Next check", photoSummaryRemarks: "Remarks", photoSummaryGoToTasks: "Go to tasks",
       photoQuickActionsTitle: "Quick actions", photoActionTakePhoto: "Take a photo", photoActionChooseGallery: "Choose from gallery", photoActionMyTasks: "My tasks", photoActionContactProrab: "Contact foreman",
-      notificationsPageTitle: "Notifications", notificationsPageSubtitle: "All your notifications", markAllRead: "Mark all as read",
+      notificationsPageTitle: "Notifications", notificationsPageSubtitle: "All important notifications and messages", markAllRead: "Mark all as read",
+      notificationTabAll: "All", notificationTabUnread: "Unread", notificationTabImportant: "Important", notificationTabSystem: "System",
+      emptyNotificationsFiltered: "No notifications found", emptyNotificationsFilteredDescription: "Change the filters or check other categories", notificationUnreadLabel: "unread",
+      notificationPriorityImportant: "Important", notificationPriorityNormal: "Normal", notificationPrioritySystem: "System",
+      notificationsResultsSummary: (count) => `Showing 1–${count} of ${count} notifications`,
+      notificationFiltersTitle: "Filters", notificationFilterTypeLabel: "Notification type", notificationAllTypes: "All types",
+      notificationTypeTask: "Tasks", notificationTypeMaterials: "Materials", notificationTypeSchedule: "Schedule", notificationTypePhotoReport: "Photo reports", notificationTypeReminder: "Reminders", notificationTypeSystem: "System",
+      notificationFilterDateLabel: "Date", notificationFilterPriorityLabel: "Priority", notificationAllPriorities: "All priorities", notificationResetFilters: "Reset filters",
+      notificationSummaryTitle: "Summary", notificationSummaryTotal: "Total notifications", notificationSummaryUnread: "Unread", notificationSummaryImportant: "Important", notificationSummarySystem: "System",
+      notificationPushTitle: "Don't miss what matters!", notificationPushDescription: "Enable push notifications to get instant alerts about new tasks and changes.",
+      notificationPushEnabled: "Notifications enabled", notificationPushDenied: "Notifications blocked in browser", notificationPushUnsupported: "Browser doesn't support push notifications", notificationPushEnableButton: "Enable notifications",
       documentsPageTitle: "My documents", documentsPageSubtitle: "Documents for your object",
       profilePageTitle: "Profile", profilePageSubtitle: "Personal details, settings and worker information", profileBrigade: "Brigade", profileObject: "Object", profileSpecialty: "Specialty", profileGrade: "Grade", profilePhone: "Phone",
       profileStatusActive: "Active", profileStatusInactive: "Inactive", profileEditButton: "Edit profile", profileChangePhotoButton: "Change photo", profileSaveButton: "Save changes",

@@ -2,36 +2,28 @@ import { Calendar, RotateCcw } from "lucide-react";
 import { Card } from "../../ui/Card";
 import { CustomSelect } from "../../ui/CustomSelect";
 import { useLanguage } from "../../../context/LanguageContext";
-import { DEFAULT_NOTIFICATION_FILTERS, type NotificationFilters } from "../../../utils/workerNotificationsAnalytics";
-import type { WorkerNotificationType } from "../../../types";
+import { DEFAULT_NOTIFICATION_FILTERS, type NotificationCategory, type NotificationFilters } from "../../../utils/workerNotificationsAnalytics";
 
 interface NotificationFiltersCardProps {
   value: NotificationFilters;
   onChange: (value: NotificationFilters) => void;
-  availableTypes: WorkerNotificationType[];
+  availableCategories: NotificationCategory[];
 }
 
-export function NotificationFiltersCard({ value, onChange, availableTypes }: NotificationFiltersCardProps) {
+export function NotificationFiltersCard({ value, onChange, availableCategories }: NotificationFiltersCardProps) {
   const { strings } = useLanguage();
   const s = strings.worker;
 
-  const typeLabel: Record<WorkerNotificationType, string> = {
-    task_assigned: s.notificationTypeTask,
-    task_completed: s.notificationTypeTask,
-    task_review: s.notificationTypeTask,
-    materials_delivered: s.notificationTypeMaterials,
-    schedule_change: s.notificationTypeSchedule,
-    photo_report_approved: s.notificationTypePhotoReport,
-    photo_report_rejected: s.notificationTypePhotoReport,
+  const categoryLabel: Record<NotificationCategory, string> = {
+    task: s.notificationTypeTask,
+    materials: s.notificationTypeMaterials,
+    schedule: s.notificationTypeSchedule,
+    photoReport: s.notificationTypePhotoReport,
     reminder: s.notificationTypeReminder,
-    problem_update: s.notificationTypeSystem,
     system: s.notificationTypeSystem,
   };
 
-  const typeOptions = [
-    { value: "all", label: s.notificationAllTypes },
-    ...Array.from(new Set(availableTypes.map((t) => typeLabel[t]))).map((label) => ({ value: label, label })),
-  ];
+  const typeOptions = [{ value: "all", label: s.notificationAllTypes }, ...availableCategories.map((c) => ({ value: c, label: categoryLabel[c] }))];
 
   const priorityOptions = [
     { value: "all", label: s.notificationAllPriorities },
@@ -39,15 +31,6 @@ export function NotificationFiltersCard({ value, onChange, availableTypes }: Not
     { value: "normal", label: s.notificationPriorityNormal },
     { value: "system", label: s.notificationPrioritySystem },
   ];
-
-  function handleTypeChange(label: string) {
-    if (label === "all") {
-      onChange({ ...value, type: "all" });
-      return;
-    }
-    const matched = availableTypes.find((t) => typeLabel[t] === label);
-    onChange({ ...value, type: matched ?? "all" });
-  }
 
   return (
     <Card className="p-4">
@@ -59,8 +42,8 @@ export function NotificationFiltersCard({ value, onChange, availableTypes }: Not
           </label>
           <CustomSelect
             id="notif-filter-type"
-            value={value.type === "all" ? "all" : typeLabel[value.type]}
-            onValueChange={handleTypeChange}
+            value={value.category}
+            onValueChange={(v) => onChange({ ...value, category: v as NotificationFilters["category"] })}
             options={typeOptions}
           />
         </div>
