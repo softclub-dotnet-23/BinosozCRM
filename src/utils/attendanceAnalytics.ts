@@ -27,20 +27,3 @@ export function computeAttendanceStatusSlices(kpis: AttendanceKpis): Specializat
     { key: "absent", label: "Отсутствовали", value: kpis.absent, percent: kpis.absentPercent, color: "#E83939" },
   ];
 }
-
-export interface FrequentLatenessRow {
-  employeeName: string;
-  count: number;
-}
-
-export function computeFrequentLateness(records: AttendanceRecord[], limit = 3): FrequentLatenessRow[] {
-  const counts = new Map<string, number>();
-  for (const r of records) {
-    if (r.status !== "late") continue;
-    counts.set(r.employeeName, (counts.get(r.employeeName) ?? 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .map(([employeeName, count]) => ({ employeeName, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
-}

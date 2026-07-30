@@ -9,6 +9,7 @@ import {
   Package,
   Pencil,
   Plus,
+  RefreshCw,
   TrendingDown,
   TrendingUp,
   Trash2,
@@ -29,7 +30,6 @@ import { MaterialFormModal } from "../components/materials/MaterialFormModal";
 import { MaterialDetailDrawer } from "../components/materials/MaterialDetailDrawer";
 import { Avatar } from "../components/ui/Avatar";
 import { MATERIAL_CATEGORIES, MATERIAL_SUPPLIERS } from "../data/mockMaterials";
-import { receiptQuantity } from "../data/mockMaterialReceipts";
 import { writeOffQuantity } from "../data/mockMaterialWriteOffs";
 import {
   materialsRepository,
@@ -66,8 +66,6 @@ const STATUS_FILTER_OPTIONS: { value: MaterialStatus | "all"; label: string }[] 
   { value: "critical", label: "Критический" },
 ];
 
-const selectClass =
-  "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
@@ -112,10 +110,6 @@ function CompanyMaterialsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Material | null>(null);
 
   const kpis = useMemo(() => computeMaterialKpis(materials), [materials]);
-  const receivedInPeriod = useMemo(
-    () => mockMaterialReceipts.reduce((s, r) => s + receiptQuantity(r), 0),
-    [mockMaterialReceipts],
-  );
   const consumedInPeriod = useMemo(
     () => mockMaterialWriteOffs.reduce((s, w) => s + writeOffQuantity(w), 0),
     [mockMaterialWriteOffs],
@@ -258,7 +252,7 @@ function CompanyMaterialsPage() {
       key: "material",
       header: "Материал",
       sticky: "left",
-      width: "208px",
+      width: "248px",
       render: (row) => (
         <div className="flex items-center gap-3">
           <MaterialThumbnail src={row.imageUrl} alt={row.name} className="h-10 w-10 shrink-0" />
@@ -368,134 +362,113 @@ function CompanyMaterialsPage() {
           }
         />
         <MetricCard label="Общий остаток" value={formatCompactAmount(kpis.totalStock)} icon={LayoutGrid} tone="blue" footer="Ед. измерения" />
-        <MetricCard label="Поступило за период" value={formatNumber(Math.round(receivedInPeriod))} icon={Download} tone="orange" footer="Ед. измерения" />
         <MetricCard label="Израсходовано" value={formatNumber(Math.round(consumedInPeriod))} icon={TrendingUp} tone="purple" footer="Ед. измерения" />
+        <Card className="flex min-w-0 flex-wrap items-center gap-2 p-4">
+          {canManage && (
+            <Button className="h-10 flex-1 min-w-[130px] justify-center" onClick={() => setFormMaterial(null)}>
+              <Plus size={16} /> Добавить материал
+            </Button>
+          )}
+          <Button variant="outline" className="h-10 flex-1 min-w-[110px] justify-center" onClick={handleExport}>
+            <Download size={16} /> Экспорт
+          </Button>
+        </Card>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card>
-            <div className="flex flex-wrap items-center gap-1 border-b border-border px-5 pt-2 sm:px-6">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => handleTabChange(t.key)}
-                  className={`relative px-3 py-3 text-sm font-semibold transition-colors ${
-                    tab === t.key ? "text-primary" : "text-ink-secondary hover:text-ink"
-                  }`}
-                >
-                  {t.label}
-                  {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" />}
-                </button>
-              ))}
-            </div>
+      <div className="mt-4 flex min-w-0 flex-col gap-4">
+        <Card>
+          <div className="flex flex-wrap items-center gap-1 border-b border-border px-5 pt-2 sm:px-6">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => handleTabChange(t.key)}
+                className={`relative px-3 py-3 text-sm font-semibold transition-colors ${
+                  tab === t.key ? "text-primary" : "text-ink-secondary hover:text-ink"
+                }`}
+              >
+                {t.label}
+                {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" />}
+              </button>
+            ))}
+          </div>
 
-            {tab === "categories" ? (
-              <div className="divide-y divide-border">
-                {categorySummary.map((row) => (
-                  <div key={row.category} className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6">
-                    <div>
-                      <p className="font-semibold text-ink">{row.category}</p>
-                      <p className="text-xs text-ink-muted">{row.count} наименований</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="tabular font-semibold text-ink">{formatCurrency(Math.round(row.totalValue))}</p>
-                      <p className="tabular text-xs text-ink-muted">{formatNumber(Math.round(row.totalStock * 10) / 10)} ед.</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : pageRows.length > 0 ? (
-              <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} onRowClick={(row) => setViewMaterial(row)} />
-            ) : (
-              <EmptyState
-                icon={Package}
-                title="Материалы не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
-                action={
-                  <Button variant="outline" size="sm" onClick={resetFilters}>
-                    Сбросить фильтры
-                  </Button>
-                }
-              />
-            )}
-
-            {tab !== "categories" && (
-              <Pagination
-                page={currentPage}
-                pageCount={pageCount}
-                pageSize={pageSize}
-                total={filteredMaterials.length}
-                onPageChange={setPage}
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setPage(1);
-                }}
-                itemLabel="материалов"
-              />
-            )}
-          </Card>
-        </div>
-
-        <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
-          <div className="flex flex-col gap-2">
-            {canManage && (
-              <Button className="w-full" onClick={() => setFormMaterial(null)}>
-                <Plus size={16} /> Добавить материал
-              </Button>
-            )}
-            <Button variant="outline" className="w-full" onClick={handleExport}>
-              <Download size={16} /> Экспорт
+          <div className="mt-4 flex flex-wrap items-center gap-2 px-5 sm:px-6">
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Категория"
+              value={filters.category}
+              onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}
+              options={[{ value: "all", label: "Категория: Все" }, ...MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+            />
+            <CustomSelect
+              size="sm"
+              aria-label="Статус"
+              value={filters.status}
+              onValueChange={(v) => setFilters((f) => ({ ...f, status: v as MaterialStatus | "all" }))}
+              options={STATUS_FILTER_OPTIONS}
+            />
+            <CustomSelect
+              size="sm"
+              searchable
+              aria-label="Поставщик"
+              value={filters.supplier}
+              onValueChange={(v) => setFilters((f) => ({ ...f, supplier: v }))}
+              options={[{ value: "all", label: "Поставщик: Все" }, ...MATERIAL_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
+            />
+            <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
+              <RefreshCw size={14} /> Сбросить фильтры
             </Button>
           </div>
 
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
-            <div className="mt-4 space-y-3.5">
-              <FilterField label="Поиск">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Название материала..."
-                  className={selectClass}
-                />
-              </FilterField>
-              <FilterField label="Категория">
-                <CustomSelect
-                  searchable
-                  value={filters.category}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}
-                  options={[{ value: "all", label: "Все категории" }, ...MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))]}
-                />
-              </FilterField>
-              <FilterField label="Статус">
-                <CustomSelect
-                  value={filters.status}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v as MaterialStatus | "all" }))}
-                  options={STATUS_FILTER_OPTIONS}
-                />
-              </FilterField>
-              <FilterField label="Поставщик">
-                <CustomSelect
-                  searchable
-                  value={filters.supplier}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, supplier: v }))}
-                  options={[{ value: "all", label: "Все поставщики" }, ...MATERIAL_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
-                />
-              </FilterField>
+          {tab === "categories" ? (
+            <div className="divide-y divide-border">
+              {categorySummary.map((row) => (
+                <div key={row.category} className="flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6">
+                  <div>
+                    <p className="font-semibold text-ink">{row.category}</p>
+                    <p className="text-xs text-ink-muted">{row.count} наименований</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="tabular font-semibold text-ink">{formatCurrency(Math.round(row.totalValue))}</p>
+                    <p className="tabular text-xs text-ink-muted">{formatNumber(Math.round(row.totalStock * 10) / 10)} ед.</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="mt-4 flex gap-2">
-              <Button className="flex-1" onClick={() => setPage(1)}>
-                Применить
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={resetFilters}>
-                Сбросить
-              </Button>
-            </div>
-          </Card>
+          ) : pageRows.length > 0 ? (
+            <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} onRowClick={(row) => setViewMaterial(row)} />
+          ) : (
+            <EmptyState
+              icon={Package}
+              title="Материалы не найдены"
+              description="Измените параметры поиска или сбросьте фильтры"
+              action={
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  Сбросить фильтры
+                </Button>
+              }
+            />
+          )}
 
+          {tab !== "categories" && (
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              total={filteredMaterials.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+              itemLabel="материалов"
+            />
+          )}
+        </Card>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-ink">Критический остаток</h2>
@@ -505,8 +478,8 @@ function CompanyMaterialsPage() {
                 </span>
               )}
             </div>
-            <ul className="mt-3.5 space-y-3">
-              {criticalItems.slice(0, 2).map((m) => {
+            <ul className="mt-3.5 max-h-72 space-y-3 overflow-y-auto pr-1">
+              {criticalItems.slice(0, 6).map((m) => {
                 const status = getMaterialStatus(m);
                 return (
                   <li key={m.id}>
@@ -591,15 +564,6 @@ function CompanyMaterialsPage() {
         onConfirm={handleDeleteConfirmed}
       />
     </AppLayout>
-  );
-}
-
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-ink-secondary">{label}</p>
-      <div className="mt-1.5">{children}</div>
-    </div>
   );
 }
 

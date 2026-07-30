@@ -16,7 +16,6 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { FilterDrawer } from "../components/objects/FilterDrawer";
 import { AddObjectModal } from "../components/objects/AddObjectModal";
-import { ObjectSummary } from "../components/objects/ObjectSummary";
 import { ProgressChart } from "../components/charts/ProgressChart";
 import { ObjectBudgetChart } from "../components/charts/ObjectBudgetChart";
 import { objectProgressSeries } from "../data/mockDashboard";
@@ -70,7 +69,7 @@ export default function ObjectsPage() {
   const [search, setSearch] = usePersistentState("filters.objects.search", "");
   const [filters, setFilters] = usePersistentState<ObjectFilters>("filters.objects.filters", DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(8);
   const [chartMode, setChartMode] = useState<"progress" | "budget">("progress");
   const [chartPeriod, setChartPeriod] = useState("month");
 
@@ -110,8 +109,6 @@ export default function ObjectsPage() {
   const pageCount = Math.max(1, Math.ceil(filteredObjects.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageRows = filteredObjects.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const selectedObject = objects.find((o) => o.id === selectedId) ?? objects[0];
 
   const budgetChartData = useMemo(
     () => objects.slice(0, 6).map((o) => ({ objectName: o.name.replace(/«.*»/, "").trim(), budget: o.budget, spent: o.spent })),
@@ -249,129 +246,125 @@ export default function ObjectsPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-              <h2 className="text-lg font-bold text-ink">{s.listTitle}</h2>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
-                  <Filter size={14} /> {c.filtersButton}
-                </Button>
-                <Button size="sm" onClick={() => setAddModalOpen(true)}>
-                  <Plus size={14} /> {s.addObject}
-                </Button>
+      <div className="mt-4 flex min-w-0 flex-col gap-4">
+        <Card className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+            <h2 className="text-lg font-bold text-ink">{s.listTitle}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
+                <Filter size={14} /> {c.filtersButton}
+              </Button>
+              <Button size="sm" onClick={() => setAddModalOpen(true)}>
+                <Plus size={14} /> {s.addObject}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 px-5 sm:px-6">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => handleTabChange(t.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  tab === t.key ? "bg-primary text-white" : "bg-surface-3 text-ink-secondary hover:bg-surface-5"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            {pageRows.length > 0 ? (
+              <DataTable
+                columns={columns}
+                rows={pageRows}
+                rowKey={(row) => row.id}
+                selectedRowKey={selectedId}
+                onRowClick={(row) => setSelectedId(row.id)}
+              />
+            ) : (
+              <EmptyState
+                icon={Building2}
+                title={s.emptyTitle}
+                description={c.emptyStateHint}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFilters(DEFAULT_FILTERS);
+                      setSearch("");
+                      setTab("all");
+                    }}
+                  >
+                    {c.resetFiltersButton}
+                  </Button>
+                }
+              />
+            )}
+          </div>
+
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={filteredObjects.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            pageSizeOptions={[8, 10, 20, 50]}
+          />
+        </Card>
+
+        <Card className="min-w-0 p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-ink">{s.chartTitle}</h2>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
+                {(
+                  [
+                    { key: "progress", label: s.chartModeProgress },
+                    { key: "budget", label: s.chartModeBudget },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setChartMode(opt.key)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      chartMode === opt.key ? "bg-card text-primary shadow-sm" : "text-ink-secondary hover:text-ink"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
+              <CustomSelect
+                size="sm"
+                aria-label={s.chartPeriodAriaLabel}
+                value={chartPeriod}
+                onValueChange={setChartPeriod}
+                options={[
+                  { value: "month", label: c.periodMonth },
+                  { value: "quarter", label: c.periodQuarter },
+                  { value: "year", label: c.periodYear },
+                ]}
+              />
             </div>
+          </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 px-5 sm:px-6">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => handleTabChange(t.key)}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                    tab === t.key ? "bg-primary text-white" : "bg-surface-3 text-ink-secondary hover:bg-surface-5"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4">
-              {pageRows.length > 0 ? (
-                <DataTable
-                  columns={columns}
-                  rows={pageRows}
-                  rowKey={(row) => row.id}
-                  selectedRowKey={selectedId}
-                  onRowClick={(row) => setSelectedId(row.id)}
-                />
-              ) : (
-                <EmptyState
-                  icon={Building2}
-                  title={s.emptyTitle}
-                  description={c.emptyStateHint}
-                  action={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFilters(DEFAULT_FILTERS);
-                        setSearch("");
-                        setTab("all");
-                      }}
-                    >
-                      {c.resetFiltersButton}
-                    </Button>
-                  }
-                />
-              )}
-            </div>
-
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              total={filteredObjects.length}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              pageSizeOptions={[6, 10, 20, 50]}
-            />
-          </Card>
-
-          <Card className="min-w-0 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-ink">{s.chartTitle}</h2>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
-                  {(
-                    [
-                      { key: "progress", label: s.chartModeProgress },
-                      { key: "budget", label: s.chartModeBudget },
-                    ] as const
-                  ).map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setChartMode(opt.key)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        chartMode === opt.key ? "bg-card text-primary shadow-sm" : "text-ink-secondary hover:text-ink"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <CustomSelect
-                  size="sm"
-                  aria-label={s.chartPeriodAriaLabel}
-                  value={chartPeriod}
-                  onValueChange={setChartPeriod}
-                  options={[
-                    { value: "month", label: c.periodMonth },
-                    { value: "quarter", label: c.periodQuarter },
-                    { value: "year", label: c.periodYear },
-                  ]}
-                />
-              </div>
-            </div>
-
-            <div className="mt-2">
-              {chartMode === "progress" ? (
-                <ProgressChart data={objectProgressSeries} />
-              ) : (
-                <ObjectBudgetChart data={budgetChartData} />
-              )}
-            </div>
-          </Card>
-        </div>
-
-        <div className="min-w-0 sticky top-6">{selectedObject && <ObjectSummary object={selectedObject} />}</div>
+          <div className="mt-3">
+            {chartMode === "progress" ? (
+              <ProgressChart data={objectProgressSeries} />
+            ) : (
+              <ObjectBudgetChart data={budgetChartData} />
+            )}
+          </div>
+        </Card>
       </div>
 
       <FilterDrawer

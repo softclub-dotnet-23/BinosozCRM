@@ -23,18 +23,15 @@ import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Drawer } from "../components/ui/Drawer";
-import { RiskList } from "../components/tables/RiskList";
 import { GroupedMoneyChart } from "../components/charts/GroupedMoneyChart";
 import { DonutChart } from "../components/charts/DonutChart";
 import { CategoryLegend } from "../components/charts/CategoryLegend";
-import { EstimateSummary } from "../components/estimates/EstimateSummary";
 import { EstimateAddModal } from "../components/estimates/EstimateAddModal";
 import {
   ESTIMATE_OBJECT_META,
   estimateBudgetDynamics,
   estimateCategorySpend,
   estimateKpis,
-  estimateRiskItems,
 } from "../data/mockEstimates";
 import { estimatesRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
@@ -85,7 +82,7 @@ export default function EstimatesPage() {
   const [minAmount, setMinAmount] = usePersistentState("filters.estimates.minAmount", "");
   const [maxAmount, setMaxAmount] = usePersistentState("filters.estimates.maxAmount", "");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(6);
+  const [pageSize, setPageSize] = useState(8);
   const [period, setPeriod] = useState<PeriodKey>("month");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -112,8 +109,6 @@ export default function EstimatesPage() {
   const currentPage = Math.min(page, pageCount);
   const pageRows = filteredEstimates.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const selectedEstimate = estimates.find((e) => e.id === selectedId) ?? estimates[0];
-
   const chartData = useMemo(() => {
     const scale = PERIOD_SCALE[period];
     return estimateBudgetDynamics.map((row) => ({
@@ -126,16 +121,6 @@ export default function EstimatesPage() {
   const translatedCategorySpend = useMemo(
     () => estimateCategorySpend.map((entry) => ({ ...entry, category: s.categoryLabels[entry.category] ?? entry.category })),
     [s],
-  );
-
-  const translatedRiskItems = useMemo(
-    () =>
-      estimateRiskItems.map((item) => ({
-        ...item,
-        description: s.riskDescriptionLabels[item.description] ?? item.description,
-        badgeLabel: c.riskBadgeLabels[item.badgeLabel] ?? item.badgeLabel,
-      })),
-    [s, c],
   );
 
   function handleSearchChange(value: string) {
@@ -231,7 +216,7 @@ export default function EstimatesPage() {
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
             trigger={<span className="text-lg leading-none">⋯</span>}
             items={[
@@ -291,168 +276,148 @@ export default function EstimatesPage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.85fr_1fr]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card>
-            <div className="flex flex-wrap items-center gap-2 px-5 pt-5 sm:px-6">
-              <CustomSelect
-                searchable
-                size="sm"
-                aria-label={s.filterObjectAriaLabel}
-                value={objectFilter}
-                onValueChange={(v) => {
-                  setObjectFilter(v);
-                  setPage(1);
-                }}
-                options={[
-                  { value: "all", label: s.allObjectsOption },
-                  ...Object.keys(ESTIMATE_OBJECT_META).map((name) => ({ value: name, label: name })),
-                ]}
-              />
-
-              <CustomSelect
-                size="sm"
-                aria-label={s.filterStatusAriaLabel}
-                value={statusFilter}
-                onValueChange={(v) => {
-                  setStatusFilter(v as EstimateStatus | "all");
-                  setPage(1);
-                }}
-                options={STATUS_OPTIONS}
-              />
-
-              <button
-                type="button"
-                onClick={() => {
-                  setObjectFilter("all");
-                  setStatusFilter("all");
-                  setResponsibleFilter("");
-                  setMinAmount("");
-                  setMaxAmount("");
-                }}
-                className="flex h-9 items-center gap-2 rounded-[10px] border border-border-strong px-3 text-sm text-ink-secondary transition-colors hover:bg-surface-3"
-              >
-                <RotateCcw size={13} /> 01.07.2026 – 30.07.2026
-              </button>
-
-              <button
-                type="button"
-                aria-label={c.filtersButton}
-                onClick={() => setDrawerOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3"
-              >
-                <Filter size={15} />
-              </button>
-            </div>
-
-            <div className="mt-4">
-              {pageRows.length > 0 ? (
-                <DataTable
-                  columns={columns}
-                  rows={pageRows}
-                  rowKey={(row) => row.id}
-                  selectedRowKey={selectedId}
-                  onRowClick={(row) => setSelectedId(row.id)}
-                />
-              ) : (
-                <EmptyState
-                  icon={FileText}
-                  title={s.emptyTitle}
-                  description={c.emptyStateHint}
-                  action={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setObjectFilter("all");
-                        setStatusFilter("all");
-                        setSearch("");
-                      }}
-                    >
-                      {c.resetFiltersButton}
-                    </Button>
-                  }
-                />
-              )}
-            </div>
-
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              total={filteredEstimates.length}
-              itemLabel={s.paginationItemLabel}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
+      <div className="mt-4 flex min-w-0 flex-col gap-4">
+        <Card>
+          <div className="flex flex-wrap items-center gap-2 px-5 pt-5 sm:px-6">
+            <CustomSelect
+              searchable
+              size="sm"
+              aria-label={s.filterObjectAriaLabel}
+              value={objectFilter}
+              onValueChange={(v) => {
+                setObjectFilter(v);
                 setPage(1);
               }}
+              options={[
+                { value: "all", label: s.allObjectsOption },
+                ...Object.keys(ESTIMATE_OBJECT_META).map((name) => ({ value: name, label: name })),
+              ]}
             />
-          </Card>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <Card className="min-w-0 p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-ink">{s.budgetChartTitle}</h2>
-                <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
-                  {PERIOD_TABS.map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => setPeriod(tab.key)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        period === tab.key ? "bg-card text-primary shadow-sm" : "text-ink-secondary hover:text-ink"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-2">
-                <GroupedMoneyChart
-                  data={chartData}
-                  categoryKey="objectName"
-                  series={[
-                    { key: "planned", label: c.seriesPlanned, color: "#2869C9" },
-                    { key: "spent", label: c.seriesSpent, color: "#FF6B00" },
-                  ]}
-                  valueFormatter={formatMillionsCompact}
-                  maxBarSize={20}
-                />
-              </div>
-            </Card>
+            <CustomSelect
+              size="sm"
+              aria-label={s.filterStatusAriaLabel}
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v as EstimateStatus | "all");
+                setPage(1);
+              }}
+              options={STATUS_OPTIONS}
+            />
 
-            <Card className="min-w-0 p-4 sm:p-5">
-              <h2 className="text-lg font-bold text-ink">{s.categorySpendTitle}</h2>
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-6">
-                <DonutChart
-                  data={translatedCategorySpend}
-                  centerLabel={s.categorySpendCenterLabel}
-                  centerValue={formatCurrency(estimateKpis.approvedAmount)}
-                />
-                <CategoryLegend data={translatedCategorySpend} secondaryOrder="amount-first" />
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-4">
-          {selectedEstimate && (
-            <EstimateSummary estimate={selectedEstimate} onOpen={() => showToast(s.toastOpenUnavailable, "info")} />
-          )}
-
-          <Card className="min-w-0 p-4 sm:p-5">
-            <h2 className="text-lg font-bold text-ink">{s.riskCardTitle}</h2>
-            <div className="mt-2">
-              <RiskList items={translatedRiskItems} onOpen={(item) => showToast(s.toastRiskOpened(item.title), "info")} />
-            </div>
             <button
               type="button"
-              className="mt-3 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
+              onClick={() => {
+                setObjectFilter("all");
+                setStatusFilter("all");
+                setResponsibleFilter("");
+                setMinAmount("");
+                setMaxAmount("");
+              }}
+              className="flex h-9 items-center gap-2 rounded-[10px] border border-border-strong px-3 text-sm text-ink-secondary transition-colors hover:bg-surface-3"
             >
-              {s.riskAllLink}
+              <RotateCcw size={13} /> 01.07.2026 – 30.07.2026
             </button>
+
+            <button
+              type="button"
+              aria-label={c.filtersButton}
+              onClick={() => setDrawerOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3"
+            >
+              <Filter size={15} />
+            </button>
+          </div>
+
+          <div className="mt-4">
+            {pageRows.length > 0 ? (
+              <DataTable
+                columns={columns}
+                rows={pageRows}
+                rowKey={(row) => row.id}
+                selectedRowKey={selectedId}
+                onRowClick={(row) => setSelectedId(row.id)}
+              />
+            ) : (
+              <EmptyState
+                icon={FileText}
+                title={s.emptyTitle}
+                description={c.emptyStateHint}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setObjectFilter("all");
+                      setStatusFilter("all");
+                      setSearch("");
+                    }}
+                  >
+                    {c.resetFiltersButton}
+                  </Button>
+                }
+              />
+            )}
+          </div>
+
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={filteredEstimates.length}
+            itemLabel={s.paginationItemLabel}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </Card>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
+          <Card className="min-w-0 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-bold text-ink">{s.budgetChartTitle}</h2>
+              <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
+                {PERIOD_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setPeriod(tab.key)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      period === tab.key ? "bg-card text-primary shadow-sm" : "text-ink-secondary hover:text-ink"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3">
+              <GroupedMoneyChart
+                data={chartData}
+                categoryKey="objectName"
+                series={[
+                  { key: "planned", label: c.seriesPlanned, color: "#2869C9" },
+                  { key: "spent", label: c.seriesSpent, color: "#FF6B00" },
+                ]}
+                valueFormatter={formatMillionsCompact}
+                height={320}
+                maxBarSize={28}
+              />
+            </div>
+          </Card>
+
+          <Card className="min-w-0 p-4 sm:p-5">
+            <h2 className="text-lg font-bold text-ink">{s.categorySpendTitle}</h2>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-6">
+              <DonutChart
+                data={translatedCategorySpend}
+                centerLabel={s.categorySpendCenterLabel}
+                centerValue={formatCurrency(estimateKpis.approvedAmount)}
+              />
+              <CategoryLegend data={translatedCategorySpend} secondaryOrder="amount-first" />
+            </div>
           </Card>
         </div>
       </div>

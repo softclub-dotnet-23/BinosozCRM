@@ -85,7 +85,7 @@ export function BrigadeCompositionTable({ employees, loading, onRowClick, onActi
       headerClassName: "text-right sm:!pr-3",
       className: "text-right sm:!pr-3",
       render: (row) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
           <EmployeeActionMenu employee={row} onAction={onAction} />
         </div>
       ),

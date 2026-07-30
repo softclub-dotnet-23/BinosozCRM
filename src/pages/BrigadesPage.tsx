@@ -11,11 +11,9 @@ import { BrigadesTable } from "../components/brigades/BrigadesTable";
 import { BrigadeFilters, DEFAULT_BRIGADE_FILTERS, type BrigadeFiltersState } from "../components/brigades/BrigadeFilters";
 import { SpecializationDonut, SpecializationLegend } from "../components/brigades/SpecializationDonut";
 import { BrigadeActivityCard } from "../components/brigades/BrigadeActivityCard";
-import { UpcomingBrigadeAssignmentsCard } from "../components/brigades/UpcomingBrigadeAssignmentsCard";
 import { CreateBrigadeModal } from "../components/brigades/CreateBrigadeModal";
 import { BrigadeDetailsDrawer } from "../components/brigades/BrigadeDetailsDrawer";
 import type { BrigadeActionKind } from "../components/brigades/BrigadeActionMenu";
-import { mockUpcomingBrigadeAssignments } from "../data/mockUpcomingBrigadeAssignments";
 import { brigadesRepository, employeesRepository, assignmentsRepository } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -253,11 +251,6 @@ function CompanyBrigadesPage() {
           </Card>
 
           <BrigadeActivityCard rows={activity} />
-
-          <UpcomingBrigadeAssignmentsCard
-            items={mockUpcomingBrigadeAssignments}
-            onSeeAll={() => showToast(s.toastFullAssignmentsListUnavailable, "info")}
-          />
         </div>
       </div>
 

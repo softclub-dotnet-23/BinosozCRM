@@ -22,7 +22,6 @@ import {
   DEFAULT_ASSIGNMENT_FILTERS,
   type AssignmentFiltersState,
 } from "../components/assignments/AssignmentFilters";
-import { UpcomingAssignments } from "../components/assignments/UpcomingAssignments";
 import { assignmentsRepository, brigadesRepository, objectsRepository } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -32,8 +31,6 @@ import { formatDateShort } from "../utils/date";
 import { ASSIGNMENT_STATUS_CONFIG, assignmentStatusLabel } from "../utils/financeStatus";
 import { useLanguage } from "../context/LanguageContext";
 import type { Assignment, AssignmentStatus } from "../types";
-
-const TODAY_ISO = "2026-07-17";
 
 function progressTone(status: AssignmentStatus): "green" | "orange" | "red" {
   if (status === "completed") return "green";
@@ -97,13 +94,6 @@ export default function AssignmentsPage() {
   const pageCount = Math.max(1, Math.ceil(filteredAssignments.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageRows = filteredAssignments.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const upcomingAssignments = useMemo(() => {
-    return [...assignments]
-      .filter((a) => a.periodStart >= TODAY_ISO && a.status !== "cancelled")
-      .sort((a, b) => a.periodStart.localeCompare(b.periodStart))
-      .slice(0, 5);
-  }, [assignments]);
 
   function handleSearchChange(value: string) {
     setSearch(value);
@@ -246,7 +236,7 @@ export default function AssignmentsPage() {
       headerClassName: "text-right sm:!pr-3",
       className: "text-right sm:!pr-3",
       render: (row) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
             trigger={<span className="text-lg leading-none">⋯</span>}
             items={[
@@ -420,7 +410,6 @@ export default function AssignmentsPage() {
               setPage(1);
             }}
           />
-          <UpcomingAssignments assignments={upcomingAssignments} />
         </div>
       </div>
 

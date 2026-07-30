@@ -9,7 +9,6 @@ import { DataTable, type DataTableColumn } from "../components/tables/DataTable"
 import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { SpecializationDonut, SpecializationLegend } from "../components/brigades/SpecializationDonut";
 import { AttendanceStatusBadge } from "../components/attendance/AttendanceStatusBadge";
 import { AttendanceFormModal } from "../components/attendance/AttendanceFormModal";
 import { AttendanceDetailDrawer } from "../components/attendance/AttendanceDetailDrawer";
@@ -18,7 +17,7 @@ import { ATTENDANCE_BRIGADES, ATTENDANCE_EMPLOYEES, ATTENDANCE_OBJECTS } from ".
 import { attendanceRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { computeAttendanceKpis, computeAttendanceStatusSlices, computeFrequentLateness } from "../utils/attendanceAnalytics";
+import { computeAttendanceKpis } from "../utils/attendanceAnalytics";
 import { useToast } from "../hooks/useToast";
 import { formatDateShort, formatWeekdayShort } from "../utils/date";
 import type { AttendanceFilters, AttendanceRecord, AttendanceStatus } from "../types";
@@ -41,8 +40,6 @@ const STATUS_FILTER_OPTIONS: { value: AttendanceStatus | "all"; label: string }[
   { value: "absent", label: "Отсутствовал" },
 ];
 
-const dateInputClass =
-  "h-9 rounded-[10px] border border-border-strong bg-card px-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const iconButtonClass =
   "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
@@ -85,10 +82,6 @@ function CompanyAttendancePage() {
       return true;
     });
   }, [records, filters, search]);
-
-  const filteredKpis = useMemo(() => computeAttendanceKpis(filteredRecords), [filteredRecords]);
-  const statusSlices = useMemo(() => computeAttendanceStatusSlices(filteredKpis), [filteredKpis]);
-  const frequentLateness = useMemo(() => computeFrequentLateness(filteredRecords), [filteredRecords]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -187,13 +180,13 @@ function CompanyAttendancePage() {
       key: "employee",
       header: "Сотрудник",
       sticky: "left",
-      width: "196px",
+      width: "216px",
       render: (row) => (
         <div className="flex items-center gap-2.5">
           <Avatar name={row.employeeName} size="sm" />
           <div className="min-w-0">
-            <p className="truncate font-semibold text-ink">{row.employeeName}</p>
-            <p className="truncate text-xs text-ink-muted">{row.position}</p>
+            <p className="truncate font-semibold text-ink" title={row.employeeName}>{row.employeeName}</p>
+            <p className="truncate text-xs text-ink-muted" title={row.position}>{row.position}</p>
           </div>
         </div>
       ),
@@ -297,273 +290,147 @@ function CompanyAttendancePage() {
         placeholder: "Поиск по сотрудникам, объектам...",
       }}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего посещений" value={String(kpis.total)} icon={CalendarCheck} tone="green" footer="За выбранный период" />
-            <MetricCard
-              label="Присутствовали"
-              value={String(kpis.present)}
-              icon={UserCheck}
-              tone="blue"
-              footer={`${kpis.presentPercent}% от общего`}
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MetricCard label="Всего посещений" value={String(kpis.total)} icon={CalendarCheck} tone="green" footer="За выбранный период" />
+          <MetricCard
+            label="Присутствовали"
+            value={String(kpis.present)}
+            icon={UserCheck}
+            tone="blue"
+            footer={`${kpis.presentPercent}% от общего`}
+          />
+          <MetricCard
+            label="Отсутствовали"
+            value={String(kpis.absent)}
+            icon={CalendarX2}
+            tone="orange"
+            footer={`${kpis.absentPercent}% от общего`}
+          />
+          <MetricCard
+            label="Опоздали"
+            value={String(kpis.late)}
+            icon={CalendarClock}
+            tone="purple"
+            footer={`${kpis.latePercent}% от общего`}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-2.5">
+            <input
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => {
+                setFilters((f) => ({ ...f, dateFrom: e.target.value }));
+                setPage(1);
+              }}
+              className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
             />
-            <MetricCard
-              label="Отсутствовали"
-              value={String(kpis.absent)}
+            <span className="text-ink-muted">–</span>
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(e) => {
+                setFilters((f) => ({ ...f, dateTo: e.target.value }));
+                setPage(1);
+              }}
+              className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
+            />
+          </div>
+          <CustomSelect
+            size="sm"
+            searchable
+            aria-label="Объект"
+            value={filters.objectName}
+            onValueChange={(v) => {
+              setFilters((f) => ({ ...f, objectName: v }));
+              setPage(1);
+            }}
+            options={[{ value: "all", label: "Объект: Все" }, ...ATTENDANCE_OBJECTS.map((o) => ({ value: o, label: o }))]}
+          />
+          <CustomSelect
+            size="sm"
+            searchable
+            aria-label="Сотрудник"
+            value={filters.employeeName}
+            onValueChange={(v) => {
+              setFilters((f) => ({ ...f, employeeName: v }));
+              setPage(1);
+            }}
+            options={[
+              { value: "all", label: "Сотрудник: Все" },
+              ...ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name })),
+            ]}
+          />
+          <CustomSelect
+            size="sm"
+            searchable
+            aria-label="Бригада"
+            value={filters.brigadeName}
+            onValueChange={(v) => {
+              setFilters((f) => ({ ...f, brigadeName: v }));
+              setPage(1);
+            }}
+            options={[
+              { value: "all", label: "Бригада: Все" },
+              ...ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name })),
+            ]}
+          />
+          <CustomSelect
+            size="sm"
+            aria-label="Статус"
+            value={filters.status}
+            onValueChange={(v) => {
+              setFilters((f) => ({ ...f, status: v as AttendanceStatus | "all" }));
+              setPage(1);
+            }}
+            options={STATUS_FILTER_OPTIONS}
+          />
+          <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
+            <RefreshCw size={14} /> Сбросить фильтры
+          </Button>
+          <Button size="sm" className="h-9" onClick={() => setFormRecord(null)}>
+            <Plus size={14} /> Добавить посещение
+          </Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={handleExport}>
+            <Download size={14} /> Экспорт
+          </Button>
+        </div>
+
+        <Card>
+          {pageRows.length > 0 ? (
+            <DataTable
+              columns={columns}
+              rows={pageRows}
+              rowKey={(row) => row.id}
+              onRowClick={(row) => setViewRecord(row)}
+            />
+          ) : (
+            <EmptyState
               icon={CalendarX2}
-              tone="orange"
-              footer={`${kpis.absentPercent}% от общего`}
+              title="Записи не найдены"
+              description="Измените параметры поиска или сбросьте фильтры"
+              action={
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  Сбросить фильтры
+                </Button>
+              }
             />
-            <MetricCard
-              label="Опоздали"
-              value={String(kpis.late)}
-              icon={CalendarClock}
-              tone="purple"
-              footer={`${kpis.latePercent}% от общего`}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-2.5">
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }));
-                  setPage(1);
-                }}
-                className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
-              />
-              <span className="text-ink-muted">–</span>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }));
-                  setPage(1);
-                }}
-                className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
-              />
-            </div>
-            <CustomSelect
-              size="sm"
-              searchable
-              aria-label="Объект"
-              value={filters.objectName}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, objectName: v }));
-                setPage(1);
-              }}
-              options={[{ value: "all", label: "Объект: Все" }, ...ATTENDANCE_OBJECTS.map((o) => ({ value: o, label: o }))]}
-            />
-            <CustomSelect
-              size="sm"
-              searchable
-              aria-label="Сотрудник"
-              value={filters.employeeName}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, employeeName: v }));
-                setPage(1);
-              }}
-              options={[
-                { value: "all", label: "Сотрудник: Все" },
-                ...ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name })),
-              ]}
-            />
-            <CustomSelect
-              size="sm"
-              searchable
-              aria-label="Бригада"
-              value={filters.brigadeName}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, brigadeName: v }));
-                setPage(1);
-              }}
-              options={[
-                { value: "all", label: "Бригада: Все" },
-                ...ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name })),
-              ]}
-            />
-            <CustomSelect
-              size="sm"
-              aria-label="Статус"
-              value={filters.status}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, status: v as AttendanceStatus | "all" }));
-                setPage(1);
-              }}
-              options={STATUS_FILTER_OPTIONS}
-            />
-            <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
-              <RefreshCw size={14} /> Сбросить фильтры
-            </Button>
-          </div>
-
-          <Card>
-            {pageRows.length > 0 ? (
-              <DataTable
-                columns={columns}
-                rows={pageRows}
-                rowKey={(row) => row.id}
-                onRowClick={(row) => setViewRecord(row)}
-              />
-            ) : (
-              <EmptyState
-                icon={CalendarX2}
-                title="Записи не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
-                action={
-                  <Button variant="outline" size="sm" onClick={resetFilters}>
-                    Сбросить фильтры
-                  </Button>
-                }
-              />
-            )}
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              total={filteredRecords.length}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              itemLabel="записей"
-            />
-          </Card>
-        </div>
-
-        <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
-          <div className="flex flex-col gap-2">
-            <Button className="w-full" onClick={() => setFormRecord(null)}>
-              <Plus size={16} /> Добавить посещение
-            </Button>
-            <Button variant="outline" className="w-full" onClick={handleExport}>
-              <Download size={16} /> Экспорт
-            </Button>
-          </div>
-
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
-            <div className="mt-4 space-y-3.5">
-              <div>
-                <p className="text-xs font-medium text-ink-secondary">Период</p>
-                <div className="mt-1.5 flex flex-col gap-2">
-                  <input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
-                    className={cnFull(dateInputClass)}
-                  />
-                  <input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
-                    className={cnFull(dateInputClass)}
-                  />
-                </div>
-              </div>
-
-              <FilterField label="Объект">
-                <CustomSelect
-                  size="sm"
-                  fullWidth
-                  searchable
-                  aria-label="Объект"
-                  value={filters.objectName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
-                  options={[{ value: "all", label: "Все объекты" }, ...ATTENDANCE_OBJECTS.map((o) => ({ value: o, label: o }))]}
-                />
-              </FilterField>
-
-              <FilterField label="Бригада">
-                <CustomSelect
-                  size="sm"
-                  fullWidth
-                  searchable
-                  aria-label="Бригада"
-                  value={filters.brigadeName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
-                  options={[
-                    { value: "all", label: "Все бригады" },
-                    ...ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name })),
-                  ]}
-                />
-              </FilterField>
-
-              <FilterField label="Сотрудник">
-                <CustomSelect
-                  size="sm"
-                  fullWidth
-                  searchable
-                  aria-label="Сотрудник"
-                  value={filters.employeeName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, employeeName: v }))}
-                  options={[
-                    { value: "all", label: "Все сотрудники" },
-                    ...ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name })),
-                  ]}
-                />
-              </FilterField>
-
-              <FilterField label="Статус">
-                <CustomSelect
-                  size="sm"
-                  fullWidth
-                  aria-label="Статус"
-                  value={filters.status}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v as AttendanceStatus | "all" }))}
-                  options={[
-                    { value: "all", label: "Все статусы" },
-                    { value: "present", label: "Присутствовал" },
-                    { value: "late", label: "Опоздание" },
-                    { value: "absent", label: "Отсутствовал" },
-                  ]}
-                />
-              </FilterField>
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <Button className="flex-1" onClick={() => setPage(1)}>
-                Применить
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={resetFilters}>
-                Сбросить
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Статистика за период</h2>
-            <div className="mt-4">
-              <SpecializationDonut slices={statusSlices} total={filteredKpis.total} size={176} />
-            </div>
-            <div className="mt-4">
-              <SpecializationLegend slices={statusSlices} />
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Частые опоздания</h2>
-            <ul className="mt-3.5 space-y-3">
-              {frequentLateness.map((row) => (
-                <li key={row.employeeName} className="flex items-center gap-2.5">
-                  <Avatar name={row.employeeName} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{row.employeeName}</span>
-                  <span className="shrink-0 text-xs font-semibold text-ink-secondary">{row.count} раза</span>
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
-            >
-              Все отчёты →
-            </button>
-          </Card>
-        </div>
+          )}
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={filteredRecords.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            itemLabel="записей"
+          />
+        </Card>
       </div>
 
       <AttendanceFormModal
@@ -585,18 +452,5 @@ function CompanyAttendancePage() {
         onConfirm={handleDeleteConfirmed}
       />
     </AppLayout>
-  );
-}
-
-function cnFull(base: string): string {
-  return `${base} w-full`;
-}
-
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-ink-secondary">{label}</p>
-      <div className="mt-1.5">{children}</div>
-    </div>
   );
 }
