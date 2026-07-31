@@ -52,6 +52,10 @@ public static class DependencyInjection
             .Validate(o => !string.IsNullOrEmpty(o.RootPath), "FileStorage:RootPath must be set.")
             .Validate(o => !string.IsNullOrEmpty(o.SignedUrlSecret) && Encoding.UTF8.GetByteCount(o.SignedUrlSecret) >= 32,
                 "FileStorage:SignedUrlSecret must be set and at least 32 bytes (MASTER §11.9) — never in a committed appsettings.json, use ENV/user-secrets.")
+            .Validate(o => o.MaxFileSizeBytes > 0, "FileStorage:MaxFileSizeBytes must be positive.")
+            .Validate(o => o.MaxPhotosPerProgress > 0, "FileStorage:MaxPhotosPerProgress must be positive.")
+            .Validate(o => o.MaxTotalUploadSizeBytes >= o.MaxFileSizeBytes,
+                "FileStorage:MaxTotalUploadSizeBytes must be at least MaxFileSizeBytes.")
             .ValidateOnStart();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();

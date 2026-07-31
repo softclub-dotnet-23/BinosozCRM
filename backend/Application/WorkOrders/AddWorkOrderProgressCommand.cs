@@ -29,6 +29,9 @@ public sealed class AddWorkOrderProgressCommandValidator : AbstractValidator<Add
         RuleFor(x => x.WorkOrderId).NotEmpty();
         RuleFor(x => x.ReportedQty).GreaterThan(0m);
         RuleFor(x => x.Comment).MaximumLength(2000);
+        RuleFor(x => x.Photos)
+            .Must(photos => photos.Count <= options.MaxPhotosPerProgress)
+            .WithMessage($"No more than {options.MaxPhotosPerProgress} photos can be uploaded at once.");
 
         // §11.9: size limit + allow-list MIME (not blacklist), enforced here
         // as the same VALIDATION_FAILED path as every other bad request —
@@ -49,7 +52,8 @@ public sealed class AddWorkOrderProgressCommandValidator : AbstractValidator<Add
 public sealed class AddWorkOrderProgressCommandHandler(
     IApplicationDbContext context,
     ICurrentUserService currentUser,
-    IFileStorageService fileStorage)
+    IFileStorageService fileStorage,
+    IOptions<FileStorageOptions> fileStorageOptions)
     : IRequestHandler<AddWorkOrderProgressCommand, Result<WorkOrderProgressDto>>
 {
     public async Task<Result<WorkOrderProgressDto>> Handle(AddWorkOrderProgressCommand request, CancellationToken cancellationToken)
@@ -63,9 +67,32 @@ public sealed class AddWorkOrderProgressCommandHandler(
             return Result.Failure<WorkOrderProgressDto>(
                 new Error("WORK_ORDER_INVALID_TRANSITION", "Progress can only be reported while the work order is in progress."));
 
-        var photoKeys = new List<string>(request.Photos.Count);
+        var options = fileStorageOptions.Value;
+        if (request.Photos.Count > options.MaxPhotosPerProgress)
+            return Result.Failure<WorkOrderProgressDto>(new Error("VALIDATION_FAILED", $"No more than {options.MaxPhotosPerProgress} photos can be uploaded at once."));
+
+        // IFormFile.Length is metadata supplied by the multipart parser. Buffer
+        // every stream with hard byte caps before persisting any photo, so a
+        // dishonest/truncated stream cannot bypass the limit and no rejected
+        // request leaves partially stored files behind.
+        var bufferedPhotos = new List<(byte[] Content, string ContentType)>(request.Photos.Count);
+        long totalBytes = 0;
         foreach (var photo in request.Photos)
-            photoKeys.Add(await fileStorage.SaveAsync(photo.Content, photo.ContentType, cancellationToken));
+        {
+            var bufferedResult = await ReadPhotoAsync(photo.Content, options.MaxFileSizeBytes, options.MaxTotalUploadSizeBytes - totalBytes, cancellationToken);
+            if (bufferedResult.IsFailure)
+                return Result.Failure<WorkOrderProgressDto>(bufferedResult.Error);
+
+            totalBytes += bufferedResult.Value.LongLength;
+            bufferedPhotos.Add((bufferedResult.Value, photo.ContentType));
+        }
+
+        var photoKeys = new List<string>(bufferedPhotos.Count);
+        foreach (var photo in bufferedPhotos)
+        {
+            await using var content = new MemoryStream(photo.Content, writable: false);
+            photoKeys.Add(await fileStorage.SaveAsync(content, photo.ContentType, cancellationToken));
+        }
 
         var progress = WorkOrderProgress.Create(
             order.CompanyId,
@@ -80,5 +107,37 @@ public sealed class AddWorkOrderProgressCommandHandler(
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(WorkOrderProgressDto.FromEntity(progress, fileStorage));
+    }
+
+    private static async Task<Result<byte[]>> ReadPhotoAsync(
+        Stream content,
+        long maxFileSizeBytes,
+        long remainingTotalBytes,
+        CancellationToken cancellationToken)
+    {
+        if (remainingTotalBytes <= 0)
+            return Result.Failure<byte[]>(new Error("VALIDATION_FAILED", "Total upload size exceeds the allowed limit."));
+
+        await using var buffered = new MemoryStream();
+        var buffer = new byte[81920];
+        long bytesRead = 0;
+
+        while (true)
+        {
+            var read = await content.ReadAsync(buffer.AsMemory(), cancellationToken);
+            if (read == 0)
+                break;
+
+            bytesRead += read;
+            if (bytesRead > maxFileSizeBytes)
+                return Result.Failure<byte[]>(new Error("VALIDATION_FAILED", "An uploaded photo exceeds the allowed file size."));
+
+            if (bytesRead > remainingTotalBytes)
+                return Result.Failure<byte[]>(new Error("VALIDATION_FAILED", "Total upload size exceeds the allowed limit."));
+
+            await buffered.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return Result.Success(buffered.ToArray());
     }
 }
