@@ -27,7 +27,7 @@ WORKDIR /app
 
 # Non-root — the runtime image doesn't need root, and Railway containers
 # gain nothing from running as one.
-RUN useradd --uid 1654 --user-group --no-create-home appuser
+RUN useradd --uid 5000 --user-group --no-create-home appuser
 COPY --from=build --chown=appuser:appuser /app/publish .
 USER appuser
 
