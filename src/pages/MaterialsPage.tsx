@@ -6,6 +6,7 @@ import {
   Eye,
   Layers,
   LayoutGrid,
+  MoreVertical,
   Package,
   Pencil,
   Plus,
@@ -65,9 +66,6 @@ const STATUS_FILTER_OPTIONS: { value: MaterialStatus | "all"; label: string }[] 
   { value: "low", label: "Низкий остаток" },
   { value: "critical", label: "Критический" },
 ];
-
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function formatCompactAmount(value: number): string {
   if (value < 100000) return formatNumber(Math.round(value));
@@ -306,31 +304,25 @@ function CompanyMaterialsPage() {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "116px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть материал" onClick={() => setViewMaterial(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          {canManage && (
-            <>
-              <button type="button" aria-label="Редактировать материал" onClick={() => setFormMaterial(row)} className={iconButtonClass}>
-                <Pencil size={14} />
-              </button>
-              <DropdownMenu
-                trigger={<span className={iconButtonClass}>⋯</span>}
-                items={[
-                  { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setViewMaterial(row) },
-                  { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormMaterial(row) },
-                  { label: "Создать поступление", icon: <TrendingUp size={14} />, onClick: () => showToast("Форма поступления пока в разработке", "info") },
-                  { label: "Создать списание", icon: <TrendingDown size={14} />, onClick: () => showToast("Форма списания пока в разработке", "info") },
-                  { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
-                ]}
-              />
-            </>
-          )}
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu
+            trigger={<MoreVertical size={16} />}
+            items={[
+              { label: "Просмотр", icon: <Eye size={14} />, onClick: () => setViewMaterial(row) },
+              ...(canManage
+                ? [
+                    { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormMaterial(row) },
+                    { label: "Создать поступление", icon: <TrendingUp size={14} />, onClick: () => showToast("Форма поступления пока в разработке", "info") },
+                    { label: "Создать списание", icon: <TrendingDown size={14} />, onClick: () => showToast("Форма списания пока в разработке", "info") },
+                    { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+                  ]
+                : []),
+            ]}
+          />
         </div>
       ),
     },

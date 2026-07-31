@@ -732,6 +732,12 @@ export interface SessionUser {
   fullName: string;
   role: UserRole;
   employeeId: string | null;
+  /** True only when this session came from a real POST /auth/login round trip against the
+   * backend (real JWT tokens saved in tokenStorage). False for the local mock/demo login —
+   * backend-connected pages must gate protected requests on this, not on `role` alone, since
+   * mock roles like "administrator"/"worker"/"storekeeper" have no backend counterpart at all
+   * and a mock "owner"-adjacent role must never be treated as a real backend Owner. */
+  isBackendSession: boolean;
 }
 
 export type PayrollRole = "accountant" | "owner" | "prorab";

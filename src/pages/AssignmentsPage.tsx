@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Ban, CheckCircle, CheckCircle2, ClipboardList, Eye, Pencil, Plus, Trash2, Users, XCircle } from "lucide-react";
+import { Ban, CheckCircle, CheckCircle2, ClipboardList, Eye, MoreVertical, Pencil, Plus, Trash2, Users, XCircle } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -238,7 +238,7 @@ export default function AssignmentsPage() {
       render: (row) => (
         <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className="text-lg leading-none">⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: a.actionView, icon: <Eye size={14} />, onClick: () => setDrawerTarget(row) },
               {

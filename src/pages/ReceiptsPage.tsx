@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Banknote, Boxes, Download, Eye, FileInput, LayoutGrid, Pencil, Plus, RefreshCw, Trash2, UserCog } from "lucide-react";
+import { Banknote, Boxes, Download, Eye, FileInput, LayoutGrid, MoreVertical, Pencil, Plus, RefreshCw, Trash2, UserCog } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -28,7 +28,6 @@ import { computeReceiptKpis } from "../utils/receiptAnalytics";
 import { adjustMaterialStock } from "../utils/materialStockEffects";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatNumber } from "../utils/format";
-import { formatDateShort } from "../utils/date";
 import type { MaterialReceipt, ReceiptFilters } from "../types";
 
 const DEFAULT_FILTERS: ReceiptFilters = {
@@ -41,8 +40,6 @@ const DEFAULT_FILTERS: ReceiptFilters = {
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function formatCompactAmount(value: number): string {
   if (value < 100000) return formatNumber(Math.round(value * 10) / 10);
@@ -135,9 +132,8 @@ export default function ReceiptsPage() {
   }
 
   function handleExport() {
-    const header = ["Дата", "Номер", "Поставщик", "Объект", "Бригада", "Материалов", "Кол-во", "Сумма"];
+    const header = ["Номер", "Поставщик", "Объект", "Бригада", "Материалов", "Кол-во", "Сумма"];
     const rows = filteredReceipts.map((r) => [
-      formatDateShort(r.date),
       r.documentNumber,
       r.supplier,
       r.objectName,
@@ -166,7 +162,6 @@ export default function ReceiptsPage() {
       width: "100px",
       render: (row) => <span className="whitespace-nowrap font-semibold text-ink">{row.documentNumber}</span>,
     },
-    { key: "date", header: "Дата", render: (row) => <span className="whitespace-nowrap text-ink">{formatDateShort(row.date)}</span> },
     { key: "supplier", header: "Поставщик", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.supplier}</span> },
     { key: "object", header: "Объект", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.objectName}</span> },
     { key: "materials", header: "Материалов", render: (row) => <span className="tabular text-ink-secondary">{row.lines.length}</span> },
@@ -192,21 +187,16 @@ export default function ReceiptsPage() {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "116px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть поступление" onClick={() => setViewReceipt(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label="Редактировать поступление" onClick={() => setFormReceipt(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className={iconButtonClass}>⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setViewReceipt(row) },
+              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormReceipt(row) },
               { label: "Дублировать", icon: <FileInput size={14} />, onClick: () => handleDuplicate(row) },
               { label: "Скачать накладную", icon: <Download size={14} />, onClick: () => showToast("Накладная скачана", "info") },
               { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },

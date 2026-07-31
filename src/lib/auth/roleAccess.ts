@@ -32,9 +32,23 @@ const FULL_ACCESS = "*" as const;
 const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   owner: FULL_ACCESS,
   administrator: FULL_ACCESS,
-  accountant: ["/dashboard", "/payroll", "/reports", "/budgets", "/estimates", "/objects"],
-  prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/attendance", "/inventory/*", "/reports"],
-  brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials", "/reports", "/payroll", "/profile"],
+  accountant: [
+    "/dashboard", "/payroll", "/payroll-entries", "/payroll-advances", "/absences", "/reports", "/budgets", "/estimates", "/objects",
+  ],
+  // NOTE: /payroll-advances (PayrollAdvancesController) is class-level
+  // [Authorize(Roles="Owner,Accountant")] — Prorab and Brigadir are both excluded here, live-
+  // verified via curl (both get a real 403), even though the GET method also carries a
+  // "...,Brigadir" override that looks like it should admit Brigadir. It doesn't: ASP.NET Core
+  // combines multiple [Authorize] attributes on one action with AND, not "most specific wins", so
+  // Brigadir still fails the class-level check. Do not re-add either role without re-verifying live.
+  prorab: [
+    "/dashboard", "/objects", "/works", "/individual-tasks", "/timesheets", "/brigades/*", "/attendance", "/inventory/*", "/reports",
+    "/material-requests", "/material-consumption-reports", "/material-deliveries", "/absences", "/payroll",
+  ],
+  brigadir: [
+    "/dashboard", "/works", "/individual-tasks", "/timesheets", "/brigades", "/attendance", "/inventory/materials", "/reports", "/payroll", "/profile",
+    "/material-requests", "/material-consumption-reports", "/payroll-entries", "/work-orders",
+  ],
   worker: ["/worker/*"],
   storekeeper: ["/dashboard", "/inventory/*", "/reports"],
 };

@@ -6,6 +6,7 @@ import {
   Eye,
   FileText,
   Filter,
+  MoreVertical,
   Pencil,
   Plus,
   RotateCcw,
@@ -218,7 +219,7 @@ export default function EstimatesPage() {
       render: (row) => (
         <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className="text-lg leading-none">⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
               {

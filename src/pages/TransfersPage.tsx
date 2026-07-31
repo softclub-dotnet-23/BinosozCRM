@@ -8,6 +8,7 @@ import {
   Eye,
   History,
   Layers,
+  MoreVertical,
   Pencil,
   Plus,
   Printer,
@@ -56,8 +57,6 @@ const DEFAULT_FILTERS: TransferFilters = {
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function formatCompactAmount(value: number): string {
   if (value < 100000) return formatNumber(Math.round(value * 10) / 10);
@@ -236,19 +235,13 @@ export default function TransfersPage() {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "116px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть перемещение" onClick={() => setViewTransfer(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label="Редактировать перемещение" onClick={() => setFormTransfer(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className={iconButtonClass}>⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setViewTransfer(row) },
               { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormTransfer(row) },

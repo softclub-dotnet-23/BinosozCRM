@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Eye, Pencil, Plus, RefreshCw, TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
+import { Download, Eye, MoreVertical, Pencil, Plus, RefreshCw, TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from "../components/tables/DataTable"
 import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { DropdownMenu } from "../components/ui/DropdownMenu";
 import { DonutChart } from "../components/charts/DonutChart";
 import { PayrollStatusBadge, PAYROLL_STATUSES, payrollStatusLabel } from "../components/payroll/PayrollStatusBadge";
 import { PayrollGenerateModal } from "../components/payroll/PayrollGenerateModal";
@@ -37,9 +38,6 @@ const DEFAULT_FILTERS: PayrollFilters = {
   dateFrom: "2026-07-01",
   dateTo: "2026-07-31",
 };
-
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function overlaps(record: PayrollRecord, from: string, to: string): boolean {
   if (from && record.periodEnd < from) return false;
@@ -297,19 +295,20 @@ function CompanyPayrollPage() {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "92px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть начисление" onClick={() => setDetailRecord(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          {canEditPayroll(role, row.status) && (
-            <button type="button" aria-label="Редактировать начисление" onClick={() => setEditRecord(row)} className={iconButtonClass}>
-              <Pencil size={14} />
-            </button>
-          )}
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu
+            trigger={<MoreVertical size={16} />}
+            items={[
+              { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setDetailRecord(row) },
+              ...(canEditPayroll(role, row.status)
+                ? [{ label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setEditRecord(row) }]
+                : []),
+            ]}
+          />
         </div>
       ),
     },

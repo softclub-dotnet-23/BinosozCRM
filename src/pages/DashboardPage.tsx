@@ -10,6 +10,7 @@ import { AttentionList } from "../components/tables/AttentionList";
 import { BudgetChart } from "../components/charts/BudgetChart";
 import { BudgetSummaryBlocks } from "../components/dashboard/BudgetSummaryBlocks";
 import { PayrollCard } from "../components/dashboard/PayrollCard";
+import { WorkStatusFromBackendCard } from "../components/dashboard/WorkStatusFromBackendCard";
 import { budgetSeriesByPeriod } from "../data/mockDashboard";
 import { objectsRepository, worksRepository, materialsRepository, payrollRepository } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
@@ -179,6 +180,10 @@ function CompanyDashboard() {
           tone="purple"
           footer={d.kpiOverallProgress}
         />
+      </div>
+
+      <div className="mt-4">
+        <WorkStatusFromBackendCard />
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">

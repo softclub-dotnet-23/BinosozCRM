@@ -1,4 +1,4 @@
-import { CheckCircle, Copy, Eye, PauseCircle, Pencil, Trash2, UserCog, Users } from "lucide-react";
+import { CheckCircle, Copy, Eye, MoreVertical, PauseCircle, Pencil, Trash2, UserCog, Users } from "lucide-react";
 import { DropdownMenu } from "../ui/DropdownMenu";
 import { useLanguage } from "../../context/LanguageContext";
 import type { Brigade } from "../../types";
@@ -25,7 +25,7 @@ export function BrigadeActionMenu({ brigade, onAction }: BrigadeActionMenuProps)
   const c = strings.common;
   return (
     <DropdownMenu
-      trigger={<span className="text-lg leading-none">⋯</span>}
+      trigger={<MoreVertical size={16} />}
       items={[
         { label: c.open, icon: <Eye size={14} />, onClick: () => onAction("open", brigade) },
         { label: c.edit, icon: <Pencil size={14} />, onClick: () => onAction("edit", brigade) },

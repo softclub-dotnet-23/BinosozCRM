@@ -14,6 +14,10 @@ interface DropdownMenuProps {
   trigger: ReactNode;
   align?: "left" | "right";
   items: DropdownMenuItem[];
+  /** Announced via aria-label/title on the trigger button — every row-actions menu in the app
+   * should read the same way to assistive tech, so this defaults to "Действия" rather than
+   * requiring every call site to repeat it. */
+  ariaLabel?: string;
 }
 
 interface TriggerRect {
@@ -34,7 +38,7 @@ const MARGIN = 12;
  * and stacking context; rendering at the document root sidesteps that entirely instead of papering
  * over it with a bigger z-index.
  */
-export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuProps) {
+export function DropdownMenu({ trigger, align = "right", items, ariaLabel = "Действия" }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<TriggerRect | null>(null);
   const [placement, setPlacement] = useState<{ top: number; left: number } | null>(null);
@@ -131,12 +135,14 @@ export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuPr
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
+        aria-label={ariaLabel}
+        title={ariaLabel}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
         className={cn(
-          "rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink",
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
           open && "bg-primary-soft text-primary hover:bg-primary-soft",
         )}
       >

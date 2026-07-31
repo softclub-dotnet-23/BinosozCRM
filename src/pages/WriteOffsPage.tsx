@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Banknote, Download, Eye, Layers, Pencil, PackageMinus, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlertTriangle, Banknote, Download, Eye, Layers, MoreVertical, Pencil, PackageMinus, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -14,21 +14,15 @@ import { CustomSelect } from "../components/ui/CustomSelect";
 import { WriteOffFormModal } from "../components/materials/WriteOffFormModal";
 import { WriteOffDetailDrawer } from "../components/materials/WriteOffDetailDrawer";
 import { writeOffReasonLabel, WRITE_OFF_REASONS } from "../components/materials/InventoryStatusBadges";
-import {
-  WRITE_OFF_OBJECTS,
-  WRITE_OFF_BRIGADES,
-  writeOffQuantity,
-  writeOffTotal,
-} from "../data/mockMaterialWriteOffs";
+import { WRITE_OFF_OBJECTS, WRITE_OFF_BRIGADES, writeOffTotal } from "../data/mockMaterialWriteOffs";
 import { materialWriteOffsRepository, employeesRepository } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { responsiblePersonName } from "../utils/responsiblePerson";
-import { computeWriteOffKpis, computeFrequentReasons } from "../utils/writeOffAnalytics";
+import { computeWriteOffKpis } from "../utils/writeOffAnalytics";
 import { adjustMaterialStock } from "../utils/materialStockEffects";
 import { useToast } from "../hooks/useToast";
 import { formatCurrency, formatNumber } from "../utils/format";
-import { formatDateShort } from "../utils/date";
 import type { MaterialWriteOff, WriteOffFilters } from "../types";
 
 const DEFAULT_FILTERS: WriteOffFilters = {
@@ -41,8 +35,6 @@ const DEFAULT_FILTERS: WriteOffFilters = {
 
 const selectClass =
   "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 function formatCompactAmount(value: number): string {
   if (value < 100000) return formatNumber(Math.round(value * 10) / 10);
@@ -90,7 +82,6 @@ export default function WriteOffsPage() {
   }, [writeOffs, search, filters, employees]);
 
   const kpis = useMemo(() => computeWriteOffKpis(filteredWriteOffs), [filteredWriteOffs]);
-  const frequentReasons = useMemo(() => computeFrequentReasons(filteredWriteOffs), [filteredWriteOffs]);
 
   const pageCount = Math.max(1, Math.ceil(filteredWriteOffs.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -131,16 +122,13 @@ export default function WriteOffsPage() {
   }
 
   function handleExport() {
-    const header = ["Дата", "Номер", "Объект", "Бригада", "Материалов", "Кол-во", "Сумма", "Причина", "Ответственный"];
+    const header = ["Номер", "Объект", "Бригада", "Материалов", "Сумма", "Ответственный"];
     const rows = filteredWriteOffs.map((w) => [
-      formatDateShort(w.date),
       w.documentNumber,
       w.objectName,
       w.brigadeName ?? "",
       w.lines.length,
-      writeOffQuantity(w).toFixed(2),
       writeOffTotal(w).toFixed(2),
-      writeOffReasonLabel(w.reason),
       responsiblePersonName(w.responsible, employees),
     ]);
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -163,21 +151,14 @@ export default function WriteOffsPage() {
       width: "100px",
       render: (row) => <span className="whitespace-nowrap font-semibold text-ink">{row.documentNumber}</span>,
     },
-    { key: "date", header: "Дата", render: (row) => <span className="whitespace-nowrap text-ink">{formatDateShort(row.date)}</span> },
     { key: "object", header: "Объект", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.objectName}</span> },
     { key: "brigade", header: "Бригада", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.brigadeName ?? "—"}</span> },
     { key: "materials", header: "Материалов", render: (row) => <span className="tabular text-ink-secondary">{row.lines.length}</span> },
-    {
-      key: "quantity",
-      header: "Кол-во (ед.)",
-      render: (row) => <span className="tabular whitespace-nowrap font-semibold text-ink">{formatNumber(writeOffQuantity(row))}</span>,
-    },
     {
       key: "total",
       header: "Сумма (сомони)",
       render: (row) => <span className="tabular whitespace-nowrap font-semibold text-red">{formatNumber(writeOffTotal(row))}</span>,
     },
-    { key: "reason", header: "Причина", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{writeOffReasonLabel(row.reason)}</span> },
     {
       key: "responsible",
       header: "Кто списал",
@@ -195,21 +176,16 @@ export default function WriteOffsPage() {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "116px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть списание" onClick={() => setViewWriteOff(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label="Редактировать списание" onClick={() => setFormWriteOff(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className={iconButtonClass}>⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setViewWriteOff(row) },
+              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormWriteOff(row) },
               { label: "Скачать акт", icon: <Download size={14} />, onClick: () => showToast("Акт скачан", "info") },
               { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
             ]}
@@ -415,27 +391,6 @@ export default function WriteOffsPage() {
                 <dd className="font-bold text-ink tabular">{formatCurrency(Math.round(kpis.totalCost))}</dd>
               </div>
             </dl>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Частые причины</h2>
-            <div className="mt-3.5 space-y-2.5 text-sm">
-              {frequentReasons.map(({ reason, count }) => (
-                <button
-                  key={reason}
-                  type="button"
-                  onClick={() => {
-                    setFilters((f) => ({ ...f, reason }));
-                    setPage(1);
-                  }}
-                  className="flex w-full items-center justify-between rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-surface-3"
-                >
-                  <span className="text-ink-secondary">{writeOffReasonLabel(reason)}</span>
-                  <span className="font-bold text-ink tabular">{count}</span>
-                </button>
-              ))}
-              {frequentReasons.length === 0 && <p className="text-ink-muted">Нет данных за период</p>}
-            </div>
           </Card>
         </div>
       </div>

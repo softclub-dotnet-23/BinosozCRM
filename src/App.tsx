@@ -8,11 +8,21 @@ import { ProtectedRoute, PublicOnlyRoute } from "./components/auth/RouteGuards";
 import { useAuth } from "./context/AuthContext";
 import { ROLE_HOME } from "./lib/auth/roleAccess";
 import LoginPage from "./pages/LoginPage";
+import ChangePasswordRequiredPage from "./pages/ChangePasswordRequiredPage";
 import DashboardPage from "./pages/DashboardPage";
 import ObjectsPage from "./pages/ObjectsPage";
 import EstimatesPage from "./pages/EstimatesPage";
 import BudgetsPage from "./pages/BudgetsPage";
 import WorksPage from "./pages/WorksPage";
+import IndividualTasksPage from "./pages/IndividualTasksPage";
+import TimesheetsPage from "./pages/TimesheetsPage";
+import MaterialRequestsPage from "./pages/MaterialRequestsPage";
+import MaterialConsumptionReportsPage from "./pages/MaterialConsumptionReportsPage";
+import MaterialDeliveriesPage from "./pages/MaterialDeliveriesPage";
+import AbsencesPage from "./pages/AbsencesPage";
+import PayrollEntriesPage from "./pages/PayrollEntriesPage";
+import PayrollAdvancesPage from "./pages/PayrollAdvancesPage";
+import WorkOrdersPage from "./pages/WorkOrdersPage";
 import BrigadesPage from "./pages/BrigadesPage";
 import BrigadeCompositionPage from "./pages/BrigadeCompositionPage";
 import AssignmentsPage from "./pages/AssignmentsPage";
@@ -79,6 +89,7 @@ function App() {
               }
             />
             <Route element={<ProtectedRoute />}>
+              <Route path="/change-password-required" element={<ChangePasswordRequiredPage />} />
               <Route path="/" element={<HomeRedirect />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/worker" element={<Navigate to="/worker/dashboard" replace />} />
@@ -95,6 +106,15 @@ function App() {
               <Route path="/estimates" element={<EstimatesPage />} />
               <Route path="/budgets" element={<BudgetsPage />} />
               <Route path="/works" element={<WorksPage />} />
+              <Route path="/individual-tasks" element={<IndividualTasksPage />} />
+              <Route path="/timesheets" element={<TimesheetsPage />} />
+              <Route path="/material-requests" element={<MaterialRequestsPage />} />
+              <Route path="/material-consumption-reports" element={<MaterialConsumptionReportsPage />} />
+              <Route path="/material-deliveries" element={<MaterialDeliveriesPage />} />
+              <Route path="/absences" element={<AbsencesPage />} />
+              <Route path="/payroll-entries" element={<PayrollEntriesPage />} />
+              <Route path="/payroll-advances" element={<PayrollAdvancesPage />} />
+              <Route path="/work-orders" element={<WorkOrdersPage />} />
               <Route path="/brigades" element={<BrigadesPage />} />
               <Route path="/brigades/composition" element={<BrigadeCompositionPage />} />
               <Route path="/brigades/assignments" element={<AssignmentsPage />} />

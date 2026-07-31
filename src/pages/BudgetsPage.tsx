@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Eye, Filter, Pencil, Plus, Trash2, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, Filter, MoreVertical, Pencil, Plus, Trash2, Wallet } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -252,21 +252,13 @@ export default function BudgetsPage() {
     {
       key: "actions",
       header: c.tableActions,
-      width: "11%",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            aria-label={s.actionViewBudget}
-            onClick={() => setSelectedId(row.id)}
-            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
-          >
-            <Eye size={16} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className="text-lg leading-none">⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
               {

@@ -1,4 +1,4 @@
-import { CheckCircle, Copy, Eye, PauseCircle, Pencil, Trash2, TrendingUp, UserCog, Users } from "lucide-react";
+import { CheckCircle, Copy, Eye, MoreVertical, PauseCircle, Pencil, Trash2, TrendingUp, UserCog, Users } from "lucide-react";
 import { DropdownMenu } from "../ui/DropdownMenu";
 import { useLanguage } from "../../context/LanguageContext";
 import type { Work } from "../../types";
@@ -42,7 +42,7 @@ export function WorkActionMenu({ work, onAction, actions = ALL_ACTIONS }: WorkAc
 
   return (
     <DropdownMenu
-      trigger={<span className="text-lg leading-none">⋯</span>}
+      trigger={<MoreVertical size={16} />}
       items={[
         ...(allowed.has("open") ? [{ label: c.open, icon: <Eye size={14} />, onClick: () => onAction("open", work) }] : []),
         ...(allowed.has("edit") ? [{ label: c.edit, icon: <Pencil size={14} />, onClick: () => onAction("edit", work) }] : []),

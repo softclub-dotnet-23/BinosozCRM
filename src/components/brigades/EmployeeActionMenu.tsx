@@ -1,4 +1,4 @@
-import { Clock3, Eye, Pencil, Repeat, Trash2, UserCog, Wrench } from "lucide-react";
+import { Clock3, Eye, MoreVertical, Pencil, Repeat, Trash2, UserCog, Wrench } from "lucide-react";
 import { DropdownMenu } from "../ui/DropdownMenu";
 import { useLanguage } from "../../context/LanguageContext";
 import type { Employee } from "../../types";
@@ -16,7 +16,7 @@ export function EmployeeActionMenu({ employee, onAction }: EmployeeActionMenuPro
   const c = strings.common;
   return (
     <DropdownMenu
-      trigger={<span className="text-lg leading-none">⋯</span>}
+      trigger={<MoreVertical size={16} />}
       items={[
         { label: c.open, icon: <Eye size={14} />, onClick: () => onAction("open", employee) },
         { label: c.edit, icon: <Pencil size={14} />, onClick: () => onAction("edit", employee) },

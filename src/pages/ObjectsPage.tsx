@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Building2, CheckCircle2, Eye, Filter, Flag, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, Eye, Filter, Flag, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -189,21 +189,13 @@ export default function ObjectsPage() {
       key: "actions",
       header: c.tableActions,
       sticky: "right",
-      width: "84px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            aria-label={s.actionViewObject}
-            onClick={() => setSelectedId(row.id)}
-            className="rounded-lg p-1.5 text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
-          >
-            <Eye size={16} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className="text-lg leading-none">⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
               { label: c.edit, icon: <Pencil size={14} />, onClick: () => showToast(c.editUnavailableInDemo, "info") },

@@ -99,7 +99,14 @@ function buildNavItems(s: AppStrings["sidebar"]): NavEntry[] {
         { to: "/budgets", label: s.budgets },
       ],
     },
-    { to: "/works", label: s.works, icon: ClipboardCheck },
+    {
+      label: s.works,
+      icon: ClipboardCheck,
+      children: [
+        { to: "/works", label: "Список работ" },
+        { to: "/individual-tasks", label: "Индивидуальные задачи" },
+      ],
+    },
     {
       label: s.brigades,
       icon: HardHat,
@@ -110,19 +117,34 @@ function buildNavItems(s: AppStrings["sidebar"]): NavEntry[] {
       ],
     },
     { to: "/employees", label: s.employees, icon: User },
-    { to: "/attendance", label: s.attendance, icon: Calendar },
+    {
+      label: s.attendance,
+      icon: Calendar,
+      children: [
+        { to: "/timesheets", label: "Табели" },
+        { to: "/absences", label: "Отсутствия" },
+      ],
+    },
     {
       label: s.warehouse,
       icon: Package,
       children: [
         { to: "/inventory/materials", label: s.materials },
-        { to: "/inventory/receipts", label: s.receipts },
-        { to: "/inventory/write-offs", label: s.writeOffs },
+        { to: "/material-requests", label: "Заявки на материалы" },
+        { to: "/material-deliveries", label: "Поступления материалов" },
+        { to: "/material-consumption-reports", label: "Списания материалов" },
         { to: "/inventory/transfers", label: s.transfers },
         { to: "/inventory/stock", label: s.stock },
       ],
     },
-    { to: "/payroll", label: s.payroll, icon: Wallet },
+    {
+      label: s.payroll,
+      icon: Wallet,
+      children: [
+        { to: "/payroll-entries", label: "Начисления зарплаты" },
+        { to: "/payroll-advances", label: "Авансы" },
+      ],
+    },
     { to: "/reports", label: s.reports, icon: BarChart3 },
     { to: "/users", label: s.users, icon: Users },
     { to: "/settings", label: s.settings, icon: Settings },
@@ -133,11 +155,31 @@ function buildBrigadirNavItems(s: AppStrings["sidebar"], onNotYetAvailable: (lab
   return [
     { to: "/dashboard", label: s.dashboard, icon: Home },
     { to: "/brigades", label: s.myBrigade, icon: Users },
-    { to: "/works", label: s.assignedWorks, icon: ClipboardCheck },
-    { to: "/attendance", label: s.attendance, icon: Calendar },
-    { to: "/inventory/materials", label: s.materials, icon: Package },
+    {
+      label: s.assignedWorks,
+      icon: ClipboardCheck,
+      children: [
+        { to: "/works", label: "Список работ" },
+        { to: "/individual-tasks", label: "Мои задачи" },
+        { to: "/work-orders", label: "Мои наряды" },
+      ],
+    },
+    {
+      label: s.attendance,
+      icon: Calendar,
+      children: [{ to: "/timesheets", label: "Табели" }],
+    },
+    {
+      label: s.materials,
+      icon: Package,
+      children: [
+        { to: "/inventory/materials", label: "Каталог материалов" },
+        { to: "/material-requests", label: "Заявки на материалы" },
+        { to: "/material-consumption-reports", label: "Списания материалов" },
+      ],
+    },
     { to: "/reports", label: s.reports, icon: BarChart3 },
-    { to: "/payroll", label: "Зарплата", icon: Wallet },
+    { to: "/payroll-entries", label: "Начисления зарплаты", icon: Wallet },
     { label: "Уведомления", icon: Bell, badge: 2, onClick: () => onNotYetAvailable("Уведомления") },
     { to: "/profile", label: "Профиль", icon: User },
   ];

@@ -3,15 +3,24 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { ROLE_HOME, isRouteAllowed } from "../../lib/auth/roleAccess";
 
-/** Wraps every app route: bounces unauthenticated visitors to /login, and a role trying to open a page outside its access matrix back to its own home route. */
+/** Wraps every app route: bounces unauthenticated visitors to /login, a real-backend session
+ * with a pending forced password change to /change-password-required (mirrors the backend's own
+ * ForcePasswordChangeMiddleware, which 403s everything else until that happens), and a role
+ * trying to open a page outside its access matrix back to its own home route. */
 export function ProtectedRoute() {
-  const { user } = useAuth();
+  const { user, forcePasswordChange } = useAuth();
   const location = useLocation();
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
-  if (!isRouteAllowed(user.role, location.pathname)) {
+  if (forcePasswordChange && location.pathname !== "/change-password-required") {
+    return <Navigate to="/change-password-required" replace />;
+  }
+  if (!forcePasswordChange && location.pathname === "/change-password-required") {
+    return <Navigate to={ROLE_HOME[user.role]} replace />;
+  }
+  if (!forcePasswordChange && !isRouteAllowed(user.role, location.pathname)) {
     return <Navigate to={ROLE_HOME[user.role]} replace />;
   }
   return <Outlet />;

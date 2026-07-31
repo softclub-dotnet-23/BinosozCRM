@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Boxes, Download, Eye, LayoutGrid, Pencil, RefreshCw, TrendingDown } from "lucide-react";
+import { AlertTriangle, Boxes, Download, Eye, LayoutGrid, MoreVertical, Pencil, RefreshCw, TrendingDown } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -15,23 +15,12 @@ import { MaterialStatusBadge } from "../components/materials/MaterialStatusBadge
 import { StockDetailDrawer } from "../components/materials/StockDetailDrawer";
 import { StockAdjustmentModal } from "../components/materials/StockAdjustmentModal";
 import { StockReservationModal } from "../components/materials/StockReservationModal";
-import { DonutChart } from "../components/charts/DonutChart";
 import { MATERIAL_WAREHOUSES, MATERIAL_CATEGORIES } from "../data/mockMaterials";
-import {
-  materialsRepository,
-  materialReceiptsRepository,
-  stockReservationsRepository,
-  stockAdjustmentsRepository,
-} from "../data/repositories";
+import { materialsRepository, stockReservationsRepository, stockAdjustmentsRepository } from "../data/repositories";
 import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { adjustMaterialStock } from "../utils/materialStockEffects";
-import {
-  buildStockRows,
-  computeStockKpis,
-  computeStockStatusBuckets,
-  getCriticalStockRows,
-} from "../utils/stockAnalytics";
+import { buildStockRows, computeStockKpis, getCriticalStockRows } from "../utils/stockAnalytics";
 import { useToast } from "../hooks/useToast";
 import { formatNumber } from "../utils/format";
 import { formatDateTimeShort } from "../utils/date";
@@ -45,16 +34,10 @@ const DEFAULT_FILTERS: StockFilters = {
   dateTo: "2026-07-30",
 };
 
-const selectClass =
-  "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
-
 export default function StockPage() {
   const { showToast } = useToast();
   const [materials] = useRepositoryState(materialsRepository);
   const reservations = useRepositorySnapshot(stockReservationsRepository);
-  const receipts = useRepositorySnapshot(materialReceiptsRepository);
 
   const [search, setSearch] = usePersistentState("filters.stock.search", "");
   const [filters, setFilters] = usePersistentState<StockFilters>("filters.stock.filters", DEFAULT_FILTERS);
@@ -86,7 +69,6 @@ export default function StockPage() {
   }, [allRows, search, filters]);
 
   const kpis = useMemo(() => computeStockKpis(filteredRows), [filteredRows]);
-  const statusBuckets = useMemo(() => computeStockStatusBuckets(filteredRows, receipts), [filteredRows, receipts]);
   const criticalRows = useMemo(() => getCriticalStockRows(filteredRows, 4), [filteredRows]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -251,19 +233,13 @@ export default function StockPage() {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "116px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть остаток" onClick={() => setDetailRow(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label="Корректировать остаток" onClick={() => setAdjustRow(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu
-            trigger={<span className={iconButtonClass}>⋯</span>}
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setDetailRow(row) },
               { label: "Корректировать остаток", icon: <Pencil size={14} />, onClick: () => setAdjustRow(row) },
@@ -396,90 +372,6 @@ export default function StockPage() {
           </Button>
 
           <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
-            <div className="mt-4 space-y-3.5">
-              <FilterField label="Поиск">
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Название материала..."
-                  className={selectClass}
-                />
-              </FilterField>
-
-              <FilterField label="Категория">
-                <CustomSelect
-                  searchable
-                  value={filters.category}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}
-                  options={[{ value: "all", label: "Все категории" }, ...MATERIAL_CATEGORIES.map((c) => ({ value: c, label: c }))]}
-                />
-              </FilterField>
-
-              <FilterField label="Склад">
-                <CustomSelect
-                  value={filters.warehouse}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, warehouse: v }))}
-                  options={[{ value: "all", label: "Все склады" }, ...MATERIAL_WAREHOUSES.map((w) => ({ value: w, label: w }))]}
-                />
-              </FilterField>
-
-              <FilterField label="Статус">
-                <CustomSelect
-                  value={filters.status}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v as StockFilters["status"] }))}
-                  options={[
-                    { value: "all", label: "Все статусы" },
-                    { value: "normal", label: "В наличии" },
-                    { value: "low", label: "Низкий остаток" },
-                    { value: "critical", label: "Критический" },
-                  ]}
-                />
-              </FilterField>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button className="flex-1" onClick={() => setPage(1)}>
-                Применить
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={resetFilters}>
-                Сбросить
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Статистика остатков</h2>
-            {statusBuckets.length > 0 ? (
-              <>
-                <DonutChart
-                  data={statusBuckets}
-                  centerLabel="Всего позиций"
-                  centerValue={String(kpis.totalPositions)}
-                  size={176}
-                  valueFormatter={(value) => formatNumber(value)}
-                />
-                <ul className="mt-4 w-full space-y-2.5">
-                  {statusBuckets.map((bucket) => (
-                    <li key={bucket.category} className="flex items-center gap-2.5 text-sm">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: bucket.color }} />
-                      <span className="text-ink-secondary">{bucket.category}</span>
-                      <span className="ml-auto shrink-0 font-semibold text-ink tabular">
-                        {bucket.amount}{" "}
-                        <span className="text-ink-muted">
-                          ({kpis.totalPositions > 0 ? Math.round((bucket.amount / kpis.totalPositions) * 1000) / 10 : 0}%)
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="mt-4 text-sm text-ink-muted">Нет данных для отображения</p>
-            )}
-          </Card>
-
-          <Card className="p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-ink">Критические остатки</h2>
               {criticalRows.length > 0 && (
@@ -566,14 +458,5 @@ export default function StockPage() {
       />
 
     </AppLayout>
-  );
-}
-
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-ink-secondary">{label}</p>
-      <div className="mt-1.5">{children}</div>
-    </div>
   );
 }

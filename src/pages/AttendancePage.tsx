@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarCheck, CalendarClock, CalendarX2, Download, Eye, Pencil, Plus, RefreshCw, Trash2, UserCheck } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarX2, Download, Eye, MoreVertical, Pencil, Plus, RefreshCw, Trash2, UserCheck } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -7,6 +7,7 @@ import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
+import { DropdownMenu } from "../components/ui/DropdownMenu";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { AttendanceStatusBadge } from "../components/attendance/AttendanceStatusBadge";
@@ -39,9 +40,6 @@ const STATUS_FILTER_OPTIONS: { value: AttendanceStatus | "all"; label: string }[
   { value: "late", label: "Опоздание" },
   { value: "absent", label: "Отсутствовал" },
 ];
-
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -128,7 +126,7 @@ function CompanyAttendancePage() {
   }
 
   function handleExport() {
-    const header = ["Дата", "Сотрудник", "Бригада", "Объект", "Приход", "Уход", "Статус", "Примечание"];
+    const header = ["Дата", "Сотрудник", "Бригада", "Объект", "Приход", "Уход", "Статус"];
     const rows = filteredRecords.map((r) => [
       formatDateShort(r.date),
       r.employeeName,
@@ -137,7 +135,6 @@ function CompanyAttendancePage() {
       r.arrivalTime ?? "",
       r.departureTime ?? "",
       r.status,
-      r.note,
     ]);
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
@@ -245,33 +242,22 @@ function CompanyAttendancePage() {
       render: (row) => <AttendanceStatusBadge status={row.status} />,
     },
     {
-      key: "note",
-      header: "Примечание",
-      render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.note || "—"}</span>,
-    },
-    {
       key: "actions",
       header: "Действия",
       sticky: "right",
-      width: "108px",
+      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть запись" onClick={() => setViewRecord(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label="Редактировать запись" onClick={() => setFormRecord(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
-          <button
-            type="button"
-            aria-label="Удалить запись"
-            onClick={() => setDeleteTarget(row)}
-            className={`${iconButtonClass} hover:border-red hover:text-red`}
-          >
-            <Trash2 size={14} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu
+            trigger={<MoreVertical size={16} />}
+            items={[
+              { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setViewRecord(row) },
+              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormRecord(row) },
+              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+            ]}
+          />
         </div>
       ),
     },

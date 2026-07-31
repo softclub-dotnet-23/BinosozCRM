@@ -5,7 +5,7 @@ import {
   Eye,
   Filter,
   HardHat,
-  MoreHorizontal,
+  MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
@@ -36,7 +36,6 @@ import { staffRepository } from "../data/repositories";
 import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
-import { formatDateShort } from "../utils/date";
 import { useLanguage } from "../context/LanguageContext";
 import type { AppStrings } from "../lib/i18n/appStrings";
 import type { StaffFilters, StaffMember, StaffStatus } from "../types";
@@ -55,9 +54,6 @@ function buildStatusFilterOptions(e: AppStrings["employees"]): { value: StaffSta
     { value: "dismissed", label: e.statusDismissed },
   ];
 }
-
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink";
 
 export default function EmployeesPage() {
   const { showToast } = useToast();
@@ -180,7 +176,7 @@ export default function EmployeesPage() {
   }
 
   function handleExport() {
-    const header = [e.csvId, e.csvFullName, e.csvPosition, e.csvUnit, e.csvPhone, e.csvStatus, e.csvHireDate];
+    const header = [e.csvId, e.csvFullName, e.csvPosition, e.csvUnit, e.csvPhone, e.csvStatus];
     const rows = filteredStaff.map((s) => [
       s.id,
       s.fullName,
@@ -188,7 +184,6 @@ export default function EmployeesPage() {
       s.brigadeName ?? s.department ?? "",
       s.phone,
       s.status,
-      formatDateShort(s.hireDate),
     ]);
     const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
@@ -268,31 +263,16 @@ export default function EmployeesPage() {
       render: (row) => <StaffStatusBadge status={row.status} />,
     },
     {
-      key: "hireDate",
-      header: e.colHireDate,
-      render: (row) => <span className="whitespace-nowrap text-ink-secondary">{formatDateShort(row.hireDate)}</span>,
-    },
-    {
       key: "actions",
       header: c.tableActions,
-      width: "112px",
+      width: "56px",
       sticky: "right",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(ev) => ev.stopPropagation()}>
-          <button type="button" aria-label={e.viewEmployeeAriaLabel} onClick={() => setSelectedId(row.id)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label={e.editEmployeeAriaLabel} onClick={() => setFormEmployee(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
+        <div className="flex items-center justify-end" onClick={(ev) => ev.stopPropagation()}>
           <DropdownMenu
-            trigger={
-              <span className={iconButtonClass}>
-                <MoreHorizontal size={14} />
-              </span>
-            }
+            trigger={<MoreVertical size={16} />}
             items={[
               { label: strings.assignments.actionView, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
               { label: c.edit, icon: <Pencil size={14} />, onClick: () => setFormEmployee(row) },

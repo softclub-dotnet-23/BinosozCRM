@@ -7,6 +7,7 @@ import {
   MoreVertical,
   Pencil,
   Plus,
+  Power,
   Search,
   ShieldCheck,
   UserCheck,
@@ -18,6 +19,7 @@ import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
+import { DropdownMenu } from "../components/ui/DropdownMenu";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -188,6 +190,17 @@ export default function UsersPage() {
   return (
     <AppLayout title={s.pageTitle} subtitle={s.pageSubtitle} search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: s.searchPlaceholder }}>
       <div className="users-page">
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-warning bg-warning-soft p-4 text-sm text-ink">
+          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-warning" />
+          <div>
+            <p className="font-semibold text-warning">Модуль управления пользователями недоступен на бэкенде</p>
+            <p className="mt-0.5 text-ink-secondary">
+              Backend поддерживает только вход в систему и профиль текущего пользователя (GET /users/me не
+              реализован). Список, создание, редактирование и удаление пользователей ниже — демонстрационные
+              данные, не связанные с реальным сервером. Действия не будут сохранены.
+            </p>
+          </div>
+        </div>
         <div className="users-overview-row">
           <div className="users-kpi-grid">
             <UserKpi icon={UserRound} tone="green" label={s.kpiTotal} value={String(stats.total)} suffix={s.kpiTotalSuffix} />
@@ -222,19 +235,21 @@ export default function UsersPage() {
                       <td>{user.email}</td>
                       <td><span className={`user-status ${user.status === "active" ? "active" : "inactive"}`}>{statusLabel(user.status)}</span></td>
                       <td className="nowrap">{user.registeredAt}</td>
-                      <td>
-                        <div className="user-row-actions">
-                          <button type="button" aria-label={s.actionView} onClick={() => openUser(user, "view")}><Eye size={14} /></button>
-                          <button type="button" aria-label={s.actionEdit} onClick={() => openUser(user, "edit")}><Pencil size={14} /></button>
-                          <button
-                            type="button"
-                            aria-label={s.actionChangeStatus}
-                            title={user.id === currentUser?.id ? s.actionChangeStatusDisabled : s.actionChangeStatus}
-                            disabled={user.id === currentUser?.id}
-                            onClick={() => toggleStatus(user)}
-                          >
-                            <MoreVertical size={14} />
-                          </button>
+                      <td className="text-right">
+                        <div className="flex items-center justify-end">
+                          <DropdownMenu
+                            trigger={<MoreVertical size={16} />}
+                            items={[
+                              { label: s.actionView, icon: <Eye size={14} />, onClick: () => openUser(user, "view") },
+                              { label: s.actionEdit, icon: <Pencil size={14} />, onClick: () => openUser(user, "edit") },
+                              {
+                                label: user.id === currentUser?.id ? s.actionChangeStatusDisabled : s.actionChangeStatus,
+                                icon: <Power size={14} />,
+                                onClick: () => toggleStatus(user),
+                                disabled: user.id === currentUser?.id,
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
