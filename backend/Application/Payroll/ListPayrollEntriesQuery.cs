@@ -21,7 +21,7 @@ public sealed class ListPayrollEntriesQueryHandler(IApplicationDbContext context
 {
     public async Task<Result<PagedResult<PayrollEntryDto>>> Handle(ListPayrollEntriesQuery request, CancellationToken cancellationToken)
     {
-        var query = context.PayrollEntries.AsQueryable();
+        var query = context.PayrollEntries.AsNoTracking().AsQueryable();
 
         if (currentUser.Role == Role.Brigadir)
         {

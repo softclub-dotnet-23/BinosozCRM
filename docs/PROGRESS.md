@@ -38,6 +38,14 @@ across all six phases are `[BOT]` steps, blocked on the 2026-07-18 bot
 deferral. No phase-summary files written for 2-6 — genuinely not finished
 (bot work outstanding), just unblocked for further backend work per the
 user's 2026-07-19 decision to keep going rather than wait on the bot.
+**Payroll backend audit (2026-07-31):** confirmed the persisted three-state
+`PayrollEntry` workflow, advances, API contracts, tenant filters, FK/index
+schema, and frontend contract. Fixed a production defect in the Phase 5 Step
+8 hosted draft generator: without a request JWT it previously queried workers
+under `Guid.Empty` and silently generated no drafts. It now creates a scoped
+`ApplicationDbContext` per company, matching the established overdue-job
+pattern. Added workflow, tenant-isolation, advance-validation, and draft
+persistence coverage. No schema change or migration was required.
 **Frontend integration — Checkpoint 1/12 (Auth + API client) — 2026-07-31,
 branch `feature/shahrom-frontend-backend-integration`.** Separate track from
 the Phase 1-6 backend/bot work below: `frontend/` (React+Vite+TS, added by

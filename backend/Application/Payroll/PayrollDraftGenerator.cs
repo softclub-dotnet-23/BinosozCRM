@@ -1,6 +1,5 @@
 using Application.Common.Interfaces;
 using Domain.Enums;
-using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -21,30 +20,34 @@ namespace Application.Payroll;
 // means — logged at Error so it surfaces on whatever monitoring reads
 // Serilog output (no push/paging channel exists in this project yet,
 // same scope Phase 6 Step 7's own "мониторинг" step is left to build).
-public sealed class PayrollDraftGenerator(IApplicationDbContext context, ISender sender, ILogger<PayrollDraftGenerator> logger)
+public static class PayrollDraftGenerator
 {
-    public async Task GenerateForMostRecentlyEndedPeriodsAsync(DateOnly today, CancellationToken cancellationToken)
+    // The hosted service creates an ApplicationDbContext for each company because
+    // it has no HTTP/JWT context. Keeping the actual generation here uses the
+    // same command and calculation path as the HTTP endpoint.
+    public static async Task GenerateForCompanyAsync(
+        IApplicationDbContext context,
+        Domain.Entities.Company company,
+        DateOnly today,
+        ILogger logger,
+        CancellationToken cancellationToken)
     {
-        var companies = await context.Companies.ToListAsync(cancellationToken);
+        var (periodStart, periodEnd) = GetMostRecentlyEndedPeriod(today, company.PayrollPeriodType);
 
-        foreach (var company in companies)
+        var workerIds = await context.Workers
+            .Where(w => w.CompanyId == company.Id && w.IsActive)
+            .Select(w => w.Id)
+            .ToListAsync(cancellationToken);
+
+        var handler = new CreatePayrollEntryCommandHandler(context);
+        foreach (var workerId in workerIds)
         {
-            var (periodStart, periodEnd) = GetMostRecentlyEndedPeriod(today, company.PayrollPeriodType);
-
-            var workerIds = await context.Workers
-                .Where(w => w.CompanyId == company.Id && w.IsActive)
-                .Select(w => w.Id)
-                .ToListAsync(cancellationToken);
-
-            foreach (var workerId in workerIds)
+            var result = await handler.Handle(new CreatePayrollEntryCommand(workerId, periodStart, periodEnd), cancellationToken);
+            if (result.IsFailure && result.Error.Code != "PAYROLL_ENTRY_NOT_DRAFT")
             {
-                var result = await sender.Send(new CreatePayrollEntryCommand(workerId, periodStart, periodEnd), cancellationToken);
-                if (result.IsFailure && result.Error.Code != "PAYROLL_ENTRY_NOT_DRAFT")
-                {
-                    logger.LogError(
-                        "Payroll draft generation failed for Worker {WorkerId}, period {PeriodStart}-{PeriodEnd}: {ErrorCode}",
-                        workerId, periodStart, periodEnd, result.Error.Code);
-                }
+                logger.LogError(
+                    "Payroll draft generation failed for Worker {WorkerId}, period {PeriodStart}-{PeriodEnd}: {ErrorCode}",
+                    workerId, periodStart, periodEnd, result.Error.Code);
             }
         }
     }

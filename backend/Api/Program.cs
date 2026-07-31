@@ -134,7 +134,6 @@ builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNot
 builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
 builder.Services.AddScoped<IPasswordResetDeliveryService, LoggingPasswordResetDeliveryService>();
 
-builder.Services.AddScoped<PayrollDraftGenerator>();
 builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 
