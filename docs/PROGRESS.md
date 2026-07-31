@@ -38,6 +38,40 @@ across all six phases are `[BOT]` steps, blocked on the 2026-07-18 bot
 deferral. No phase-summary files written for 2-6 — genuinely not finished
 (bot work outstanding), just unblocked for further backend work per the
 user's 2026-07-19 decision to keep going rather than wait on the bot.
+**Frontend integration — Checkpoint 1/12 (Auth + API client) — 2026-07-31,
+branch `feature/shahrom-frontend-backend-integration`.** Separate track from
+the Phase 1-6 backend/bot work below: `frontend/` (React+Vite+TS, added by
+`1a1419d`, mock-data-only) is being wired to the real backend module by
+module, one checkpoint per module, per user decision. `docs/MASTER.md` §0's
+"no web panel" decision is superseded by this — see the note added there.
+
+Checkpoint 1 shipped: `frontend/src/api/apiClient.ts` (typed fetch wrapper,
+single-flight refresh-then-retry on 401, `{error:{code,message,traceId}}`
+envelope parsing), `frontend/src/api/authApi.ts` (login/refresh/logout/
+change-password/forgot-password/me + `mapBackendRole`), real login/logout/
+force-password-change wired into `AuthContext`/`LoginPage`/a new
+`ForcePasswordChangeModal`, demo auth (`authService.ts`, `demoCredentials.ts`)
+deleted. Backend gained one small endpoint the login response itself didn't
+cover: `GET /api/v1/auth/me` (`Application/Auth/GetCurrentUserQuery.cs`) —
+login/refresh only ever returned a bare user id via the JWT claim, never
+phone/FullName, and no `/users` endpoint exists yet either.
+
+`administrator`/`storekeeper` (frontend-only roles, no backend equivalent)
+are dropped from the real login path per user decision — see the comment on
+`UserRole`/`ROLE_HOME` in `frontend/src/lib/auth/roleAccess.ts`.
+
+Remaining checkpoints (2-12): Users, Objects, Workers, Brigades, Work
+Orders, Attendance, Material Requests/Deliveries/Consumption, Payroll,
+Dashboard — each needs its own backend read-DTO audit first (most currently
+return bare GUIDs with no display name, a systemic gap found during the
+Checkpoint 1 audit).
+
+Build clean, 0 warnings (backend). Frontend: lint clean, `tsc -b` clean,
+`vite build` clean. Backend test suite: 108/124 pass — the 16 failures are
+pre-existing (`ProrabObjectAssignments` FK seeding issue in
+`AssignProrabCommandHandler`-adjacent tests), confirmed unrelated by
+reproducing them against unmodified `HEAD` before this checkpoint.
+
 **Punch list from Phase 6 Step 9's MASTER.md-vs-code reconciliation
 (2026-07-20) — all 3 closed, 2026-07-20:**
 - ~~`GET,PUT /companies/current`~~ — **done**, see writeup below.
