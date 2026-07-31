@@ -59,7 +59,7 @@ export default function LoginPage() {
     setSubmitting(false);
 
     if (!result.ok) {
-      setFormError(result.error);
+      setFormError(strings[result.errorCode]);
       setPassword("");
       passwordRef.current?.focus();
       return;
@@ -93,8 +93,8 @@ export default function LoginPage() {
                 <input
                   id="login-input"
                   ref={loginRef}
-                  type="text"
-                  autoComplete="username"
+                  type="tel"
+                  autoComplete="tel"
                   value={loginValue}
                   onChange={(e) => {
                     setLoginValue(e.target.value);

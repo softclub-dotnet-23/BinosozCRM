@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ToastProvider } from "./hooks/useToast";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute, PublicOnlyRoute } from "./components/auth/RouteGuards";
+import { ForcePasswordChangeModal } from "./components/auth/ForcePasswordChangeModal";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ObjectsPage from "./pages/ObjectsPage";
@@ -27,6 +28,7 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
+        <ForcePasswordChangeModal />
         <Routes>
           <Route
             path="/login"

@@ -1,12 +1,13 @@
 import type { UserAccount } from "../types";
 
 /**
- * Seed accounts for the shared repository (persisted, no passwords — those live
- * separately in demoCredentials.ts and are never written to storage). One real
- * account per role so the login page's automatic role-redirect can be tested
- * end-to-end. Names reuse people who already have a headshot in personPhotos.ts
- * where possible, purely for a nicer demo — the login system itself doesn't
- * depend on that.
+ * Seed accounts for the shared repository — still mock data backing the Users
+ * management page (not yet wired to a real backend endpoint, see the
+ * frontend-integration checkpoints in docs/PROGRESS.md). No longer used for
+ * authentication itself: login now goes through the real backend (AuthContext
+ * + api/authApi.ts), which owns password verification entirely. Names reuse
+ * people who already have a headshot in personPhotos.ts where possible,
+ * purely for a nicer demo.
  */
 export const mockUsers: UserAccount[] = [
   { id: "user-owner-1", login: "sadi.imomov", fullName: "Садди Имомов", role: "owner", status: "active", phone: "+992 93 123 45 67", email: "sadi.imomov@binosoz.tj", registeredAt: "2025-02-12" },
