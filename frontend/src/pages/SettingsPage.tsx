@@ -4,11 +4,9 @@ import {
   Building2,
   Check,
   CircleHelp,
-  Clock3,
   CloudDownload,
   DatabaseBackup,
   FileCog,
-  FilePenLine,
   FileText,
   HardDrive,
   Info,
@@ -22,17 +20,17 @@ import {
   ShieldCheck,
   Sun,
   Upload,
-  UserRound,
   Wrench,
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
+import { EmptyState } from "../components/ui/EmptyState";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { useRepositorySnapshot } from "../hooks/useRepositoryState";
 import { useToast } from "../hooks/useToast";
-import { usersRepository } from "../data/repositories";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { listUsers } from "../api/usersApi";
 import "../styles/settings.css";
 
 type SettingsTab = "general" | "company" | "finance" | "notifications" | "security" | "integrations" | "backups";
@@ -108,14 +106,35 @@ const SEARCH_INDEX = [
   ["Время сессии", "security"], ["API", "integrations"], ["Telegram", "integrations"], ["Резервное копирование", "backups"],
 ] as const;
 
+function describeError(error: unknown): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) return error.message || "Не удалось загрузить данные";
+  return "Не удалось загрузить данные";
+}
+
 export default function SettingsPage() {
   const { showToast } = useToast();
-  const users = useRepositorySnapshot(usersRepository);
+  const [userCount, setUserCount] = useState<number | null>(null);
+  const [userCountError, setUserCountError] = useState("");
   const [settings, setSettings] = usePersistentState<AppSettings>("app.settings.v1", DEFAULT_SETTINGS);
   const [tab, setTab] = usePersistentState<SettingsTab>("settings.active-tab", "general");
   const [search, setSearch] = useState("");
   const [lastSaved, setLastSaved] = useState("");
   const restoreInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listUsers(1, 1)
+      .then((result) => {
+        if (!cancelled) setUserCount(result.totalCount);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setUserCountError(describeError(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => setSettings((current) => ({ ...current, [key]: value }));
 
@@ -191,7 +210,7 @@ export default function SettingsPage() {
           </main>
 
           <aside className="settings-aside">
-            <SystemInfo usersCount={users.length} />
+            <SystemInfo userCount={userCount} userCountError={userCountError} />
             <SystemActivity />
           </aside>
         </div>
@@ -260,10 +279,14 @@ function ChoiceButton({active,onClick,icon:Icon,label}:{active:boolean;onClick:(
 function SegmentRow({label,description,value,onChange,items}:{label:string;description?:string;value:string;onChange:(value:string)=>void;items:[string,string][]}) { return <div className="setting-row segment-row"><LabelText label={label} description={description}/><div>{items.map(([key,text])=><button type="button" key={key} className={value===key?"active":""} onClick={()=>onChange(key)}>{text}</button>)}</div></div>; }
 function InfoPanel({icon:Icon,title,text}:{icon:typeof Info;title:string;text:string}) { return <Card className="settings-info-panel"><Icon size={20}/><div><h2>{title}</h2><p>{text}</p></div></Card>; }
 
-function SystemInfo({usersCount}:{usersCount:number}) {
+/** Пользователей — real count from GET /api/v1/users (Owner-only, same role this whole page is gated to). Version/license/build rows were removed: no backend contract backs them, and this page must not present fabricated system facts as real (2026-07-31 remediation). */
+function SystemInfo({ userCount, userCountError }: { userCount: number | null; userCountError: string }) {
   const storage = useMemo(()=>{let bytes=0;for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key)bytes+=key.length+(localStorage.getItem(key)?.length??0)}return Math.max(.1,bytes/1024/1024).toFixed(1)},[]);
-  return <Card className="system-info-card"><header><Info size={16}/><h2>Информация о системе</h2></header><dl><div><dt>Версия системы</dt><dd>1.2.0</dd></div><div><dt>Сборка</dt><dd>2026.07.22</dd></div><div><dt>Лицензия</dt><dd><span>Активна</span></dd></div><div><dt>Тип лицензии</dt><dd>Профессиональная</dd></div><div><dt>Действует до</dt><dd>15.07.2027</dd></div><div><dt>Пользователей</dt><dd>{usersCount} из 50</dd></div></dl><div className="storage-label"><span>Место в хранилище</span><b>{storage} MB</b></div><div className="storage-bar"><span style={{width:`${Math.min(100,Number(storage)*2)}%`}}/></div><p>{storage} MB локальных данных</p></Card>;
+  return <Card className="system-info-card"><header><Info size={16}/><h2>Информация о системе</h2></header><dl><div><dt>Пользователей</dt><dd>{userCount !== null ? userCount : userCountError ? "—" : "…"}</dd></div></dl><div className="storage-label"><span>Место в хранилище</span><b>{storage} MB</b></div><div className="storage-bar"><span style={{width:`${Math.min(100,Number(storage)*2)}%`}}/></div><p>{storage} MB локальных данных браузера</p></Card>;
 }
-function SystemActivity() { const rows=[{icon:UserRound,tone:"green",title:"Вход в систему",text:"Садди Имомов",time:"Сегодня, 09:45"},{icon:FileText,tone:"blue",title:"Создан документ",text:"Поступление PR-24",time:"Сегодня, 09:32"},{icon:FilePenLine,tone:"red",title:"Изменены данные",text:"Объект ЖК «Сомони»",time:"Сегодня, 08:15"},{icon:UserRound,tone:"red",title:"Удалён пользователь",text:"test.user",time:"Вчера, 17:45"},{icon:DatabaseBackup,tone:"green",title:"Резервное копирование",text:"База данных",time:"Вчера, 02:30"}];return <Card className="system-activity-card"><header><Clock3 size={16}/><h2>Активность системы</h2></header><div>{rows.map((row)=><article key={row.title}><span className={row.tone}><row.icon size={12}/></span><p><strong>{row.title}</strong><small>{row.text}</small></p><time>{row.time}</time></article>)}</div><button type="button">Просмотреть журнал <span>→</span></button></Card>; }
+/** No audit-log/activity endpoint exists on the backend — this used to be hardcoded fake rows presented as a real activity feed. Left unavailable rather than fabricated (2026-07-31 remediation). */
+function SystemActivity() {
+  return <Card className="system-activity-card"><header><Info size={16}/><h2>Активность системы</h2></header><EmptyState title="Раздел пока недоступен" description="Журнал активности пока не подключён к backend." /></Card>;
+}
 
 function darkenHex(hex:string){const value=hex.replace("#","");const number=parseInt(value,16);const r=Math.max(0,(number>>16)-18),g=Math.max(0,((number>>8)&255)-18),b=Math.max(0,(number&255)-18);return `#${((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1)}`;}
