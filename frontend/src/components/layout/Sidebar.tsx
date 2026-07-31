@@ -68,6 +68,7 @@ const NAV_ITEMS: NavEntry[] = [
     icon: Package,
     children: [
       { to: "/inventory/materials", label: "Материалы" },
+      { to: "/inventory/material-requests", label: "Заявки на материалы" },
       { to: "/inventory/receipts", label: "Поступления" },
       { to: "/inventory/write-offs", label: "Списания" },
       { to: "/inventory/transfers", label: "Перемещения" },

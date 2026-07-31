@@ -15,6 +15,7 @@ import AssignmentsPage from "./pages/AssignmentsPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import AttendancePage from "./pages/AttendancePage";
 import MaterialsPage from "./pages/MaterialsPage";
+import MaterialRequestsPage from "./pages/MaterialRequestsPage";
 import ReceiptsPage from "./pages/ReceiptsPage";
 import WriteOffsPage from "./pages/WriteOffsPage";
 import TransfersPage from "./pages/TransfersPage";
@@ -52,6 +53,7 @@ function App() {
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/warehouse" element={<Navigate to="/inventory/materials" replace />} />
             <Route path="/inventory/materials" element={<MaterialsPage />} />
+            <Route path="/inventory/material-requests" element={<MaterialRequestsPage />} />
             <Route path="/inventory/receipts" element={<ReceiptsPage />} />
             <Route path="/inventory/write-offs" element={<WriteOffsPage />} />
             <Route path="/inventory/transfers" element={<TransfersPage />} />
