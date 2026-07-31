@@ -28,7 +28,7 @@ export function DropdownMenu({ trigger, align = "right", items }: DropdownMenuPr
       {open && (
         <div
           className={cn(
-            "absolute z-20 mt-1 w-44 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]",
+            "absolute z-20 mt-1 w-44 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)",
             align === "right" ? "right-0" : "left-0",
           )}
         >

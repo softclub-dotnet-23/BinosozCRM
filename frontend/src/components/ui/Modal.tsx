@@ -46,7 +46,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         aria-modal="true"
         aria-labelledby="modal-title"
         className={cn(
-          "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-border bg-card shadow-[var(--shadow-popover)]",
+          "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-border bg-card shadow-(--shadow-popover)",
           "animate-[modal-in_180ms_ease-out]",
           SIZE_CLASSNAMES[size],
         )}

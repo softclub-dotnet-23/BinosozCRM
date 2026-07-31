@@ -32,7 +32,7 @@ export function Drawer({ open, onClose, title, children, footer }: DrawerProps) 
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title"
-        className="relative flex h-full w-full max-w-sm flex-col bg-card shadow-[var(--shadow-popover)] animate-[drawer-in_200ms_ease-out]"
+        className="relative flex h-full w-full max-w-sm flex-col bg-card shadow-(--shadow-popover) animate-[drawer-in_200ms_ease-out]"
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
           <h2 id="drawer-title" className="text-lg font-bold text-ink">
