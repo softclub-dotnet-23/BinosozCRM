@@ -1,0 +1,388 @@
+import { useMemo, useState } from "react";
+import { AlertTriangle, Building2, CheckCircle2, Eye, Filter, Flag, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { AppLayout } from "../components/layout/AppLayout";
+import { MetricCard } from "../components/ui/MetricCard";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { StatusBadge } from "../components/ui/StatusBadge";
+import { ProgressBar } from "../components/ui/ProgressBar";
+import { ObjectImage } from "../components/ui/ObjectImage";
+import { Avatar } from "../components/ui/Avatar";
+import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { Pagination } from "../components/ui/Pagination";
+import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
+import { CustomSelect } from "../components/ui/CustomSelect";
+import { EmptyState } from "../components/ui/EmptyState";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { FilterDrawer } from "../components/objects/FilterDrawer";
+import { AddObjectModal } from "../components/objects/AddObjectModal";
+import { ProgressChart } from "../components/charts/ProgressChart";
+import { ObjectBudgetChart } from "../components/charts/ObjectBudgetChart";
+import { objectProgressSeries } from "../data/mockDashboard";
+import { objectsRepository } from "../data/repositories";
+import { useRepositoryState } from "../hooks/useRepositoryState";
+import { usePersistentState } from "../hooks/usePersistentState";
+import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../context/LanguageContext";
+import { formatCurrency } from "../utils/format";
+import { formatDateRu } from "../utils/date";
+import { getProgressTone } from "../utils/progress";
+import type { ConstructionObject, ObjectFilters, ObjectStatus } from "../types";
+
+type TabKey = "all" | "active" | "at_risk" | "completed";
+
+const DEFAULT_FILTERS: ObjectFilters = {
+  statuses: [],
+  city: "",
+  foreman: "",
+  minProgress: "",
+  maxProgress: "",
+  startDate: "",
+  deadline: "",
+  minBudget: "",
+  maxBudget: "",
+};
+
+function matchesTab(status: ObjectStatus, tab: TabKey): boolean {
+  if (tab === "all") return true;
+  if (tab === "active") return status === "in_progress" || status === "almost_done";
+  if (tab === "at_risk") return status === "at_risk";
+  return status === "completed";
+}
+
+export default function ObjectsPage() {
+  const { showToast } = useToast();
+  const { strings } = useLanguage();
+  const s = strings.objects;
+  const c = strings.common;
+
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: "all", label: s.tabAll },
+    { key: "active", label: s.tabActive },
+    { key: "at_risk", label: s.tabAtRisk },
+    { key: "completed", label: s.tabCompleted },
+  ];
+
+  const [objects, setObjects] = useRepositoryState(objectsRepository);
+  const [selectedId, setSelectedId] = useState<string>(() => objectsRepository.getSnapshot()[0]?.id ?? "");
+  const [tab, setTab] = usePersistentState<TabKey>("filters.objects.tab", "all");
+  const [search, setSearch] = usePersistentState("filters.objects.search", "");
+  const [filters, setFilters] = usePersistentState<ObjectFilters>("filters.objects.filters", DEFAULT_FILTERS);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const [chartMode, setChartMode] = useState<"progress" | "budget">("progress");
+  const [chartPeriod, setChartPeriod] = useState("month");
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ConstructionObject | null>(null);
+
+  const kpis = useMemo(() => {
+    const total = objects.length;
+    const inWork = objects.filter((o) => o.status === "in_progress" || o.status === "almost_done").length;
+    const completed = objects.filter((o) => o.status === "completed").length;
+    const atRisk = objects.filter((o) => o.status === "at_risk").length;
+    return { total, inWork, completed, atRisk };
+  }, [objects]);
+
+  const filteredObjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return objects.filter((o) => {
+      if (!matchesTab(o.status, tab)) return false;
+      if (query) {
+        const haystack = `${o.name} ${o.city} ${o.foreman}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      if (filters.statuses.length > 0 && !filters.statuses.includes(o.status)) return false;
+      if (filters.city && !o.city.toLowerCase().includes(filters.city.toLowerCase())) return false;
+      if (filters.foreman && !o.foreman.toLowerCase().includes(filters.foreman.toLowerCase())) return false;
+      if (filters.minProgress && o.progress < Number(filters.minProgress)) return false;
+      if (filters.maxProgress && o.progress > Number(filters.maxProgress)) return false;
+      if (filters.minBudget && o.budget < Number(filters.minBudget)) return false;
+      if (filters.maxBudget && o.budget > Number(filters.maxBudget)) return false;
+      if (filters.startDate && o.startDate < filters.startDate) return false;
+      if (filters.deadline && o.deadline > filters.deadline) return false;
+      return true;
+    });
+  }, [objects, tab, search, filters]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredObjects.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = filteredObjects.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const budgetChartData = useMemo(
+    () => objects.slice(0, 6).map((o) => ({ objectName: o.name.replace(/«.*»/, "").trim(), budget: o.budget, spent: o.spent })),
+    [objects],
+  );
+
+  function handleTabChange(nextTab: TabKey) {
+    setTab(nextTab);
+    setPage(1);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
+  function handleCreateObject(object: ConstructionObject) {
+    setObjects((prev) => [object, ...prev]);
+    setSelectedId(object.id);
+    setAddModalOpen(false);
+    showToast(s.toastCreated);
+  }
+
+  function handleDeleteConfirmed() {
+    if (!deleteTarget) return;
+    setObjects((prev) => prev.filter((o) => o.id !== deleteTarget.id));
+    if (selectedId === deleteTarget.id) {
+      setSelectedId((prev) => objects.find((o) => o.id !== prev)?.id ?? "");
+    }
+    showToast(s.toastDeleted, "info");
+    setDeleteTarget(null);
+  }
+
+  const columns: DataTableColumn<ConstructionObject>[] = [
+    {
+      key: "object",
+      header: c.colObject,
+      sticky: "left",
+      width: "232px",
+      render: (row) => (
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-14 shrink-0 overflow-hidden rounded-lg border border-border">
+            <ObjectImage src={row.imageUrl} type={row.objectType} alt={row.name} />
+          </div>
+          <span className="truncate font-semibold text-ink">{row.name}</span>
+        </div>
+      ),
+    },
+    { key: "city", header: s.colCity, render: (row) => <span className="text-ink-secondary">{row.city}</span> },
+    {
+      key: "foreman",
+      header: s.colForeman,
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Avatar name={row.foreman} size="sm" />
+          <span className="whitespace-nowrap text-ink-secondary">{row.foreman}</span>
+        </div>
+      ),
+    },
+    {
+      key: "progress",
+      header: s.colProgress,
+      render: (row) => (
+        <div className="flex items-center gap-2.5">
+          <ProgressBar value={row.progress} tone={getProgressTone(row.status, row.progress)} className="w-20" />
+          <span className="text-xs font-semibold text-ink">{row.progress}%</span>
+        </div>
+      ),
+    },
+    {
+      key: "budget",
+      header: s.colBudget,
+      render: (row) => <span className="tabular text-ink">{formatCurrency(row.budget).replace(" сомони", " с.")}</span>,
+    },
+    { key: "deadline", header: s.colDeadline, render: (row) => <span className="text-ink-secondary">{formatDateRu(row.deadline)}</span> },
+    { key: "status", header: c.colStatus, render: (row) => <StatusBadge status={row.status} /> },
+    {
+      key: "actions",
+      header: c.tableActions,
+      sticky: "right",
+      width: "56px",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (row) => (
+        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu
+            trigger={<MoreVertical size={16} />}
+            items={[
+              { label: c.view, icon: <Eye size={14} />, onClick: () => setSelectedId(row.id) },
+              { label: c.edit, icon: <Pencil size={14} />, onClick: () => showToast(c.editUnavailableInDemo, "info") },
+              { label: c.delete, icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
+            ]}
+          />
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <AppLayout
+      title={s.pageTitle}
+      subtitle={s.pageSubtitle}
+      search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
+    >
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label={s.kpiTotal} value={String(kpis.total)} icon={Building2} tone="orange" footer={s.kpiTotalFooter} />
+        <MetricCard
+          label={s.kpiInWork}
+          value={String(kpis.inWork)}
+          icon={CheckCircle2}
+          tone="green"
+          footer={s.kpiPercentOfTotal(Math.round((kpis.inWork / kpis.total) * 100))}
+        />
+        <MetricCard
+          label={s.kpiCompleted}
+          value={String(kpis.completed)}
+          icon={Flag}
+          tone="blue"
+          footer={s.kpiPercentOfTotal(Math.round((kpis.completed / kpis.total) * 100))}
+        />
+        <MetricCard
+          label={s.kpiAtRisk}
+          value={String(kpis.atRisk)}
+          icon={AlertTriangle}
+          tone="red"
+          footer={s.kpiPercentOfTotal(Math.round((kpis.atRisk / kpis.total) * 100))}
+        />
+      </StaggeredGrid>
+
+      <div className="mt-4 flex min-w-0 flex-col gap-4">
+        <Card className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+            <h2 className="text-lg font-bold text-ink">{s.listTitle}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
+                <Filter size={14} /> {c.filtersButton}
+              </Button>
+              <Button size="sm" onClick={() => setAddModalOpen(true)}>
+                <Plus size={14} /> {s.addObject}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2 px-5 sm:px-6">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => handleTabChange(t.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  tab === t.key ? "bg-primary text-white" : "bg-surface-3 text-ink-secondary hover:bg-surface-5"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            {pageRows.length > 0 ? (
+              <DataTable
+                columns={columns}
+                rows={pageRows}
+                rowKey={(row) => row.id}
+                selectedRowKey={selectedId}
+                onRowClick={(row) => setSelectedId(row.id)}
+              />
+            ) : (
+              <EmptyState
+                icon={Building2}
+                title={s.emptyTitle}
+                description={c.emptyStateHint}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFilters(DEFAULT_FILTERS);
+                      setSearch("");
+                      setTab("all");
+                    }}
+                  >
+                    {c.resetFiltersButton}
+                  </Button>
+                }
+              />
+            )}
+          </div>
+
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={filteredObjects.length}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            pageSizeOptions={[8, 10, 20, 50]}
+          />
+        </Card>
+
+        <Card className="min-w-0 p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-ink">{s.chartTitle}</h2>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
+                {(
+                  [
+                    { key: "progress", label: s.chartModeProgress },
+                    { key: "budget", label: s.chartModeBudget },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setChartMode(opt.key)}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      chartMode === opt.key ? "bg-card text-primary shadow-sm" : "text-ink-secondary hover:text-ink"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <CustomSelect
+                size="sm"
+                aria-label={s.chartPeriodAriaLabel}
+                value={chartPeriod}
+                onValueChange={setChartPeriod}
+                options={[
+                  { value: "month", label: c.periodMonth },
+                  { value: "quarter", label: c.periodQuarter },
+                  { value: "year", label: c.periodYear },
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            {chartMode === "progress" ? (
+              <ProgressChart data={objectProgressSeries} />
+            ) : (
+              <ObjectBudgetChart data={budgetChartData} />
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <FilterDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        filters={filters}
+        onChange={setFilters}
+        onApply={() => setPage(1)}
+        onReset={() => {
+          setFilters(DEFAULT_FILTERS);
+          setPage(1);
+        }}
+      />
+
+      <AddObjectModal open={addModalOpen} onClose={() => setAddModalOpen(false)} onCreate={handleCreateObject} />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title={s.deleteConfirmTitle}
+        description={deleteTarget ? s.deleteConfirmDescription(deleteTarget.name) : undefined}
+        confirmLabel={c.delete}
+        danger
+        onConfirm={handleDeleteConfirmed}
+      />
+    </AppLayout>
+  );
+}
