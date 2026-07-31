@@ -35,12 +35,13 @@ public sealed class SeedDataServiceTests(PostgresFixture fixture)
         });
         var passwordHasher = new Argon2PasswordHasher();
         var seededPhones = seedOptions.Value.Owners.Select(o => o.Phone).ToList();
+        var connectionString = await fixture.CreateIsolatedDatabaseConnectionStringAsync();
 
-        await using (var firstRun = fixture.CreateDbContext())
+        await using (var firstRun = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
             await new SeedDataService(firstRun, passwordHasher, seedOptions).SeedAsync(CancellationToken.None);
 
         int companyCountAfterFirstRun, ownerCountAfterFirstRun;
-        await using (var verify = fixture.CreateDbContext())
+        await using (var verify = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
         {
             companyCountAfterFirstRun = await verify.Companies.CountAsync(c => c.Id == companyId);
             ownerCountAfterFirstRun = await verify.Users.CountAsync(u => seededPhones.Contains(u.Phone));
@@ -49,7 +50,7 @@ public sealed class SeedDataServiceTests(PostgresFixture fixture)
         companyCountAfterFirstRun.Should().Be(1);
         ownerCountAfterFirstRun.Should().Be(seedOptions.Value.Owners.Count);
 
-        await using (var verifyOwners = fixture.CreateDbContext())
+        await using (var verifyOwners = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
         {
             var owners = await verifyOwners.Users.Where(u => seededPhones.Contains(u.Phone)).ToListAsync();
             owners.Should().OnlyContain(u => u.Role == Role.Owner && u.ForcePasswordChange);
@@ -57,10 +58,10 @@ public sealed class SeedDataServiceTests(PostgresFixture fixture)
 
         // Second run, same options — MASTER §5.27 step 3: "already there? exit
         // silently, touch nothing."
-        await using (var secondRun = fixture.CreateDbContext())
+        await using (var secondRun = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
             await new SeedDataService(secondRun, passwordHasher, seedOptions).SeedAsync(CancellationToken.None);
 
-        await using var verifyAgain = fixture.CreateDbContext();
+        await using var verifyAgain = fixture.CreateDbContext(connectionString, new NullCurrentUserService());
         var companyCountAfterSecondRun = await verifyAgain.Companies.CountAsync(c => c.Id == companyId);
         var ownerCountAfterSecondRun = await verifyAgain.Users.CountAsync(u => seededPhones.Contains(u.Phone));
 

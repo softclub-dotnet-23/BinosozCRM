@@ -51,6 +51,8 @@ public static class ErrorCodeCatalog
         ["BRIGADE_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["WORKER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["USER_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["PHONE_ALREADY_IN_USE"] = StatusCodes.Status409Conflict,
+        ["CANNOT_MODIFY_OWN_ACCOUNT"] = StatusCodes.Status400BadRequest,
         ["COMPANY_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["CUSTOMER_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["OBJECT_NOT_FOUND"] = StatusCodes.Status404NotFound,

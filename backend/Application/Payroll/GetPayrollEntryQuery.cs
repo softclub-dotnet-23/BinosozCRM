@@ -22,7 +22,7 @@ public sealed class GetPayrollEntryQueryHandler(IApplicationDbContext context, I
 {
     public async Task<Result<PayrollEntryDto>> Handle(GetPayrollEntryQuery request, CancellationToken cancellationToken)
     {
-        var entry = await context.PayrollEntries.FirstOrDefaultAsync(e => e.Id == request.Id, cancellationToken);
+        var entry = await context.PayrollEntries.AsNoTracking().FirstOrDefaultAsync(e => e.Id == request.Id, cancellationToken);
         if (entry is null)
             return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ENTRY_NOT_FOUND", "Payroll entry not found."));
 
