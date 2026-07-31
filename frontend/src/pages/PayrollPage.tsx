@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from "../components/tables/DataTable"
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Modal } from "../components/ui/Modal";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, NetworkError } from "../api/apiClient";
@@ -30,7 +31,11 @@ import { formatCurrency } from "../utils/format";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
-  if (error instanceof ApiError) return error.message || fallback;
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Сессия истекла. Войдите в систему заново.";
+    if (error.status === 403) return "У вас нет прав для этого действия.";
+    return error.message || fallback;
+  }
   return fallback;
 }
 
@@ -69,6 +74,8 @@ export default function PayrollPage() {
   const [adjustReason, setAdjustReason] = useState("");
   const [adjustError, setAdjustError] = useState("");
   const [adjusting, setAdjusting] = useState(false);
+
+  const [payTarget, setPayTarget] = useState<PayrollEntry | null>(null);
 
   async function loadAll() {
     setLoadState("loading");
@@ -228,7 +235,7 @@ export default function PayrollPage() {
         <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           {canAdjust && row.status === "Draft" && <Button size="sm" variant="secondary" onClick={() => openAdjust(row)}>Корректировка</Button>}
           {canApprovePay && row.status === "Draft" && <Button size="sm" disabled={busyId === row.id} onClick={() => void handleApprove(row)}>Утвердить</Button>}
-          {canApprovePay && row.status === "Approved" && <Button size="sm" disabled={busyId === row.id} onClick={() => void handlePay(row)}>Выплатить</Button>}
+          {canApprovePay && row.status === "Approved" && <Button size="sm" disabled={busyId === row.id} onClick={() => setPayTarget(row)}>Выплатить</Button>}
         </div>
       ),
     },
@@ -312,6 +319,15 @@ export default function PayrollPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={payTarget !== null}
+        onClose={() => setPayTarget(null)}
+        title="Провести выплату?"
+        description={payTarget ? `${workerNameById.get(payTarget.workerId) ?? "Работник"} — ${payTarget.finalAmount != null ? formatCurrency(payTarget.finalAmount) : "сумма не рассчитана"}. Это действие нельзя отменить через интерфейс.` : undefined}
+        confirmLabel="Выплатить"
+        onConfirm={() => payTarget && void handlePay(payTarget)}
+      />
 
       <Modal open={adjustTarget !== null} onClose={() => setAdjustTarget(null)} title="Корректировка начисления" size="sm">
         <form className="users-modal-form" onSubmit={submitAdjust}>
