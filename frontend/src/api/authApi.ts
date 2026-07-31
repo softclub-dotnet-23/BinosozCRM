@@ -27,6 +27,24 @@ export function mapBackendRole(role: BackendRole): UserRole {
   }
 }
 
+/** Every role a real backend account can be given — for role-picker UIs. administrator/storekeeper are frontend-only placeholders (roleAccess.ts) and never appear here. */
+export const BACKEND_ROLES: readonly BackendRole[] = ["Owner", "Prorab", "Brigadir", "Accountant"];
+
+export function mapToBackendRole(role: UserRole): BackendRole {
+  switch (role) {
+    case "owner":
+      return "Owner";
+    case "prorab":
+      return "Prorab";
+    case "brigadir":
+      return "Brigadir";
+    case "accountant":
+      return "Accountant";
+    default:
+      throw new Error(`"${role}" has no backend equivalent — administrator/storekeeper cannot be sent to the API.`);
+  }
+}
+
 export interface CurrentUser {
   id: string;
   phone: string;

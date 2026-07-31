@@ -6,6 +6,14 @@ function getBaseUrl(): string {
   return import.meta.env.VITE_API_BASE_URL || DEFAULT_BASE_URL;
 }
 
+/** Matches Application/Common/Models/PagedResult.cs — every paginated list endpoint on this API returns this shape. */
+export interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 /** Backend error envelope shape — the only one this API ever returns, for validation failures, business-rule failures, and unhandled exceptions alike (Api/Common/ResultExtensions.cs). */
 export class ApiError extends Error {
   readonly code: string;
