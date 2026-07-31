@@ -196,6 +196,10 @@ public sealed class IndividualTaskIsolationTests(PostgresFixture fixture)
             created.IsSuccess.Should().BeTrue();
             taskId = created.Value.Id;
 
+            var started = await new StartIndividualTaskCommandHandler(createContext, brigadir).Handle(
+                new StartIndividualTaskCommand(taskId), CancellationToken.None);
+            started.IsSuccess.Should().BeTrue();
+
             var completed = await new CompleteIndividualTaskCommandHandler(createContext, brigadir).Handle(
                 new CompleteIndividualTaskCommand(taskId, BonusAmount: 50m), CancellationToken.None);
             completed.IsSuccess.Should().BeTrue();

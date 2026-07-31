@@ -46,6 +46,14 @@ under `Guid.Empty` and silently generated no drafts. It now creates a scoped
 `ApplicationDbContext` per company, matching the established overdue-job
 pattern. Added workflow, tenant-isolation, advance-validation, and draft
 persistence coverage. No schema change or migration was required.
+**CI integration-test repair (2026-07-31):** fixed the shared PostgreSQL test
+infrastructure so every authenticated `FixedCurrentUserService` actor is
+materialized as a real `User` before an audited command saves. This preserves
+the production audit FKs while making test actor IDs valid. `SeedDataService`
+now runs its first-run/idempotency test against an isolated migrated database,
+instead of the shared fixture database where an unrelated company already
+exists. Also fixed one bonus-isolation setup to start its task before
+completion. Release suite: **148/148 passed**.
 **Frontend integration — Checkpoint 1/12 (Auth + API client) — 2026-07-31,
 branch `feature/shahrom-frontend-backend-integration`.** Separate track from
 the Phase 1-6 backend/bot work below: `frontend/` (React+Vite+TS, added by
