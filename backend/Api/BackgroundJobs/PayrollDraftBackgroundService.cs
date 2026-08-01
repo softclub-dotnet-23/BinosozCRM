@@ -1,4 +1,5 @@
 using Application.Payroll;
+using Application.Common.Interfaces;
 using Api.BackgroundServices;
 using Domain.Entities;
 using Infrastructure.Persistence;
@@ -43,6 +44,13 @@ public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFact
     private async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
+        var jobLock = scope.ServiceProvider.GetRequiredService<IDistributedJobLock>();
+        await using var heldLock = await jobLock.TryAcquireAsync("brigadacrm:payroll-draft", cancellationToken);
+        if (heldLock is null)
+        {
+            logger.LogInformation("Payroll draft background job skipped because another replica holds the lock.");
+            return;
+        }
         var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<ApplicationDbContext>>();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 

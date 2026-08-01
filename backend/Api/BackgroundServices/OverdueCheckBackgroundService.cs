@@ -44,6 +44,13 @@ public sealed class OverdueCheckBackgroundService(
     private async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
+        var jobLock = scope.ServiceProvider.GetRequiredService<IDistributedJobLock>();
+        await using var heldLock = await jobLock.TryAcquireAsync("brigadacrm:overdue-check", cancellationToken);
+        if (heldLock is null)
+        {
+            logger.LogInformation("Overdue check skipped because another replica holds the lock.");
+            return;
+        }
         var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<ApplicationDbContext>>();
         var notifier = scope.ServiceProvider.GetRequiredService<IOverdueNotifier>();
 

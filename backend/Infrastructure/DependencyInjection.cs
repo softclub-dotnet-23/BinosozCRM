@@ -3,6 +3,7 @@ using Application.Common.Interfaces;
 using Application.Common.Options;
 using Application.Seed;
 using Infrastructure.Auth;
+using Infrastructure.BackgroundJobs;
 using Infrastructure.Files;
 using Infrastructure.Persistence;
 using Infrastructure.Persistence.Interceptors;
@@ -34,6 +35,7 @@ public static class DependencyInjection
                     sp.GetRequiredService<AdminAuditSaveChangesInterceptor>()));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IDistributedJobLock, PostgresDistributedJobLock>();
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
