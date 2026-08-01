@@ -37,6 +37,8 @@ public sealed class SeedDataService(IApplicationDbContext context, IPasswordHash
             var ownerOptions = options.Owners[i];
             var envVarName = $"SEED_OWNER_{i + 1}_PASSWORD";
             var password = Environment.GetEnvironmentVariable(envVarName);
+            if (string.IsNullOrEmpty(password) && string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase) && options.DemoDataEnabled)
+                password = "Demo12345!";
 
             if (string.IsNullOrEmpty(password))
                 throw new InvalidOperationException($"{envVarName} is not set — cannot seed Owner accounts.");

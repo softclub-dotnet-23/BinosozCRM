@@ -87,12 +87,12 @@ public sealed class DemoSeedDataService(
         }
 
         // ---- Staff users: 2 Prorab, 3 Brigadir, 1 Accountant ------------------
-        var prorab1 = User.Create(companyId, "Азизов Фаррух Джамолович", "+992700100101", passwordHasher.Hash(DemoPassword), Role.Prorab);
+        var prorab1 = User.Create(companyId, "Азизов Фаррух Джамолович", "+992900000002", passwordHasher.Hash(DemoPassword), Role.Prorab);
         var prorab2 = User.Create(companyId, "Каримов Далер Салимович", "+992700100102", passwordHasher.Hash(DemoPassword), Role.Prorab);
-        var brigadir1 = User.Create(companyId, "Рахимов Шариф Абдуллоевич", "+992700100201", passwordHasher.Hash(DemoPassword), Role.Brigadir);
+        var brigadir1 = User.Create(companyId, "Рахимов Шариф Абдуллоевич", "+992900000003", passwordHasher.Hash(DemoPassword), Role.Brigadir);
         var brigadir2 = User.Create(companyId, "Юсупов Бахтиёр Насимович", "+992700100202", passwordHasher.Hash(DemoPassword), Role.Brigadir);
         var brigadir3 = User.Create(companyId, "Назаров Комрон Раджабович", "+992700100203", passwordHasher.Hash(DemoPassword), Role.Brigadir);
-        var accountant = User.Create(companyId, "Абдуллоева Мадина Хакимовна", "+992700100301", passwordHasher.Hash(DemoPassword), Role.Accountant);
+        var accountant = User.Create(companyId, "Абдуллоева Мадина Хакимовна", "+992900000004", passwordHasher.Hash(DemoPassword), Role.Accountant);
         context.Users.AddRange(prorab1, prorab2, brigadir1, brigadir2, brigadir3, accountant);
 
         // ---- Customers ----------------------------------------------------
