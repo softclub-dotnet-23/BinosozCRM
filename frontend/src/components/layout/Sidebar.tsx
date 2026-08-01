@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
-  Calculator,
   Calendar,
   ChevronDown,
   ClipboardCheck,
@@ -44,14 +43,6 @@ function isNavGroup(entry: NavEntry): entry is NavGroup {
 const NAV_ITEMS: NavEntry[] = [
   { to: "/dashboard", label: "Обзор", icon: Home },
   { to: "/objects", label: "Объекты", icon: Building2 },
-  {
-    label: "Сметы и бюджеты",
-    icon: Calculator,
-    children: [
-      { to: "/estimates", label: "Сметы" },
-      { to: "/budgets", label: "Бюджеты" },
-    ],
-  },
   { to: "/works", label: "Работы", icon: ClipboardCheck },
   {
     label: "Бригады",
@@ -59,7 +50,6 @@ const NAV_ITEMS: NavEntry[] = [
     children: [
       { to: "/brigades", label: "Список бригад" },
       { to: "/brigades/composition", label: "Состав бригад" },
-      { to: "/brigades/assignments", label: "Назначения" },
     ],
   },
   { to: "/employees", label: "Сотрудники", icon: User },
@@ -68,12 +58,9 @@ const NAV_ITEMS: NavEntry[] = [
     label: "Склад и материалы",
     icon: Package,
     children: [
-      { to: "/inventory/materials", label: "Материалы" },
       { to: "/inventory/material-requests", label: "Заявки на материалы" },
       { to: "/inventory/receipts", label: "Поступления" },
       { to: "/inventory/write-offs", label: "Списания" },
-      { to: "/inventory/transfers", label: "Перемещения" },
-      { to: "/inventory/stock", label: "Остатки" },
     ],
   },
   { to: "/payroll", label: "Зарплаты", icon: Wallet },
@@ -87,7 +74,7 @@ const BRIGADIR_NAV_ITEMS: NavEntry[] = [
   { to: "/brigades", label: "Моя бригада", icon: Users },
   { to: "/works", label: "Назначенные работы", icon: ClipboardCheck },
   { to: "/attendance", label: "Посещаемость", icon: Calendar },
-  { to: "/inventory/materials", label: "Материалы", icon: Package },
+  { to: "/inventory/material-requests", label: "Материалы", icon: Package },
 ];
 
 interface SidebarProps {

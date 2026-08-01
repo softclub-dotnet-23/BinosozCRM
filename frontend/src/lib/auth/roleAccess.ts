@@ -15,10 +15,10 @@ import type { UserRole } from "../../types";
 export const ROLE_HOME: Record<UserRole, string> = {
   owner: "/dashboard",
   administrator: "/dashboard",
-  accountant: "/payroll",
+  accountant: "/dashboard",
   prorab: "/works",
   brigadir: "/brigades",
-  storekeeper: "/inventory/materials",
+  storekeeper: "/dashboard",
 };
 
 const FULL_ACCESS = "*" as const;
@@ -42,14 +42,14 @@ const FULL_ACCESS = "*" as const;
 const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   owner: FULL_ACCESS,
   administrator: FULL_ACCESS,
-  accountant: ["/dashboard", "/payroll", "/budgets", "/estimates", "/objects"],
-  prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/attendance", "/inventory/*", "/reports"],
-  brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials"],
+  accountant: ["/dashboard", "/objects", "/works", "/brigades", "/attendance", "/inventory/material-requests", "/inventory/receipts", "/inventory/write-offs", "/payroll", "/reports"],
+  prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/employees", "/attendance", "/inventory/material-requests", "/inventory/receipts", "/inventory/write-offs", "/reports"],
+  brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/material-requests", "/inventory/write-offs"],
   storekeeper: ["/dashboard", "/inventory/*", "/reports"],
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  owner: "Владелец",
+  owner: "Администратор",
   administrator: "Администратор",
   accountant: "Бухгалтер",
   prorab: "Прораб",
