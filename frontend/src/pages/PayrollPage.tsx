@@ -28,6 +28,7 @@ import {
 import { listBrigades } from "../api/brigadesApi";
 import { listAllWorkers, type Worker } from "../api/workersApi";
 import { formatCurrency } from "../utils/format";
+import { formatDushanbeDate } from "../utils/dushanbeTime";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
@@ -244,7 +245,7 @@ export default function PayrollPage() {
   const advanceColumns: DataTableColumn<PayrollAdvance>[] = [
     { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
     { key: "amount", header: "Сумма", render: (row) => <span className="tabular text-ink">{formatCurrency(row.amount)}</span> },
-    { key: "issuedAt", header: "Дата выдачи", render: (row) => <span className="text-ink-secondary">{new Date(row.issuedAt).toLocaleDateString("ru-RU")}</span> },
+    { key: "issuedAt", header: "Дата выдачи", render: (row) => <span className="text-ink-secondary">{formatDushanbeDate(row.issuedAt)}</span> },
     { key: "settled", header: "Статус", render: (row) => <Badge tone={row.settledInPayrollEntryId ? "green" : "orange"}>{row.settledInPayrollEntryId ? "Зачтён" : "Не зачтён"}</Badge> },
     { key: "note", header: "Примечание", render: (row) => <span className="text-ink-secondary">{row.note ?? "—"}</span> },
   ];

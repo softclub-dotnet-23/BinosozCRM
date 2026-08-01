@@ -16,6 +16,7 @@ import { approveTimesheet, createManualTimesheet, listTimesheets, type Timesheet
 import { listObjects, type ConstructionObject } from "../api/objectsApi";
 import { listBrigades } from "../api/brigadesApi";
 import { listAllWorkers, type Worker } from "../api/workersApi";
+import { formatDushanbeTime } from "../utils/dushanbeTime";
 import BrigadirAttendancePage from "./BrigadirAttendancePage";
 
 function describeError(error: unknown, fallback: string): string {
@@ -132,8 +133,8 @@ function CompanyAttendancePage() {
     { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
     { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
     { key: "date", header: "Дата", render: (row) => <span className="text-ink-secondary">{row.date}</span> },
-    { key: "checkIn", header: "Приход", render: (row) => <span className="text-ink-secondary">{row.checkInAt ? new Date(row.checkInAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "—"}</span> },
-    { key: "checkOut", header: "Уход", render: (row) => <span className="text-ink-secondary">{row.checkOutAt ? new Date(row.checkOutAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "—"}</span> },
+    { key: "checkIn", header: "Приход", render: (row) => <span className="text-ink-secondary">{row.checkInAt ? formatDushanbeTime(row.checkInAt) : "—"}</span> },
+    { key: "checkOut", header: "Уход", render: (row) => <span className="text-ink-secondary">{row.checkOutAt ? formatDushanbeTime(row.checkOutAt) : "—"}</span> },
     { key: "late", header: "Опоздание", render: (row) => (row.lateMinutes ? <Badge tone="red">{row.lateMinutes} мин</Badge> : <span className="text-ink-muted">—</span>) },
     { key: "hours", header: "Часов", render: (row) => <span className="text-ink-secondary">{row.hoursWorked ?? "—"}</span> },
     { key: "approved", header: "Статус", render: (row) => <Badge tone={row.approvedAt ? "green" : "orange"}>{row.approvedAt ? "Утверждён" : "Ожидает"}</Badge> },
