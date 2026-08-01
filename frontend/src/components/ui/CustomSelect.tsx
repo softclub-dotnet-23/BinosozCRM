@@ -308,6 +308,7 @@ export function CustomSelect({
         aria-controls={listboxId}
         aria-disabled={disabled || undefined}
         aria-busy={loading || undefined}
+        aria-invalid={error || undefined}
         aria-activedescendant={activeOptionId}
         aria-label={ariaProps["aria-label"]}
         aria-labelledby={ariaProps["aria-labelledby"]}
