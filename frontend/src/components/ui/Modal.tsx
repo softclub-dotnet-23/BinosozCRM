@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { useDialogFocus } from "../../hooks/useDialogFocus";
 
 interface ModalProps {
   open: boolean;
@@ -19,18 +20,10 @@ const SIZE_CLASSNAMES = {
 };
 
 export function Modal({ open, onClose, title, description, children, footer, size = "md" }: ModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  useDialogFocus(open, onClose, containerRef);
 
   if (!open) return null;
 
@@ -42,9 +35,12 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         aria-hidden="true"
       />
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className={cn(
           "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-border bg-card shadow-(--shadow-popover)",
           "animate-[modal-in_180ms_ease-out]",
@@ -53,10 +49,14 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       >
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
-            <h2 id="modal-title" className="text-lg font-bold text-ink">
+            <h2 id={titleId} className="text-lg font-bold text-ink">
               {title}
             </h2>
-            {description && <p className="mt-1 text-sm text-ink-secondary">{description}</p>}
+            {description && (
+              <p id={descriptionId} className="mt-1 text-sm text-ink-secondary">
+                {description}
+              </p>
+            )}
           </div>
           <button
             type="button"
