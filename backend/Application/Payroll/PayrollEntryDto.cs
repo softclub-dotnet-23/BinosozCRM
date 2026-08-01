@@ -16,9 +16,10 @@ public sealed record PayrollEntryDto(
     string? AdjustmentReason,
     decimal? FinalAmount,
     PayrollEntryStatus Status,
-    DateTimeOffset? PaidAt)
+    DateTimeOffset? PaidAt,
+    string? WorkerName)
 {
-    public static PayrollEntryDto FromEntity(PayrollEntry entry) => new(
+    public static PayrollEntryDto FromEntity(PayrollEntry entry, string? workerName = null) => new(
         entry.Id,
         entry.WorkerId,
         entry.PeriodStart,
@@ -31,5 +32,6 @@ public sealed record PayrollEntryDto(
         entry.AdjustmentReason,
         entry.FinalAmount,
         entry.Status,
-        entry.PaidAt);
+        entry.PaidAt,
+        workerName);
 }
