@@ -78,8 +78,20 @@ public sealed class SetWorkOrderPayoutSharesCommandHandler(IApplicationDbContext
             .Select(s => WorkOrderPayoutShare.Create(workOrder.CompanyId, workOrder.Id, s.WorkerId, s.SharePercent, currentUser.UserId!.Value))
             .ToList();
         context.WorkOrderPayoutShares.AddRange(newShares);
+        workOrder.MarkPayoutSharesChanged(DateTimeOffset.UtcNow);
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            // The versioned WorkOrder root participates in this same EF
+            // transaction. If another complete replacement won the race, its
+            // xmin changes and EF rolls this entire delete/insert batch back.
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result.Failure<IReadOnlyList<WorkOrderPayoutShareDto>>(new Error(
+                "CONCURRENCY_CONFLICT", "Payout shares were changed by another request. Reload and retry."));
+        }
 
         return Result.Success<IReadOnlyList<WorkOrderPayoutShareDto>>(newShares.Select(WorkOrderPayoutShareDto.FromEntity).ToList());
     }
