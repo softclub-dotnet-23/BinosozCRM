@@ -144,6 +144,11 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         />
       )}
       <aside
+        // data-sidebar-state reflects this component's own collapsed prop
+        // directly — settings.css/users.css key off it instead of matching
+        // the literal "w-[236px]" Tailwind class string below, which would
+        // silently stop matching if that arbitrary value ever changes.
+        data-sidebar-state={collapsed ? "collapsed" : "expanded"}
         className={cn(
           "flex h-screen flex-col border-r border-border bg-card transition-[width,transform] duration-200",
           collapsed ? "w-[84px]" : "w-[236px]",
