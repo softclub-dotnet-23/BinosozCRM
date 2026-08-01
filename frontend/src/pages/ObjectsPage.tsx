@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, Building2, CheckCircle2, Eye, Flag, Loader2, Pencil, Plus } from "lucide-react";
+import { AlertCircle, Building2, CheckCircle2, Eye, Flag, Pencil, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { ListRowsSkeleton } from "../components/tables/ListRowsSkeleton";
 import { Pagination } from "../components/ui/Pagination";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Modal } from "../components/ui/Modal";
+import { MotionSection } from "../components/ui/MotionSection";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { useToast } from "../hooks/useToast";
 import { ApiError, NetworkError } from "../api/apiClient";
 import {
@@ -259,57 +262,68 @@ export default function ObjectsPage() {
       subtitle="Управление строительными объектами и их статусами"
       search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "Поиск объектов, адресов, заказчиков..." }}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Всего объектов" value={String(kpis.total)} icon={Building2} tone="orange" footer="Все проекты компании" />
         <MetricCard label="В работе" value={String(kpis.inProgress)} icon={CheckCircle2} tone="green" footer="Активные объекты" />
         <MetricCard label="Завершены" value={String(kpis.completed)} icon={Flag} tone="blue" footer="Закрытые проекты" />
         <MetricCard label="Приостановлены" value={String(kpis.suspended)} icon={AlertCircle} tone="red" footer="Требуют внимания" />
-      </div>
+      </StaggeredGrid>
 
       {loadState === "error" && (
-        <Card style={{ marginTop: 16, padding: 24 }}>
-          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
-          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
-        </Card>
+        <MotionSection>
+          <Card style={{ marginTop: 16, padding: 24 }}>
+            <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+            <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+          </Card>
+        </MotionSection>
       )}
 
       {loadState === "loading" && (
-        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+        <MotionSection>
+          <Card className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+              <h2 className="text-[17px] font-bold text-ink">Список объектов</h2>
+            </div>
+            <div className="mt-4"><ListRowsSkeleton /></div>
+          </Card>
+        </MotionSection>
       )}
 
       {loadState === "ready" && (
-        <Card className="mt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Список объектов</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <CustomSelect
-                size="sm"
-                value={statusFilter}
-                onValueChange={(value) => { setStatusFilter(value); setPage(1); }}
-                options={[{ value: "all", label: "Все статусы" }, ...STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))]}
-              />
-              <Button size="sm" onClick={openCreate}><Plus size={14} /> Добавить объект</Button>
+        <MotionSection delayMs={80}>
+          <Card className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+              <h2 className="text-[17px] font-bold text-ink">Список объектов</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <CustomSelect
+                  size="sm"
+                  value={statusFilter}
+                  onValueChange={(value) => { setStatusFilter(value); setPage(1); }}
+                  options={[{ value: "all", label: "Все статусы" }, ...STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))]}
+                />
+                <Button size="sm" onClick={openCreate}><Plus size={14} /> Добавить объект</Button>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4">
-            {pageRows.length > 0 ? (
-              <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} />
-            ) : (
-              <EmptyState icon={Building2} title="Объекты не найдены" description="Измените параметры поиска или добавьте первый объект" />
-            )}
-          </div>
+            <div className="mt-4">
+              {pageRows.length > 0 ? (
+                <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} />
+              ) : (
+                <EmptyState icon={Building2} title="Объекты не найдены" description="Измените параметры поиска или добавьте первый объект" />
+              )}
+            </div>
 
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            total={filteredObjects.length}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-            pageSizeOptions={[10, 20, 50]}
-          />
-        </Card>
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              total={filteredObjects.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              pageSizeOptions={[10, 20, 50]}
+            />
+          </Card>
+        </MotionSection>
       )}
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Добавить объект" size="md">

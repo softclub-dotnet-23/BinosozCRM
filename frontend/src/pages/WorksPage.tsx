@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, ClipboardList, Loader2, Plus } from "lucide-react";
+import { AlertCircle, ClipboardList, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { ListRowsSkeleton } from "../components/tables/ListRowsSkeleton";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Modal } from "../components/ui/Modal";
+import { MotionSection } from "../components/ui/MotionSection";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, NetworkError } from "../api/apiClient";
@@ -264,43 +267,54 @@ function CompanyWorksPage() {
       subtitle="Наряды на работы для бригад"
       action={<Button onClick={openCreate} disabled={objects.length === 0 || brigades.length === 0}><Plus size={15} /> Создать наряд</Button>}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Всего нарядов" value={String(kpis.total)} icon={ClipboardList} tone="orange" footer="Все наряды" />
         <MetricCard label="В работе" value={String(kpis.inProgress)} icon={ClipboardList} tone="blue" footer="Назначены или выполняются" />
         <MetricCard label="На проверке" value={String(kpis.onReview)} icon={ClipboardList} tone="purple" footer="Ждут решения" />
         <MetricCard label="Закрыты" value={String(kpis.closed)} icon={ClipboardList} tone="green" footer="Завершённые наряды" />
-      </div>
+      </StaggeredGrid>
 
       {loadState === "error" && (
-        <Card style={{ marginTop: 16, padding: 24 }}>
-          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
-          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
-        </Card>
+        <MotionSection>
+          <Card style={{ marginTop: 16, padding: 24 }}>
+            <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+            <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+          </Card>
+        </MotionSection>
       )}
 
       {loadState === "loading" && (
-        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+        <MotionSection>
+          <Card className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+              <h2 className="text-[17px] font-bold text-ink">Список нарядов</h2>
+            </div>
+            <div className="mt-4"><ListRowsSkeleton /></div>
+          </Card>
+        </MotionSection>
       )}
 
       {loadState === "ready" && (
-        <Card className="mt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-[17px] font-bold text-ink">Список нарядов</h2>
-            <CustomSelect
-              size="sm"
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
-              options={[{ value: "all", label: "Все статусы" }, ...(Object.keys(STATUS_LABEL) as WorkOrderStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
-            />
-          </div>
-          <div className="mt-4">
-            {filteredOrders.length > 0 ? (
-              <DataTable columns={columns} rows={filteredOrders} rowKey={(row) => row.id} />
-            ) : (
-              <EmptyState icon={ClipboardList} title="Наряды не найдены" description="Создайте первый наряд" />
-            )}
-          </div>
-        </Card>
+        <MotionSection delayMs={80}>
+          <Card className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+              <h2 className="text-[17px] font-bold text-ink">Список нарядов</h2>
+              <CustomSelect
+                size="sm"
+                value={statusFilter}
+                onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                options={[{ value: "all", label: "Все статусы" }, ...(Object.keys(STATUS_LABEL) as WorkOrderStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
+              />
+            </div>
+            <div className="mt-4">
+              {filteredOrders.length > 0 ? (
+                <DataTable columns={columns} rows={filteredOrders} rowKey={(row) => row.id} />
+              ) : (
+                <EmptyState icon={ClipboardList} title="Наряды не найдены" description="Создайте первый наряд" />
+              )}
+            </div>
+          </Card>
+        </MotionSection>
       )}
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Создать наряд" size="md">
