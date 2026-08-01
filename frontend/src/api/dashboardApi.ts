@@ -7,9 +7,7 @@ export interface StatusCount {
 
 export interface DashboardWorkStatus {
   workOrderStatusCounts: StatusCount[];
-  individualTaskStatusCounts: StatusCount[];
   overdueWorkOrderCount: number;
-  overdueIndividualTaskCount: number;
 }
 
 export function getDashboardWorkStatus(objectId?: string, brigadeId?: string): Promise<DashboardWorkStatus> {

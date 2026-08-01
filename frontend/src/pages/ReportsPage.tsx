@@ -9,9 +9,12 @@ import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
+import { DonutChart } from "../components/charts/DonutChart";
+import { CategoryLegend } from "../components/charts/CategoryLegend";
 import { ApiError, NetworkError } from "../api/apiClient";
 import { getActualCostReport, type ActualCostLine, type ActualCostReport } from "../api/reportsApi";
-import { formatCurrency } from "../utils/format";
+import { formatCompactCurrency, formatCurrency } from "../utils/format";
+import type { CategorySpend } from "../types";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
@@ -90,6 +93,28 @@ export default function ReportsPage() {
     lines: report?.lines.length ?? 0,
   }), [report]);
 
+  // Only 3 categories exist in the actual-cost domain model — there is no
+  // equipment-rental or transport cost anywhere in the backend. Amounts sum
+  // to each line's own TotalCost = Material + Piecework + Hourly + Bonus −
+  // Advance − Lateness + Adjustment (GetActualCostReportQuery.cs), so the
+  // 3 buckets below reconstruct that same total exactly. A bucket is
+  // dropped rather than shown negative if deductions exceed the underlying
+  // cost — a donut slice can't represent a negative share.
+  const expenseStructure: CategorySpend[] = useMemo(() => {
+    if (!report) return [];
+    const material = report.lines.reduce((sum, line) => sum + line.materialCost, 0);
+    const payroll = report.lines.reduce(
+      (sum, line) => sum + line.pieceworkCost + line.hourlyCost + line.bonusAmount - line.advanceDeductedAmount - line.latenessDeductionAmount,
+      0,
+    );
+    const other = report.lines.reduce((sum, line) => sum + line.adjustmentAmount, 0);
+    return [
+      { category: "Материалы", amount: material, color: "var(--color-green)" },
+      { category: "Зарплаты", amount: payroll, color: "var(--color-primary)" },
+      { category: "Прочие", amount: other, color: "var(--color-ink-muted)" },
+    ].filter((entry) => entry.amount > 0);
+  }, [report]);
+
   const columns: DataTableColumn<ActualCostLine>[] = [
     {
       key: "object",
@@ -139,6 +164,25 @@ export default function ReportsPage() {
         <MetricCard label="Итого за период" value={formatCurrency(kpis.total)} icon={Wallet} tone="orange" footer="Сумма по всем строкам отчёта" />
         <MetricCard label="Строк в отчёте" value={String(kpis.lines)} icon={BarChart3} tone="blue" footer="Объекты и «Общие»" />
       </div>
+
+      {loadState === "ready" && report && (
+        <Card className="mt-4 p-5 sm:p-6">
+          <h2 className="text-[17px] font-bold text-ink">Структура расходов</h2>
+          {expenseStructure.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-muted">Нет расходов за выбранный период</p>
+          ) : (
+            <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+              <DonutChart
+                data={expenseStructure}
+                centerLabel="Расходы"
+                centerValue={formatCompactCurrency(expenseStructure.reduce((sum, entry) => sum + entry.amount, 0))}
+                size={200}
+              />
+              <CategoryLegend data={expenseStructure} unitSuffix=" сомони" secondaryOrder="percent-first" />
+            </div>
+          )}
+        </Card>
+      )}
 
       {loadState === "error" && (
         <Card className="mt-4 p-0">

@@ -21,6 +21,8 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { Modal } from "../components/ui/Modal";
+import { DonutChart } from "../components/charts/DonutChart";
+import { CategoryLegend } from "../components/charts/CategoryLegend";
 import { useAuth } from "../context/AuthContext";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
@@ -38,7 +40,7 @@ import {
 } from "../api/usersApi";
 import { ROLE_LABEL } from "../lib/auth/roleAccess";
 import { resolvePersonPhoto } from "../utils/personPhotos";
-import type { UserRole } from "../types";
+import type { CategorySpend, UserRole } from "../types";
 import "../styles/users.css";
 
 type UserTab = "all" | "active" | "inactive";
@@ -49,6 +51,22 @@ const ROLE_CLASS_NAME: Partial<Record<UserRole, string>> = {
   brigadir: "role-brigadir",
   accountant: "role-accountant",
 };
+
+// Chart color per real, backend-assignable role (see ROLE_OPTIONS below) —
+// administrator/storekeeper/worker are UI-only labels elsewhere and never
+// appear here, so they have no chart color.
+const ROLE_CHART_COLOR: Partial<Record<UserRole, string>> = {
+  owner: "var(--color-green)",
+  prorab: "var(--color-blue)",
+  brigadir: "var(--color-purple)",
+  accountant: "var(--color-warning)",
+};
+
+const STATUS_OPTIONS: { value: UserTab; label: string }[] = [
+  { value: "all", label: "Все статусы" },
+  { value: "active", label: "Активные" },
+  { value: "inactive", label: "Неактивные" },
+];
 
 // Only the four roles the backend can actually assign — administrator/storekeeper
 // have no server-side equivalent (roleAccess.ts) and can never appear here.
@@ -178,18 +196,20 @@ export default function UsersPage() {
     return { total: users.length, active, inactive, owners, pendingPasswordChange };
   }, [users]);
 
-  const roleDistribution = useMemo(() => {
-    const total = users.length || 1;
-    return ROLE_OPTIONS.map(({ value, label }) => {
-      const role = mapToBackendRoleReverseLabel(value);
-      const count = users.filter((u) => u.role === role).length;
-      return { role, label, count, percent: (count / total) * 100 };
-    }).filter((entry) => entry.count > 0);
-  }, [users]);
+  const roleDistribution: CategorySpend[] = useMemo(
+    () =>
+      ROLE_OPTIONS.map(({ value, label }) => {
+        const role = mapToBackendRoleReverseLabel(value);
+        const count = users.filter((u) => u.role === role).length;
+        return { category: label, amount: count, color: ROLE_CHART_COLOR[role] ?? "var(--color-ink-muted)" };
+      }).filter((entry) => entry.amount > 0),
+    [users],
+  );
 
   function resetFilters() {
     setSearch("");
     setRoleFilter("all");
+    setTab("all");
     setPage(1);
   }
 
@@ -342,11 +362,6 @@ export default function UsersPage() {
         {loadState === "ready" && (
           <div className="users-content-grid">
             <Card className="users-table-card">
-              <div className="users-tabs">
-                {([['all', 'Все пользователи'], ['active', 'Активные'], ['inactive', 'Неактивные']] as [UserTab, string][]).map(([key, label]) => (
-                  <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); setPage(1); }}>{label}</button>
-                ))}
-              </div>
               {filteredUsers.length === 0 ? (
                 <div style={{ padding: 40, textAlign: "center", color: "var(--color-ink-muted)" }}>Пользователи не найдены</div>
               ) : (
@@ -413,23 +428,65 @@ export default function UsersPage() {
             </Card>
 
             <aside className="users-aside">
-              <Card className="users-filter-card">
-                <h2>Фильтры</h2>
-                <FilterLabel label="Поиск"><div className="users-filter-search"><Search size={13} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя или телефон..." /></div></FilterLabel>
-                <FilterLabel label="Роль"><CustomSelect size="sm" fullWidth value={roleFilter} onValueChange={(value) => { setRoleFilter(value); setPage(1); }} options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS.map((o) => ({ value: mapToBackendRoleReverseLabel(o.value), label: o.label }))]} /></FilterLabel>
-                <div className="users-filter-actions"><Button size="sm" onClick={() => setPage(1)}>Применить</Button><Button size="sm" variant="secondary" onClick={resetFilters}>Сбросить</Button></div>
+              <Card className="p-5">
+                <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FilterLabel label="Поиск" className="sm:col-span-2">
+                    <div className="relative">
+                      <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+                      <input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Имя или телефон"
+                        className="h-11 w-full rounded-[10px] border border-border-strong bg-white pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-muted outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+                      />
+                    </div>
+                  </FilterLabel>
+                  <FilterLabel label="Роль">
+                    <CustomSelect
+                      size="md"
+                      fullWidth
+                      className="h-11"
+                      value={roleFilter}
+                      onValueChange={(value) => { setRoleFilter(value); setPage(1); }}
+                      options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS.map((o) => ({ value: mapToBackendRoleReverseLabel(o.value), label: o.label }))]}
+                      aria-label="Роль"
+                    />
+                  </FilterLabel>
+                  <FilterLabel label="Статус">
+                    <CustomSelect
+                      size="md"
+                      fullWidth
+                      className="h-11"
+                      value={tab}
+                      onValueChange={(value) => { setTab(value as UserTab); setPage(1); }}
+                      options={STATUS_OPTIONS}
+                      aria-label="Статус"
+                    />
+                  </FilterLabel>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <Button size="md" className="h-11 w-full" onClick={() => setPage(1)}>Применить</Button>
+                  <Button size="md" variant="secondary" className="h-11 w-full" onClick={resetFilters}>Сбросить</Button>
+                </div>
               </Card>
 
-              <Card className="users-role-card">
-                <h2>Пользователей по ролям</h2>
-                <div className="users-role-content">
-                  <div className="users-role-donut" aria-label="Распределение пользователей по ролям" />
-                  <ul>
-                    {roleDistribution.map((entry) => (
-                      <li key={entry.role}><i className={ROLE_CLASS_NAME[entry.role]} />{entry.label} <b>{entry.count} ({entry.percent.toFixed(1)}%)</b></li>
-                    ))}
-                  </ul>
-                </div>
+              <Card className="p-5">
+                <h2 className="text-[15px] font-bold text-ink">Пользователи по ролям</h2>
+                {roleDistribution.length === 0 ? (
+                  <p className="mt-4 text-sm text-ink-muted">Пользователей пока нет</p>
+                ) : (
+                  <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+                    <DonutChart
+                      data={roleDistribution}
+                      centerLabel="всего"
+                      centerValue={String(roleDistribution.reduce((sum, entry) => sum + entry.amount, 0))}
+                      size={168}
+                      valueFormatter={(value) => `${value}`}
+                    />
+                    <CategoryLegend data={roleDistribution} />
+                  </div>
+                )}
               </Card>
             </aside>
           </div>
@@ -493,8 +550,13 @@ function UserAvatar({ user }: { user: AppUser }) {
   );
 }
 
-function FilterLabel({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="users-filter-label"><span>{label}</span>{children}</label>;
+function FilterLabel({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1.5 ${className ?? ""}`}>
+      <span className="text-xs font-medium text-ink-secondary">{label}</span>
+      {children}
+    </label>
+  );
 }
 
 function CreateUserModal({

@@ -297,7 +297,7 @@ export function CustomSelect({
     open && !searchable && flatOptions[activeIndex] ? `${listboxId}-opt-${activeIndex}` : undefined;
 
   return (
-    <div className={cn(resolvedFullWidth ? "w-full" : "inline-block", className)}>
+    <div className={cn(resolvedFullWidth ? "w-full" : "inline-block")}>
       {name && <input type="hidden" name={name} value={value} />}
       <div
         ref={triggerRef}
@@ -330,6 +330,7 @@ export function CustomSelect({
               : "border-border-strong hover:border-[#d4d4d2]",
           disabled && "cursor-not-allowed bg-app-bg text-ink-muted",
           loading && "cursor-wait",
+          className,
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">
