@@ -1,4 +1,5 @@
 using Application.Common.Options;
+using Application.Common.Security;
 using Application.Seed;
 using Domain.Enums;
 using FluentAssertions;
@@ -192,4 +193,57 @@ public sealed class DemoSeedDataServiceTests(PostgresFixture fixture)
         workOrders.Should().OnlyContain(o => objectIds.Contains(o.ObjectId) && brigadeIds.Contains(o.BrigadeId));
         workers.Should().OnlyContain(w => brigadeIds.Contains(w.BrigadeId));
     }
-}
+
+    [Fact]
+    public async Task Existing_demo_dataset_reconciles_documented_web_accounts()
+    {
+        var (connectionString, companyId) = await SeedBaseAsync(fixture);
+        await using (var context = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
+            await CreateDemoSeedDataService(context, companyId, demoDataEnabled: true).SeedAsync(CancellationToken.None);
+
+        var passwordHasher = new Argon2PasswordHasher();
+        await using (var stale = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
+        {
+            var users = await stale.Users.IgnoreQueryFilters()
+                .Where(user => user.CompanyId == companyId && user.Phone.StartsWith("+99290000000"))
+                .ToListAsync();
+            users.Should().ContainSingle(user => user.Phone == "+992900000004");
+
+            foreach (var user in users)
+            {
+                user.ChangeRole(Role.Owner);
+                user.Deactivate();
+                user.SetPassword(passwordHasher.Hash("obsolete-password"), forcePasswordChange: true);
+            }
+            await stale.SaveChangesAsync();
+        }
+
+        await using (var context = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
+            await CreateDemoSeedDataService(context, companyId, demoDataEnabled: true).SeedAsync(CancellationToken.None);
+
+        await using var verify = fixture.CreateDbContext(connectionString, new NullCurrentUserService());
+        var expectedRoles = new Dictionary<string, Role>
+        {
+            ["+992900000001"] = Role.Owner,
+            ["+992900000002"] = Role.Prorab,
+            ["+992900000003"] = Role.Brigadir,
+            ["+992900000004"] = Role.Accountant
+        };
+        var accounts = await verify.Users.IgnoreQueryFilters()
+            .Where(user => user.CompanyId == companyId && expectedRoles.Keys.Contains(user.Phone))
+            .ToListAsync();
+
+        accounts.Should().HaveCount(4);
+        foreach (var (phone, role) in expectedRoles)
+        {
+            var account = accounts.Single(user => user.Phone == phone);
+            account.Role.Should().Be(role);
+            account.IsActive.Should().BeTrue();
+            account.ForcePasswordChange.Should().BeFalse();
+            passwordHasher.Verify("Demo12345!", account.PasswordHash).Should().BeTrue();
+        }
+
+        var brigadir = accounts.Single(user => user.Role == Role.Brigadir);
+        (await verify.Workers.IgnoreQueryFilters()
+            .AnyAsync(worker => worker.CompanyId == companyId && worker.UserId == brigadir.Id)).Should().BeTrue();
+    }}

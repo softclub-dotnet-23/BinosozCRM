@@ -64,7 +64,51 @@ public sealed class DemoSeedDataService(
         var alreadySeeded = await context.Brigades.IgnoreQueryFilters()
             .AnyAsync(b => b.CompanyId == company.Id, cancellationToken);
         if (alreadySeeded)
+        {
+            // Reconcile an older Development dataset with the stable demo
+            // credentials instead of treating pre-existing brigades as a no-op.
+            var accounts = new (string Phone, string FullName, Role Role)[]
+            {
+                ("+992900000001", "Администратор демонстрации", Role.Owner),
+                ("+992900000002", "Азизов Фаррух Джамолович", Role.Prorab),
+                ("+992900000003", "Рахимов Шариф Абдуллоевич", Role.Brigadir),
+                ("+992900000004", "Абдуллоева Мадина Хакимовна", Role.Accountant)
+            };
+            var phones = accounts.Select(a => a.Phone).ToList();
+            var usersByPhone = await context.Users.IgnoreQueryFilters()
+                .Where(u => u.CompanyId == company.Id && phones.Contains(u.Phone))
+                .ToDictionaryAsync(u => u.Phone, cancellationToken);
+
+            foreach (var account in accounts)
+            {
+                if (!usersByPhone.TryGetValue(account.Phone, out var user))
+                {
+                    user = User.Create(company.Id, account.FullName, account.Phone, passwordHasher.Hash(DemoPassword), account.Role);
+                    context.Users.Add(user);
+                    usersByPhone.Add(account.Phone, user);
+                }
+                else
+                {
+                    user.ChangeRole(account.Role);
+                    user.Activate();
+                    user.SetPassword(passwordHasher.Hash(DemoPassword));
+                }
+            }
+
+            var brigadir = usersByPhone["+992900000003"];
+            var brigade = await context.Brigades.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(b => b.CompanyId == company.Id && b.BrigadirUserId != null, cancellationToken);
+            if (brigade is not null)
+            {
+                brigade.AssignBrigadir(brigadir.Id);
+                var worker = await context.Workers.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(w => w.CompanyId == company.Id && w.BrigadeId == brigade.Id, cancellationToken);
+                worker?.AssignUser(brigadir.Id);
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
             return;
+        }
 
         var companyId = company.Id;
         var today = businessTime.Today;

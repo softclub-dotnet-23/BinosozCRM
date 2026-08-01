@@ -7,7 +7,7 @@ export default defineConfig({
   retries: 1,
   reporter: [["html", { open: "never" }], ["list"]],
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: "http://localhost:5178",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -17,8 +17,8 @@ export default defineConfig({
     { name: "chromium-mobile", use: { ...devices["Pixel 5"], viewport: { width: 390, height: 844 } } },
   ],
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 5173",
-    url: "http://127.0.0.1:5173",
+    command: "npm run dev -- --host localhost --port 5178",
+    url: "http://localhost:5178",
     reuseExistingServer: true,
     timeout: 30_000,
   },

@@ -190,7 +190,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
           </button>
         </div>
 
-        <nav ref={navRef} className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+        <nav ref={navRef} className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
           {visibleNavItems.map((entry) => {
             if (isNavGroup(entry)) {
               const isGroupActive = entry.children.some((c) => location.pathname.startsWith(c.to));

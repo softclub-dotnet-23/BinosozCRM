@@ -65,6 +65,12 @@ public sealed class Worker : AuditableEntity, ICompanyOwned, ISoftDelete
         };
     }
 
+    public void AssignUser(Guid userId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(userId, Guid.Empty);
+        UserId = userId;
+    }
+
     public void Terminate(DateOnly terminationDate)
     {
         TerminationDate = terminationDate;
