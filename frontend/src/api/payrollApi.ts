@@ -5,6 +5,7 @@ export type PayrollEntryStatus = "Draft" | "Approved" | "Paid";
 export interface PayrollEntry {
   id: string;
   workerId: string;
+  workerName: string | null;
   periodStart: string;
   periodEnd: string;
   calculatedAmount: number;

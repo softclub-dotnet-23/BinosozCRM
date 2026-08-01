@@ -3,6 +3,7 @@ import { request, type PagedResult } from "./apiClient";
 export interface MaterialDelivery {
   id: string;
   objectId: string;
+  objectName: string;
   materialRequestId: string | null;
   documentId: string | null;
   materialName: string;
@@ -23,6 +24,16 @@ export interface MaterialDeliveryDocumentLine {
 export interface MaterialDeliveryDocument {
   documentId: string;
   objectId: string;
+  objectName: string;
+  supplierName: string | null;
+  deliveredAt: string;
+  lines: MaterialDelivery[];
+}
+
+/** Matches Application/Materials/CreateMaterialDeliveryDocumentCommand.cs's MaterialDeliveryDocumentDto exactly — no top-level objectName; each line's own MaterialDeliveryDto carries it. */
+export interface MaterialDeliveryDocumentResponse {
+  documentId: string;
+  objectId: string;
   supplierName: string | null;
   deliveredAt: string;
   lines: MaterialDelivery[];
@@ -32,8 +43,8 @@ export function listMaterialDeliveries(page: number, pageSize: number): Promise<
   return request<PagedResult<MaterialDelivery>>(`/api/v1/material-deliveries?page=${page}&pageSize=${pageSize}`);
 }
 
-export function createMaterialDeliveryDocument(objectId: string, supplierName: string | undefined, items: MaterialDeliveryDocumentLine[]): Promise<MaterialDeliveryDocument> {
-  return request<MaterialDeliveryDocument>("/api/v1/material-deliveries/document", {
+export function createMaterialDeliveryDocument(objectId: string, supplierName: string | undefined, items: MaterialDeliveryDocumentLine[]): Promise<MaterialDeliveryDocumentResponse> {
+  return request<MaterialDeliveryDocumentResponse>("/api/v1/material-deliveries/document", {
     method: "POST",
     body: { objectId, supplierName: supplierName || null, items },
   });
@@ -63,6 +74,7 @@ export function groupByDocument(deliveries: MaterialDelivery[]): MaterialDeliver
     return {
       documentId: first.documentId ?? first.id,
       objectId: first.objectId,
+      objectName: first.objectName,
       supplierName: first.supplierName,
       deliveredAt: first.deliveredAt,
       lines,

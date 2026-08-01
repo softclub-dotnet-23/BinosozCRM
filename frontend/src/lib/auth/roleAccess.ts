@@ -42,9 +42,9 @@ const FULL_ACCESS = "*" as const;
 const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   owner: FULL_ACCESS,
   administrator: FULL_ACCESS,
-  accountant: ["/dashboard", "/payroll", "/reports", "/budgets", "/estimates", "/objects"],
+  accountant: ["/dashboard", "/payroll", "/budgets", "/estimates", "/objects"],
   prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/attendance", "/inventory/*", "/reports"],
-  brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials", "/reports"],
+  brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials"],
   storekeeper: ["/dashboard", "/inventory/*", "/reports"],
 };
 

@@ -32,7 +32,7 @@ import {
   createUser,
   deactivateUser,
   listUsers,
-  regenerateTemporaryPassword,
+  resetUserPassword,
   type AppUser,
   type CreatedUser,
 } from "../api/usersApi";
@@ -87,6 +87,17 @@ function describeError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function describeResetError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Сессия истекла. Войдите в систему заново.";
+    if (error.status === 403) return "У вас нет прав для этого действия.";
+    if (error.code === "USER_NOT_FOUND") return "Пользователь не найден";
+    return error.message || fallback;
+  }
+  return fallback;
+}
+
 const CREATE_FORM_INITIAL = { fullName: "", phone: "", role: "Brigadir" as BackendRole };
 
 export default function UsersPage() {
@@ -117,6 +128,12 @@ export default function UsersPage() {
   const [revealedPassword, setRevealedPassword] = useState<CreatedUser | null>(null);
   const [copyConfirmed, setCopyConfirmed] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+
+  const [resetTarget, setResetTarget] = useState<AppUser | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   async function loadUsers() {
     setLoadState("loading");
@@ -241,18 +258,41 @@ export default function UsersPage() {
     }
   }
 
-  async function handleRegeneratePassword(user: AppUser) {
-    if (busyUserId) return;
-    setBusyUserId(user.id);
+  function openReset(user: AppUser) {
+    setResetTarget(user);
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetError("");
+  }
+
+  function closeReset() {
+    setResetTarget(null);
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetError("");
+  }
+
+  async function submitReset(event: FormEvent) {
+    event.preventDefault();
+    if (!resetTarget || resettingPassword) return;
+    if (resetNewPassword.length < 8) {
+      setResetError("Новый пароль должен содержать не менее 8 символов");
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError("Пароли не совпадают");
+      return;
+    }
+    setResettingPassword(true);
+    setResetError("");
     try {
-      const result = await regenerateTemporaryPassword(user.id);
-      setUsers((current) => current.map((u) => (u.id === result.user.id ? result.user : u)));
-      setCopyConfirmed(false);
-      setRevealedPassword(result);
+      await resetUserPassword(resetTarget.id, resetNewPassword);
+      showToast("Пароль сброшен");
+      closeReset();
     } catch (error) {
-      showToast(describeError(error, "Не удалось сгенерировать новый пароль"), "error");
+      setResetError(describeResetError(error, "Не удалось сбросить пароль"));
     } finally {
-      setBusyUserId(null);
+      setResettingPassword(false);
     }
   }
 
@@ -334,10 +374,9 @@ export default function UsersPage() {
                               </button>
                               <button
                                 type="button"
-                                aria-label="Сгенерировать новый пароль"
-                                title="Сгенерировать новый временный пароль"
-                                disabled={busyUserId === user.id}
-                                onClick={() => void handleRegeneratePassword(user)}
+                                aria-label="Сбросить пароль"
+                                title="Сбросить пароль"
+                                onClick={() => openReset(user)}
                               >
                                 <KeyRound size={14} />
                               </button>
@@ -425,6 +464,18 @@ export default function UsersPage() {
         onCopy={() => setCopyConfirmed(true)}
         onClose={() => setRevealedPassword(null)}
       />
+
+      <ResetPasswordModal
+        user={resetTarget}
+        newPassword={resetNewPassword}
+        confirmPassword={resetConfirmPassword}
+        error={resetError}
+        submitting={resettingPassword}
+        onNewPasswordChange={setResetNewPassword}
+        onConfirmPasswordChange={setResetConfirmPassword}
+        onSubmit={submitReset}
+        onClose={closeReset}
+      />
     </AppLayout>
   );
 }
@@ -435,7 +486,11 @@ function UserKpi({ icon: Icon, tone, label, value, suffix }: { icon: typeof User
 
 function UserAvatar({ user }: { user: AppUser }) {
   const src = resolvePersonPhoto(user.fullName);
-  return src ? <img className="users-row-avatar" src={src} alt={user.fullName} /> : <Avatar name={user.fullName} size="sm" />;
+  return src ? (
+    <img className="users-row-avatar" src={src} alt={user.fullName} loading="lazy" decoding="async" />
+  ) : (
+    <Avatar name={user.fullName} size="sm" />
+  );
 }
 
 function FilterLabel({ label, children }: { label: string; children: React.ReactNode }) {
@@ -517,6 +572,61 @@ function RoleChangeModal({
         <div className="users-modal-actions">
           <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
           <Button type="submit" disabled={submitting}>{submitting ? "Сохранение..." : "Сохранить"}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ResetPasswordModal({
+  user,
+  newPassword,
+  confirmPassword,
+  error,
+  submitting,
+  onNewPasswordChange,
+  onConfirmPasswordChange,
+  onSubmit,
+  onClose,
+}: {
+  user: AppUser | null;
+  newPassword: string;
+  confirmPassword: string;
+  error: string;
+  submitting: boolean;
+  onNewPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open={user !== null} onClose={onClose} title="Сбросить пароль" description={user?.fullName} size="sm">
+      <form className="users-modal-form" onSubmit={onSubmit}>
+        <label>
+          <span>Новый пароль</span>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(event) => onNewPasswordChange(event.target.value)}
+            autoComplete="new-password"
+            aria-invalid={error ? true : undefined}
+            autoFocus
+          />
+        </label>
+        <label>
+          <span>Повторите новый пароль</span>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => onConfirmPasswordChange(event.target.value)}
+            autoComplete="new-password"
+            aria-invalid={error ? true : undefined}
+          />
+        </label>
+        {error && <p className="users-modal-error" role="alert">{error}</p>}
+        <div className="users-modal-actions">
+          <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button type="submit" disabled={submitting}>{submitting ? "Сохранение..." : "Сбросить"}</Button>
         </div>
       </form>
     </Modal>

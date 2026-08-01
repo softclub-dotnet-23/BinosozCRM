@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { useDialogFocus } from "../../hooks/useDialogFocus";
 
 interface DrawerProps {
   open: boolean;
@@ -10,32 +11,25 @@ interface DrawerProps {
 }
 
 export function Drawer({ open, onClose, title, children, footer }: DrawerProps) {
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useDialogFocus(open, onClose, containerRef);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-[#171717]/40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-ink/40" onClick={onClose} aria-hidden="true" />
       <div
+        ref={containerRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="drawer-title"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className="relative flex h-full w-full max-w-sm flex-col bg-card shadow-(--shadow-popover) animate-[drawer-in_200ms_ease-out]"
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
-          <h2 id="drawer-title" className="text-lg font-bold text-ink">
+          <h2 id={titleId} className="text-lg font-bold text-ink">
             {title}
           </h2>
           <button

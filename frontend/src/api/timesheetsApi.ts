@@ -34,3 +34,13 @@ export function createManualTimesheet(input: CreateManualTimesheetInput): Promis
 export function approveTimesheet(timesheetId: string): Promise<Timesheet> {
   return request<Timesheet>(`/api/v1/timesheets/${timesheetId}/approve`, { method: "POST" });
 }
+
+/** Brigadir-only: marks a worker in their own brigade as checked in now (server clock), for themselves or any worker on their crew. */
+export function checkIn(workerId: string, objectId: string): Promise<Timesheet> {
+  return request<Timesheet>("/api/v1/timesheets/check-in", { method: "POST", body: { workerId, objectId } });
+}
+
+/** Brigadir-only: closes out an open (checked-in, not checked-out) timesheet. */
+export function checkOut(timesheetId: string): Promise<Timesheet> {
+  return request<Timesheet>(`/api/v1/timesheets/${timesheetId}/check-out`, { method: "POST" });
+}

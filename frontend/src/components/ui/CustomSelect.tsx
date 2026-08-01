@@ -308,6 +308,7 @@ export function CustomSelect({
         aria-controls={listboxId}
         aria-disabled={disabled || undefined}
         aria-busy={loading || undefined}
+        aria-invalid={error || undefined}
         aria-activedescendant={activeOptionId}
         aria-label={ariaProps["aria-label"]}
         aria-labelledby={ariaProps["aria-labelledby"]}
@@ -327,7 +328,7 @@ export function CustomSelect({
             : open
               ? "border-primary ring-2 ring-primary/15"
               : "border-border-strong hover:border-[#d4d4d2]",
-          disabled && "cursor-not-allowed bg-[#FAFAF9] text-ink-muted",
+          disabled && "cursor-not-allowed bg-app-bg text-ink-muted",
           loading && "cursor-wait",
         )}
       >

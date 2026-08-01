@@ -3,6 +3,7 @@ import { request, type PagedResult } from "./apiClient";
 export interface MaterialConsumptionReport {
   id: string;
   objectId: string;
+  objectName: string;
   brigadeId: string;
   reportedByUserId: string;
   date: string;
