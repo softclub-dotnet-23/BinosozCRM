@@ -8,10 +8,9 @@ namespace Application.Auth;
 // GET /auth/me — the "who am I" the login/refresh response itself never
 // carried: AuthTokensDto only ever had the user id inside the JWT's own
 // NameIdentifier claim, never phone/FullName (frontend-integration gap, no
-// MASTER.md section covers a /me endpoint explicitly). User has no global
-// CompanyId filter (same exclusion as Company, MASTER §5.1/§5.2), but this
-// only ever looks up the caller's own id from their token, never an
-// arbitrary id, so cross-company exposure isn't possible here.
+// MASTER.md section covers a /me endpoint explicitly). User is now company
+// scoped, so this lookup also fails closed if a token's tenant claim and the
+// persisted user ownership ever disagree.
 public sealed record GetCurrentUserQuery : IRequest<Result<CurrentUserDto>>;
 
 public sealed record CurrentUserDto(Guid Id, string Phone, string FullName, string Role);

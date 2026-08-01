@@ -44,6 +44,7 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
             return Result.Failure<ObjectCostBreakdownDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         var materialCost = await context.MaterialDeliveries
+            .AsNoTracking()
             .Where(d => d.ObjectId == request.ObjectId)
             .SumAsync(d => (decimal?)(d.UnitCost * d.Qty), cancellationToken) ?? 0m;
 
@@ -64,34 +65,15 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
     // same "not final until confirmed" spirit as ClosedPeriodsOnlyNote below.
     private async Task<decimal> ComputePieceworkCostAsync(Guid objectId, CancellationToken cancellationToken)
     {
-        var orders = await context.WorkOrders
-            .Where(w => w.ObjectId == objectId
-                        && (w.Status == WorkOrderStatus.Accepted || w.Status == WorkOrderStatus.Closed)
-                        && w.CompletedDate != null)
-            .ToListAsync(cancellationToken);
-
-        decimal total = 0;
-        foreach (var order in orders)
-        {
-            var shares = await context.WorkOrderPayoutShares
-                .Where(s => s.WorkOrderId == order.Id && s.Amount != null)
-                .ToListAsync(cancellationToken);
-
-            foreach (var share in shares)
-            {
-                var isPaid = await context.PayrollEntries.AnyAsync(
-                    p => p.WorkerId == share.WorkerId
-                         && p.Status == PayrollEntryStatus.Paid
-                         && p.PeriodStart <= order.CompletedDate && p.PeriodEnd >= order.CompletedDate,
-                    cancellationToken);
-                if (!isPaid)
-                    continue;
-
-                total += share.Amount!.Value;
-            }
-        }
-
-        return total;
+        return await (
+            from share in context.WorkOrderPayoutShares.AsNoTracking()
+            join order in context.WorkOrders.AsNoTracking() on share.WorkOrderId equals order.Id
+            where order.ObjectId == objectId && share.Amount != null
+                  && (order.Status == WorkOrderStatus.Accepted || order.Status == WorkOrderStatus.Closed)
+                  && order.CompletedDate != null
+                  && context.PayrollEntries.AsNoTracking().Any(p => p.WorkerId == share.WorkerId
+                      && p.Status == PayrollEntryStatus.Paid && p.PeriodStart <= order.CompletedDate && p.PeriodEnd >= order.CompletedDate)
+            select share.Amount!.Value).SumAsync(x => (decimal?)x, cancellationToken) ?? 0m;
     }
 
     // §8.10: "Hourly — пропорционально часам: Timesheet.ObjectId +
@@ -104,30 +86,43 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
     // worker" walk, so computed together in one pass over PayrollEntries.
     private async Task<(decimal HourlyCost, decimal AbsenceCost)> ComputeHourlyAndAbsenceCostAsync(Guid objectId, CancellationToken cancellationToken)
     {
-        var paidEntries = await context.PayrollEntries
+        var paidEntries = await context.PayrollEntries.AsNoTracking()
             .Where(p => p.Status == PayrollEntryStatus.Paid)
             .ToListAsync(cancellationToken);
+
+        if (paidEntries.Count == 0)
+            return (0m, 0m);
+
+        var workerIds = paidEntries.Select(p => p.WorkerId).Distinct().ToArray();
+        var periodStart = paidEntries.Min(p => p.PeriodStart).AddMonths(-3);
+        var periodEnd = paidEntries.Max(p => p.PeriodEnd);
+        var timesheets = await context.Timesheets.AsNoTracking()
+            .Where(t => workerIds.Contains(t.WorkerId) && t.Date >= periodStart && t.Date <= periodEnd
+                && t.ApprovedAt != null && t.HoursWorked != null)
+            .ToListAsync(cancellationToken);
+        var absences = await context.AbsenceRecords.AsNoTracking()
+            .Where(a => workerIds.Contains(a.WorkerId) && a.IsPaid && a.DateFrom <= periodEnd && a.DateTo >= periodStart)
+            .ToListAsync(cancellationToken);
+        var rates = await context.WorkerPayRateHistories.AsNoTracking()
+            .Where(r => workerIds.Contains(r.WorkerId) && r.EffectiveFrom <= periodEnd)
+            .OrderBy(r => r.EffectiveFrom).ToListAsync(cancellationToken);
 
         decimal hourlyCost = 0;
         decimal absenceCost = 0;
 
         foreach (var entry in paidEntries)
         {
-            var worker = await context.Workers.FirstOrDefaultAsync(w => w.Id == entry.WorkerId, cancellationToken);
-            if (worker is null)
-                continue;
-
-            var timesheetsInPeriod = await context.Timesheets
-                .Where(t => t.WorkerId == worker.Id
-                            && t.Date >= entry.PeriodStart && t.Date <= entry.PeriodEnd
-                            && t.ApprovedAt != null && t.HoursWorked != null)
-                .ToListAsync(cancellationToken);
+            var timesheetsInPeriod = timesheets.Where(t => t.WorkerId == entry.WorkerId
+                && t.Date >= entry.PeriodStart && t.Date <= entry.PeriodEnd).ToList();
 
             var totalHours = timesheetsInPeriod.Sum(t => t.HoursWorked!.Value);
             var thisObjectHours = timesheetsInPeriod.Where(t => t.ObjectId == objectId).Sum(t => t.HoursWorked!.Value);
 
-            if (worker.PayRateType == PayRateType.Hourly && thisObjectHours > 0)
-                hourlyCost += thisObjectHours * worker.PayRate;
+            hourlyCost += timesheetsInPeriod.Where(t => t.ObjectId == objectId).Sum(t =>
+            {
+                var rate = rates.LastOrDefault(r => r.WorkerId == entry.WorkerId && r.EffectiveFrom <= t.Date);
+                return rate?.PayRateType == PayRateType.Hourly ? t.HoursWorked!.Value * rate.PayRate : 0m;
+            });
 
             // No hours anywhere this period -> nothing to weight the
             // absence split by; skipped rather than guessing at a
@@ -135,8 +130,15 @@ public sealed class GetObjectCostBreakdownQueryHandler(IApplicationDbContext con
             if (totalHours <= 0 || thisObjectHours <= 0)
                 continue;
 
-            var absenceAmount = await CalculatedAmountCalculator.ComputePaidAbsenceAmountAsync(
-                context, worker, entry.PeriodStart, entry.PeriodEnd, cancellationToken);
+            var absenceDays = absences.Where(a => a.WorkerId == entry.WorkerId && a.DateFrom <= entry.PeriodEnd && a.DateTo >= entry.PeriodStart)
+                .Sum(a => (a.DateTo < entry.PeriodEnd ? a.DateTo : entry.PeriodEnd).DayNumber - (a.DateFrom > entry.PeriodStart ? a.DateFrom : entry.PeriodStart).DayNumber + 1);
+            var recent = timesheets.Where(t => t.WorkerId == entry.WorkerId && t.Date > entry.PeriodEnd.AddMonths(-3) && t.Date <= entry.PeriodEnd).ToList();
+            var asOfRate = rates.LastOrDefault(r => r.WorkerId == entry.WorkerId && r.EffectiveFrom <= entry.PeriodEnd);
+            var averageDailyRate = asOfRate?.PayRateType == PayRateType.Hourly
+                ? recent.Count < 10 ? 8m * asOfRate.PayRate : recent.Sum(t =>
+                    (rates.LastOrDefault(r => r.WorkerId == entry.WorkerId && r.EffectiveFrom <= t.Date)?.PayRate ?? 0m) * t.HoursWorked!.Value) / recent.Count
+                : 0m;
+            var absenceAmount = absenceDays * averageDailyRate;
             if (absenceAmount == 0)
                 continue;
 

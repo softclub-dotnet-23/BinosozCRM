@@ -13,7 +13,24 @@ public sealed class GetMaterialDeliveryQueryHandler(IApplicationDbContext contex
 {
     public async Task<Result<MaterialDeliveryDto>> Handle(GetMaterialDeliveryQuery request, CancellationToken cancellationToken)
     {
-        var delivery = await context.MaterialDeliveries.FirstOrDefaultAsync(d => d.Id == request.Id, cancellationToken);
+        var delivery = await (
+            from materialDelivery in context.MaterialDeliveries.AsNoTracking()
+            join constructionObject in context.ConstructionObjects.AsNoTracking()
+                on materialDelivery.ObjectId equals constructionObject.Id
+            where materialDelivery.Id == request.Id
+            select new MaterialDeliveryDto(
+                materialDelivery.Id,
+                materialDelivery.ObjectId,
+                constructionObject.Name,
+                materialDelivery.MaterialRequestId,
+                materialDelivery.DocumentId,
+                materialDelivery.MaterialName,
+                materialDelivery.Unit,
+                materialDelivery.Qty,
+                materialDelivery.UnitCost,
+                materialDelivery.SupplierName,
+                materialDelivery.DeliveredAt))
+            .FirstOrDefaultAsync(cancellationToken);
         if (delivery is null)
             return Result.Failure<MaterialDeliveryDto>(new Error("MATERIAL_DELIVERY_NOT_FOUND", "Material delivery not found."));
 
@@ -21,6 +38,6 @@ public sealed class GetMaterialDeliveryQueryHandler(IApplicationDbContext contex
         if (allowedObjectIds is not null && !allowedObjectIds.Contains(delivery.ObjectId))
             return Result.Failure<MaterialDeliveryDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
-        return Result.Success(MaterialDeliveryDto.FromEntity(delivery));
+        return Result.Success(delivery);
     }
 }

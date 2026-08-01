@@ -34,20 +34,21 @@ public sealed class ForgotPasswordCommandHandler(
         // same IgnoreQueryFilters() reasoning as Login/RefreshToken.
         var user = await context.Users
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(u => u.Phone == request.Phone, cancellationToken);
+            .FirstOrDefaultAsync(u => !u.IsDeleted && u.Phone == request.Phone, cancellationToken);
 
         if (user is null || !user.IsActive)
             return Result.Success();
 
-        // Single-tenant assumption, same as LoginCommand's own CompanyId
-        // lookup — one Company row per deployment in this MVP.
-        var companyId = await context.Companies.Select(c => c.Id).FirstAsync(cancellationToken);
+        // Preserve the indistinguishable success response, but never create
+        // a reset credential that production cannot actually deliver.
+        if (!deliveryService.CanDeliver)
+            return Result.Success();
 
         var plainToken = RefreshTokenGenerator.GenerateToken();
         var tokenHash = RefreshTokenGenerator.Hash(plainToken);
         var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
 
-        var resetToken = PasswordResetToken.Create(companyId, user.Id, tokenHash, expiresAt);
+        var resetToken = PasswordResetToken.Create(user.CompanyId, user.Id, tokenHash, expiresAt);
         context.PasswordResetTokens.Add(resetToken);
         await context.SaveChangesAsync(cancellationToken);
 

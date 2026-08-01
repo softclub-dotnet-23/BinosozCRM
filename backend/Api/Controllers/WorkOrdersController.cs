@@ -1,5 +1,6 @@
 using Api.Common;
 using Api.Contracts.WorkOrders;
+using Application.Common.Interfaces;
 using Application.WorkOrders;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +21,7 @@ namespace Api.Controllers;
 [ApiController]
 [Route("api/v1/work-orders")]
 [Authorize]
-public sealed class WorkOrdersController(ISender sender) : ControllerBase
+public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider businessTime) : ControllerBase
 {
     [HttpPost]
     [Authorize(Roles = "Owner,Prorab")]
@@ -74,7 +75,7 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
     [Authorize(Roles = "Owner,Prorab")]
     public async Task<IActionResult> Assign(Guid workOrderId, AssignWorkOrderRequest request, CancellationToken cancellationToken)
     {
-        var assignedDate = request.AssignedDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var assignedDate = request.AssignedDate ?? businessTime.Today;
         var result = await sender.Send(new AssignWorkOrderCommand(workOrderId, assignedDate), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
@@ -99,7 +100,7 @@ public sealed class WorkOrdersController(ISender sender) : ControllerBase
     [Authorize(Roles = "Owner,Prorab")]
     public async Task<IActionResult> Accept(Guid workOrderId, AcceptWorkOrderRequest request, CancellationToken cancellationToken)
     {
-        var completedDate = request.CompletedDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var completedDate = request.CompletedDate ?? businessTime.Today;
         var result = await sender.Send(new AcceptWorkOrderCommand(workOrderId, completedDate), cancellationToken);
         return result.ToActionResult(HttpContext);
     }

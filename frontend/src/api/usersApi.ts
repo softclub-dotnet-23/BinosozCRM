@@ -63,7 +63,7 @@ export async function deactivateUser(userId: string): Promise<AppUser> {
   return mapUser(user);
 }
 
-export async function regenerateTemporaryPassword(userId: string): Promise<CreatedUser> {
-  const result = await request<CreateUserResponse>(`/api/v1/users/${userId}/regenerate-temporary-password`, { method: "POST" });
-  return { user: mapUser(result.user), temporaryPassword: result.temporaryPassword };
+/** Owner-only, company-scoped: sets a password the Owner chose. No credential is returned — the Owner supplied it, so there is nothing to display back. */
+export function resetUserPassword(userId: string, newPassword: string): Promise<void> {
+  return request<void>(`/api/v1/users/${userId}/reset-password`, { method: "POST", body: { newPassword } });
 }

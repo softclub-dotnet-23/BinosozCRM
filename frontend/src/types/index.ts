@@ -42,42 +42,6 @@ export interface UpcomingTask {
   objectId: string;
 }
 
-export type AlertSeverity = "red" | "orange" | "blue";
-export type AlertIcon = "clock" | "bolt" | "box" | "users";
-
-export interface AttentionItem {
-  id: string;
-  title: string;
-  objectName: string;
-  responsible: string;
-  alertLabel: string;
-  severity: AlertSeverity;
-  icon: AlertIcon;
-}
-
-export interface ObjectSummaryRow {
-  id: string;
-  name: string;
-  foreman: string;
-  progress: number;
-  budget: number;
-  status: ObjectStatus;
-}
-
-export interface BudgetPoint {
-  date: string;
-  planned: number;
-  spent: number;
-}
-
-export interface ObjectProgressPoint {
-  objectName: string;
-  planned: number;
-  actual: number;
-}
-
-export type PeriodFilter = "week" | "month" | "quarter" | "year";
-
 export interface PayrollSummary {
   period: string;
   employeeCount: number;
@@ -225,16 +189,6 @@ export interface Employee {
   assignedDate: string;
 }
 
-export interface CompositionChange {
-  id: string;
-  date: string;
-  employeeId: string;
-  employeeName: string;
-  fromBrigadeName: string;
-  toBrigadeName: string;
-  changeType: "transfer" | "assignment" | "replacement";
-}
-
 export type AssignmentStatus = "active" | "completed" | "cancelled" | "overdue";
 
 export type WorkSectionKey = "prep" | "foundation" | "structure" | "finishing" | "engineering" | "other";
@@ -296,11 +250,6 @@ export interface Work {
   attachments: string[];
   comments: WorkComment[];
   progressHistory: WorkProgressHistoryEntry[];
-}
-
-export interface CriticalWork {
-  work: Work;
-  overdueDays: number;
 }
 
 export interface WorkAnalytics {

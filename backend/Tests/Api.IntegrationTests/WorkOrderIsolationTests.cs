@@ -35,8 +35,8 @@ public sealed class WorkOrderIsolationTests(PostgresFixture fixture)
         var constructionObject = ConstructionObject.Create(companyId, "Object A", customer.Id);
         var brigade = Brigade.Create(companyId, "Brigade A");
         var otherBrigade = Brigade.Create(companyId, "Brigade B");
-        var prorabUser = User.Create("Test Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
-        var brigadirUser = User.Create("Test Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var prorabUser = User.Create(companyId, "Test Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+        var brigadirUser = User.Create(companyId, "Test Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
         var brigadirWorker = Worker.Create(
             companyId, brigade.Id, "Brigadir Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 50m, new DateOnly(2020, 1, 1), userId: brigadirUser.Id);
@@ -130,7 +130,7 @@ public sealed class WorkOrderIsolationTests(PostgresFixture fixture)
         var otherBrigadirUserId = Guid.NewGuid();
         await using (var setupContext = fixture.CreateDbContext(owner))
         {
-            var otherBrigadirUser = User.Create("Other Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+            var otherBrigadirUser = User.Create(owner.CompanyId!.Value, "Other Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
             otherBrigadirUserId = otherBrigadirUser.Id;
             var otherWorker = Worker.Create(
                 owner.CompanyId!.Value, otherBrigadeId, "Other Brigadir Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",

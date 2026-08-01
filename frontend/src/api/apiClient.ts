@@ -51,6 +51,7 @@ interface RefreshTokenResponse {
 
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+  /** A FormData body is sent as-is (multipart/form-data, browser-set boundary) — for endpoints that accept files, e.g. work-order progress photos. Anything else is JSON-encoded. */
   body?: unknown;
   signal?: AbortSignal;
   /** Skips the Authorization header and the 401-refresh-retry entirely — for login/refresh/logout, which must never recurse into their own retry logic. */
@@ -63,7 +64,9 @@ export interface RequestOptions {
 let inflightRefresh: Promise<RefreshTokenResponse> | null = null;
 
 async function rawFetch(path: string, options: RequestOptions): Promise<Response> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const isFormData = options.body instanceof FormData;
+  const headers: Record<string, string> = {};
+  if (!isFormData) headers["Content-Type"] = "application/json";
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -71,7 +74,7 @@ async function rawFetch(path: string, options: RequestOptions): Promise<Response
     return await fetch(`${getBaseUrl()}${path}`, {
       method: options.method ?? "GET",
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.body === undefined ? undefined : isFormData ? (options.body as FormData) : JSON.stringify(options.body),
       signal: options.signal,
     });
   } catch (cause) {

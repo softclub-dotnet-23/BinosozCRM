@@ -11,6 +11,7 @@ public enum AdminAuditAction
     // category §11.7 already covers.
     UserActivated,
     TempPasswordRegenerated,
+    OwnerPasswordReset,
     BrigadirAssigned,
     PayRateChanged,
     PayrollPaid,

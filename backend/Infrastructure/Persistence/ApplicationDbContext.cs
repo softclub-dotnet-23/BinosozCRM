@@ -27,6 +27,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
     public DbSet<Brigade> Brigades => Set<Brigade>();
     public DbSet<Worker> Workers => Set<Worker>();
+    public DbSet<WorkerPayRateHistory> WorkerPayRateHistories => Set<WorkerPayRateHistory>();
     public DbSet<Timesheet> Timesheets => Set<Timesheet>();
     public DbSet<AbsenceRecord> AbsenceRecords => Set<AbsenceRecord>();
     public DbSet<MaterialRequest> MaterialRequests => Set<MaterialRequest>();

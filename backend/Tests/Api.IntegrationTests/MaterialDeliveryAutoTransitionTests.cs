@@ -23,8 +23,8 @@ public sealed class MaterialDeliveryAutoTransitionTests(PostgresFixture fixture)
         var customer = Customer.Create(companyId, "Acme");
         var constructionObject = ConstructionObject.Create(companyId, "Object A", customer.Id);
         var brigade = Brigade.Create(companyId, "Brigade A");
-        var prorabUser = User.Create("Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
-        var brigadirUser = User.Create("Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var prorabUser = User.Create(companyId, "Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+        var brigadirUser = User.Create(companyId, "Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
         var brigadirWorker = Worker.Create(
             companyId, brigade.Id, "Brigadir Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1), userId: brigadirUser.Id);

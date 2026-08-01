@@ -16,6 +16,8 @@ namespace Api.IntegrationTests;
 [Collection(PostgresCollection.Name)]
 public sealed class WorkerTerminationLifecycleTests(PostgresFixture fixture)
 {
+    private static readonly FixedBusinessTimeProvider BusinessTime = new(DateTimeOffset.UtcNow);
+
     private async Task<(FixedCurrentUserService Owner, Guid WorkerId, Guid ObjectId, Guid BrigadeId)> SeedWorkerAsync(decimal payRate)
     {
         var companyId = Guid.NewGuid();
@@ -53,7 +55,7 @@ public sealed class WorkerTerminationLifecycleTests(PostgresFixture fixture)
         }
 
         await using var terminateContext = fixture.CreateDbContext(owner);
-        var result = await new TerminateWorkerCommandHandler(terminateContext)
+        var result = await new TerminateWorkerCommandHandler(terminateContext, BusinessTime)
             .Handle(new TerminateWorkerCommand(workerId, new DateOnly(2026, 6, 15)), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -93,7 +95,7 @@ public sealed class WorkerTerminationLifecycleTests(PostgresFixture fixture)
 
         await using (var terminateContext = fixture.CreateDbContext(owner))
         {
-            var result = await new TerminateWorkerCommandHandler(terminateContext)
+            var result = await new TerminateWorkerCommandHandler(terminateContext, BusinessTime)
                 .Handle(new TerminateWorkerCommand(workerId, terminationDate), CancellationToken.None);
             result.IsSuccess.Should().BeTrue();
         }
@@ -128,7 +130,7 @@ public sealed class WorkerTerminationLifecycleTests(PostgresFixture fixture)
 
         await using (var terminateContext = fixture.CreateDbContext(owner))
         {
-            var result = await new TerminateWorkerCommandHandler(terminateContext)
+            var result = await new TerminateWorkerCommandHandler(terminateContext, BusinessTime)
                 .Handle(new TerminateWorkerCommand(workerId, terminationDate), CancellationToken.None);
             result.IsSuccess.Should().BeTrue();
         }

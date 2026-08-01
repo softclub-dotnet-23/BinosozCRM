@@ -1,184 +1,212 @@
-import { useState } from "react";
-import { BarChart3, CalendarDays, Clock3, Plus, UserRound, UserRoundX } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, CalendarCheck, Loader2, LogIn, LogOut } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
-import { Card } from "../components/ui/Card";
 import { MetricCard } from "../components/ui/MetricCard";
+import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/StatusBadge";
+import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
-import { Avatar } from "../components/ui/Avatar";
-import { AttendanceStatusBadge } from "../components/attendance/AttendanceStatusBadge";
-import { AttendanceFormModal } from "../components/attendance/AttendanceFormModal";
-import { AttendanceDetailDrawer } from "../components/attendance/AttendanceDetailDrawer";
-import { brigadesRepository, employeesRepository, attendanceRepository } from "../data/repositories";
-import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
-import { usePersistentState } from "../hooks/usePersistentState";
-import { findBrigadirScope } from "../utils/brigadeAccess";
-import { computeAttendanceKpis, computeFrequentLateness } from "../utils/attendanceAnalytics";
-import { resolvePersonPhoto } from "../utils/personPhotos";
-import { formatDateShort } from "../utils/date";
+import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
-import { useAuth } from "../context/AuthContext";
-import type { AttendanceRecord, AttendanceStatus } from "../types";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { checkIn, checkOut, listTimesheets, type Timesheet } from "../api/timesheetsApi";
+import { listObjectLookups, listWorkerLookups, toNameMap, type LookupItem } from "../api/lookupsApi";
+import { formatDushanbeTime } from "../utils/dushanbeTime";
 
-type StatusFilter = "all" | AttendanceStatus;
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Сессия истекла. Войдите в систему заново.";
+    if (error.status === 403) return "У вас нет прав для этого действия.";
+    if (error.code === "TIMESHEET_ABSENCE_CONFLICT") return "У этого сотрудника оформлено отсутствие на эту дату.";
+    if (error.code === "TIMESHEET_ALREADY_CHECKED_IN") return "Этот сотрудник уже отмечен сегодня.";
+    return error.message || fallback;
+  }
+  return fallback;
+}
 
-const STATUS_TABS: { key: StatusFilter; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "present", label: "Присутствуют" },
-  { key: "late", label: "Опоздания" },
-  { key: "absent", label: "Отсутствуют" },
-];
-
+/**
+ * GET /timesheets, POST /timesheets/check-in and /{id}/check-out are all
+ * real, Brigadir-scoped-to-own-brigade endpoints. The only reason this page
+ * was previously a placeholder is that there was no way for a Brigadir to
+ * resolve worker/object names for their own crew — /lookups/workers and
+ * /lookups/objects (both scoped to the caller's own brigade) close that gap.
+ */
 export default function BrigadirAttendancePage() {
-  const { user } = useAuth();
   const { showToast } = useToast();
-  const employees = useRepositorySnapshot(employeesRepository);
-  const brigades = useRepositorySnapshot(brigadesRepository);
-  const [records, setRecords] = useRepositoryState(attendanceRepository);
-  const [filter, setFilter] = usePersistentState<StatusFilter>("filters.brigadirAttendance.status", "all");
-  const [formRecord, setFormRecord] = useState<AttendanceRecord | null | undefined>(undefined);
-  const [viewRecord, setViewRecord] = useState<AttendanceRecord | null>(null);
 
-  const scope = user ? findBrigadirScope(employees, brigades, user.fullName) : null;
+  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
+  const [workers, setWorkers] = useState<LookupItem[]>([]);
+  const [objects, setObjects] = useState<LookupItem[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "unavailable">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  if (!scope) {
-    return (
-      <AppLayout title="Посещаемость" subtitle="Учёт присутствия бригады, опозданий и отсутствий">
-        <Card className="p-0">
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkInWorkerId, setCheckInWorkerId] = useState("");
+  const [checkInObjectId, setCheckInObjectId] = useState("");
+  const [checkInError, setCheckInError] = useState("");
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [timesheetsResult, workersResult, objectsResult] = await Promise.all([
+        listTimesheets(1, 100),
+        listWorkerLookups({ limit: 100 }),
+        listObjectLookups({ limit: 100 }),
+      ]);
+      setTimesheets(timesheetsResult.items);
+      setWorkers(workersResult);
+      setObjects(objectsResult);
+      setLoadState("ready");
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "WORKER_NOT_FOUND") {
+        setLoadState("unavailable");
+        return;
+      }
+      setLoadError(describeError(error, "Не удалось загрузить посещаемость"));
+      setLoadState("error");
+    }
+  }
+
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const workerNameById = useMemo(() => toNameMap(workers), [workers]);
+  const objectNameById = useMemo(() => toNameMap(objects), [objects]);
+
+  const kpis = useMemo(() => ({
+    total: timesheets.length,
+    open: timesheets.filter((t) => t.checkInAt && !t.checkOutAt).length,
+    pendingApproval: timesheets.filter((t) => !t.approvedAt).length,
+  }), [timesheets]);
+
+  function openCheckIn() {
+    setCheckInWorkerId(workers[0]?.id ?? "");
+    setCheckInObjectId(objects[0]?.id ?? "");
+    setCheckInError("");
+    setCheckInOpen(true);
+  }
+
+  async function submitCheckIn(event: FormEvent) {
+    event.preventDefault();
+    if (checkingIn) return;
+    if (!checkInWorkerId || !checkInObjectId) {
+      setCheckInError("Выберите сотрудника и объект");
+      return;
+    }
+    setCheckingIn(true);
+    setCheckInError("");
+    try {
+      const created = await checkIn(checkInWorkerId, checkInObjectId);
+      setTimesheets((current) => [created, ...current.filter((t) => t.id !== created.id)]);
+      setCheckInOpen(false);
+      showToast("Приход отмечен");
+    } catch (error) {
+      setCheckInError(describeError(error, "Не удалось отметить приход"));
+    } finally {
+      setCheckingIn(false);
+    }
+  }
+
+  async function handleCheckOut(timesheet: Timesheet) {
+    if (busyId) return;
+    setBusyId(timesheet.id);
+    try {
+      const updated = await checkOut(timesheet.id);
+      setTimesheets((current) => current.map((t) => (t.id === updated.id ? updated : t)));
+      showToast("Уход отмечен");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось отметить уход"), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const columns: DataTableColumn<Timesheet>[] = [
+    { key: "worker", header: "Сотрудник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
+    { key: "date", header: "Дата", render: (row) => <span className="text-ink-secondary">{row.date}</span> },
+    { key: "checkIn", header: "Приход", render: (row) => <span className="text-ink-secondary">{row.checkInAt ? formatDushanbeTime(row.checkInAt) : "—"}</span> },
+    { key: "checkOut", header: "Уход", render: (row) => <span className="text-ink-secondary">{row.checkOutAt ? formatDushanbeTime(row.checkOutAt) : "—"}</span> },
+    { key: "late", header: "Опоздание", render: (row) => (row.lateMinutes ? <Badge tone="orange">{row.lateMinutes} мин</Badge> : <span className="text-ink-muted">—</span>) },
+    { key: "approved", header: "Статус", render: (row) => <Badge tone={row.approvedAt ? "green" : "orange"}>{row.approvedAt ? "Утверждён" : "Ожидает"}</Badge> },
+    {
+      key: "actions",
+      header: "Действия",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (row) =>
+        row.checkInAt && !row.checkOutAt ? (
+          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => void handleCheckOut(row)}>
+              <LogOut size={13} /> Отметить уход
+            </Button>
+          </div>
+        ) : null,
+    },
+  ];
+
+  return (
+    <AppLayout
+      title="Посещаемость"
+      subtitle="Отметки прихода и ухода вашей бригады"
+      action={<Button onClick={openCheckIn} disabled={workers.length === 0 || objects.length === 0}><LogIn size={15} /> Отметить приход</Button>}
+    >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Всего отметок" value={String(kpis.total)} icon={CalendarCheck} tone="orange" footer="За всё время" />
+        <MetricCard label="Открытых смен" value={String(kpis.open)} icon={CalendarCheck} tone="blue" footer="Отмечен приход, нет ухода" />
+        <MetricCard label="Ожидают утверждения" value={String(kpis.pendingApproval)} icon={CalendarCheck} tone="green" footer="Прораб ещё не утвердил" />
+      </div>
+
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
+
+      {loadState === "unavailable" && (
+        <Card className="mt-4 p-0">
           <ErrorState
             title="Бригада не найдена"
             description="Ваша учётная запись не привязана ни к одной бригаде. Обратитесь к администратору."
           />
         </Card>
-      </AppLayout>
-    );
-  }
+      )}
 
-  const { brigade } = scope;
-  const brigadeRecords = records.filter((r) => r.brigadeName === brigade.name);
-  const kpis = computeAttendanceKpis(brigadeRecords);
-  const frequentLateness = computeFrequentLateness(brigadeRecords);
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-  const filteredRecords = filter === "all" ? brigadeRecords : brigadeRecords.filter((r) => r.status === filter);
-
-  function handleSave(record: AttendanceRecord) {
-    setRecords((prev) => {
-      const exists = prev.some((r) => r.id === record.id);
-      return exists ? prev.map((r) => (r.id === record.id ? record : r)) : [record, ...prev];
-    });
-    setFormRecord(undefined);
-    showToast(formRecord ? "Запись обновлена" : "Посещение отмечено");
-  }
-
-  return (
-    <AppLayout title="Посещаемость" subtitle="Учёт присутствия бригады, опозданий и отсутствий">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        <MetricCard label="Всего отметок" value={String(kpis.total)} icon={CalendarDays} tone="blue" footer={brigade.name} />
-        <MetricCard label="Присутствовали" value={String(kpis.present)} icon={UserRound} tone="green" footer={`${kpis.presentPercent}% от отметок`} />
-        <MetricCard label="Опоздания" value={String(kpis.late)} icon={Clock3} tone="orange" footer={`${kpis.latePercent}% от отметок`} />
-        <MetricCard label="Отсутствия" value={String(kpis.absent)} icon={UserRoundX} tone="red" footer={`${kpis.absentPercent}% от отметок`} />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 2xl:grid-cols-[1.12fr_1fr]">
-        <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <div className="flex gap-2">
-              {STATUS_TABS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setFilter(t.key)}
-                  className={`rounded-lg border px-3 py-1.5 text-[10px] font-bold ${
-                    filter === t.key ? "border-primary bg-primary-soft text-primary" : "border-border-strong text-ink-secondary"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <Button size="sm" onClick={() => setFormRecord(null)}>
-              <Plus size={14} /> Отметить посещение
-            </Button>
-          </div>
-
-          {filteredRecords.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-left text-[10px]">
-                <thead>
-                  <tr className="border-y border-border bg-[#fafaf9] text-ink-muted">
-                    <th className="px-4 py-3">Сотрудник</th>
-                    <th>Дата</th>
-                    <th>Приход</th>
-                    <th>Уход</th>
-                    <th>Статус</th>
-                    <th>Примечание</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRecords.map((r) => (
-                    <tr key={r.id} onClick={() => setViewRecord(r)} className="cursor-pointer border-b border-border hover:bg-[#fffaf6]">
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          {resolvePersonPhoto(r.employeeName) ? (
-                            <img src={resolvePersonPhoto(r.employeeName)} alt={r.employeeName} className="h-8 w-8 rounded-full object-cover" />
-                          ) : (
-                            <Avatar name={r.employeeName} size="sm" />
-                          )}
-                          <b>{r.employeeName}</b>
-                        </div>
-                      </td>
-                      <td>{formatDateShort(r.date)}</td>
-                      <td>{r.arrivalTime ?? "—"}</td>
-                      <td>{r.departureTime ?? "—"}</td>
-                      <td><AttendanceStatusBadge status={r.status} /></td>
-                      <td>{r.note || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={UserRoundX}
-              title="Записей не найдено"
-              description={filter === "all" ? "Для этой бригады пока нет отметок посещаемости" : "Нет записей с выбранным статусом"}
-            />
-          )}
-        </Card>
-
-        <div className="grid gap-4">
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Сводка</h2>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-border p-3"><div className="flex items-center gap-2"><UserRound size={16} className="text-green" /><span className="text-[9px] text-ink-secondary">Присутствуют</span></div><b className="mt-2 block text-xl">{kpis.present}</b></div>
-              <div className="rounded-xl border border-border p-3"><div className="flex items-center gap-2"><Clock3 size={16} className="text-warning" /><span className="text-[9px] text-ink-secondary">Опоздали</span></div><b className="mt-2 block text-xl">{kpis.late}</b></div>
-              <div className="rounded-xl border border-border p-3"><div className="flex items-center gap-2"><UserRoundX size={16} className="text-red" /><span className="text-[9px] text-ink-secondary">Отсутствуют</span></div><b className="mt-2 block text-xl">{kpis.absent}</b></div>
-              <div className="rounded-xl border border-border p-3"><div className="flex items-center gap-2"><BarChart3 size={16} className="text-blue" /><span className="text-[9px] text-ink-secondary">Явка</span></div><b className="mt-2 block text-xl">{kpis.total > 0 ? `${kpis.presentPercent}%` : "—"}</b></div>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Частые опоздания</h2>
-            {frequentLateness.length > 0 ? (
-              <ul className="mt-3.5 space-y-3">
-                {frequentLateness.map((row) => (
-                  <li key={row.employeeName} className="flex items-center gap-2.5">
-                    <Avatar name={row.employeeName} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{row.employeeName}</span>
-                    <span className="shrink-0 text-xs font-semibold text-ink-secondary">{row.count} раза</span>
-                  </li>
-                ))}
-              </ul>
+      {loadState === "ready" && (
+        <Card className="mt-4">
+          <div className="mt-4">
+            {timesheets.length > 0 ? (
+              <DataTable columns={columns} rows={timesheets} rowKey={(row) => row.id} />
             ) : (
-              <p className="mt-3 py-4 text-center text-sm text-ink-secondary">Опозданий не зафиксировано</p>
+              <EmptyState icon={CalendarCheck} title="Отметок пока нет" description="Отметьте приход первого сотрудника" />
             )}
-          </Card>
-        </div>
-      </div>
+          </div>
+        </Card>
+      )}
 
-      <AttendanceFormModal open={formRecord !== undefined} record={formRecord ?? null} onClose={() => setFormRecord(undefined)} onSave={handleSave} />
-      <AttendanceDetailDrawer record={viewRecord} onClose={() => setViewRecord(null)} />
+      <Modal open={checkInOpen} onClose={() => setCheckInOpen(false)} title="Отметить приход" size="sm">
+        <form className="users-modal-form" onSubmit={submitCheckIn}>
+          <label><span>Сотрудник</span><CustomSelect fullWidth value={checkInWorkerId} onValueChange={setCheckInWorkerId} options={workers.map((w) => ({ value: w.id, label: w.name }))} /></label>
+          <label><span>Объект</span><CustomSelect fullWidth value={checkInObjectId} onValueChange={setCheckInObjectId} options={objects.map((o) => ({ value: o.id, label: o.name }))} /></label>
+          {checkInError && <p className="users-modal-error" role="alert">{checkInError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setCheckInOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={checkingIn}>{checkingIn ? "Сохранение..." : "Отметить"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
   );
 }

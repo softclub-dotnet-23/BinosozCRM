@@ -29,6 +29,7 @@ public static class PayrollDraftGenerator
         IApplicationDbContext context,
         Domain.Entities.Company company,
         DateOnly today,
+        IBusinessTimeProvider businessTime,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -39,7 +40,7 @@ public static class PayrollDraftGenerator
             .Select(w => w.Id)
             .ToListAsync(cancellationToken);
 
-        var handler = new CreatePayrollEntryCommandHandler(context);
+        var handler = new CreatePayrollEntryCommandHandler(context, businessTime);
         foreach (var workerId in workerIds)
         {
             var result = await handler.Handle(new CreatePayrollEntryCommand(workerId, periodStart, periodEnd), cancellationToken);

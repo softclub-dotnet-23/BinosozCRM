@@ -1,5 +1,5 @@
 import { WORK_SECTIONS } from "../data/mockWorks";
-import type { CriticalWork, Work, WorkAnalytics, WorkSectionBreakdown } from "../types";
+import type { Work, WorkAnalytics, WorkSectionBreakdown } from "../types";
 
 export function computeWorkAnalytics(works: Work[]): WorkAnalytics {
   const total = works.length;
@@ -53,12 +53,4 @@ export function computeOverdueDays(work: Work, todayIso: string): number {
   const end = new Date(`${work.plannedEnd}T00:00:00`).getTime();
   const today = new Date(`${todayIso}T00:00:00`).getTime();
   return Math.max(0, Math.round((today - end) / 86_400_000));
-}
-
-export function computeCriticalWorks(works: Work[], todayIso: string, limit = 3): CriticalWork[] {
-  return works
-    .filter((w) => w.status === "overdue")
-    .map((work) => ({ work, overdueDays: computeOverdueDays(work, todayIso) }))
-    .sort((a, b) => b.overdueDays - a.overdueDays || a.work.progress - b.work.progress)
-    .slice(0, limit);
 }

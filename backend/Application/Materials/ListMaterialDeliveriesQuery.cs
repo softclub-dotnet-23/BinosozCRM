@@ -19,20 +19,32 @@ public sealed class ListMaterialDeliveriesQueryHandler(IApplicationDbContext con
     {
         var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
 
-        var query = context.MaterialDeliveries.AsQueryable();
+        var query = context.MaterialDeliveries.AsNoTracking().AsQueryable();
         if (allowedObjectIds is not null)
             query = query.Where(d => allowedObjectIds.Contains(d.ObjectId));
 
-        query = query.OrderByDescending(d => d.DeliveredAt);
-
         var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query
+        var items = await (
+                from materialDelivery in query
+                join constructionObject in context.ConstructionObjects.AsNoTracking()
+                    on materialDelivery.ObjectId equals constructionObject.Id
+                orderby materialDelivery.DeliveredAt descending
+                select new MaterialDeliveryDto(
+                    materialDelivery.Id,
+                    materialDelivery.ObjectId,
+                    constructionObject.Name,
+                    materialDelivery.MaterialRequestId,
+                    materialDelivery.DocumentId,
+                    materialDelivery.MaterialName,
+                    materialDelivery.Unit,
+                    materialDelivery.Qty,
+                    materialDelivery.UnitCost,
+                    materialDelivery.SupplierName,
+                    materialDelivery.DeliveredAt))
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = items.Select(MaterialDeliveryDto.FromEntity).ToList();
-
-        return Result.Success(new PagedResult<MaterialDeliveryDto>(dtos, request.Page, request.PageSize, totalCount));
+        return Result.Success(new PagedResult<MaterialDeliveryDto>(items, request.Page, request.PageSize, totalCount));
     }
 }

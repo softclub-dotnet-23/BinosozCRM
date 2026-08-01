@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Api.Common;
 using Application.Common.Interfaces;
+using Infrastructure.Auth;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Middleware;
@@ -17,11 +18,12 @@ public sealed class AccountActiveMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext context, IApplicationDbContext db)
     {
         if (context.User.Identity?.IsAuthenticated == true &&
-            Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+            Guid.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) &&
+            Guid.TryParse(context.User.FindFirstValue(CurrentUserService.CompanyIdClaimType), out var companyId))
         {
             var isActive = await db.Users
                 .IgnoreQueryFilters()
-                .Where(u => u.Id == userId)
+                .Where(u => u.Id == userId && u.CompanyId == companyId && !u.IsDeleted)
                 .Select(u => (bool?)u.IsActive)
                 .FirstOrDefaultAsync(context.RequestAborted);
 

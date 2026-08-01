@@ -5,6 +5,7 @@ namespace Application.Materials;
 public sealed record MaterialConsumptionReportDto(
     Guid Id,
     Guid ObjectId,
+    string ObjectName,
     Guid BrigadeId,
     Guid ReportedByUserId,
     DateOnly Date,
@@ -14,9 +15,10 @@ public sealed record MaterialConsumptionReportDto(
     decimal QtyShortage,
     string? Comment)
 {
-    public static MaterialConsumptionReportDto FromEntity(MaterialConsumptionReport report) => new(
+    public static MaterialConsumptionReportDto FromEntity(MaterialConsumptionReport report, string objectName) => new(
         report.Id,
         report.ObjectId,
+        objectName,
         report.BrigadeId,
         report.ReportedByUserId,
         report.Date,

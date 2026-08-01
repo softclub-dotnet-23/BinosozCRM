@@ -43,6 +43,8 @@ export function Avatar({ name, size = "md", className }: AvatarProps) {
       <img
         src={photoSrc}
         alt={name}
+        loading="lazy"
+        decoding="async"
         onError={() => setPhotoFailed(true)}
         className={cn("shrink-0 rounded-full object-cover", sizeClass, className)}
       />
@@ -58,8 +60,8 @@ export function Avatar({ name, size = "md", className }: AvatarProps) {
         TONE_CLASSNAMES[tone],
         className,
       )}
-      title={name}
-      aria-hidden="true"
+      role="img"
+      aria-label={name}
     >
       {getInitials(name)}
     </div>

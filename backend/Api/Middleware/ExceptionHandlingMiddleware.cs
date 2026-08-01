@@ -1,4 +1,5 @@
 using Api.Common;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Middleware;
 
@@ -14,6 +15,24 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         try
         {
             await next(context);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // PostgreSQL xmin protects WorkOrder (and other versioned
+            // aggregates) from lost updates. This is an expected conflict,
+            // not an internal server error: a caller must reload and retry.
+            logger.LogInformation(
+                ex,
+                "Optimistic concurrency conflict processing {Method} {Path} (traceId {TraceId})",
+                context.Request.Method,
+                context.Request.Path,
+                context.TraceIdentifier);
+
+            await ErrorEnvelope.WriteAsync(
+                context,
+                StatusCodes.Status409Conflict,
+                "CONCURRENCY_CONFLICT",
+                "The resource was modified by another request. Reload and retry.");
         }
         catch (Exception ex)
         {

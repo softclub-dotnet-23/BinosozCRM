@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Objects;
 using Domain.Common;
 using Domain.Entities;
 using FluentValidation;
@@ -42,8 +43,17 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
 {
     public async Task<Result<MaterialDeliveryDto>> Handle(CreateMaterialDeliveryCommand request, CancellationToken cancellationToken)
     {
-        if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
+        var objectName = await context.ConstructionObjects
+            .AsNoTracking()
+            .Where(o => o.Id == request.ObjectId)
+            .Select(o => o.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (objectName is null)
             return Result.Failure<MaterialDeliveryDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
+
+        var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+        if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId))
+            return Result.Failure<MaterialDeliveryDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         MaterialRequest? materialRequest = null;
         if (request.MaterialRequestId is not null)
@@ -53,6 +63,8 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
                 return Result.Failure<MaterialDeliveryDto>(accessResult.Error);
 
             materialRequest = accessResult.Value;
+            if (materialRequest.ObjectId != request.ObjectId)
+                return Result.Failure<MaterialDeliveryDto>(new Error("MATERIAL_REQUEST_NOT_FOUND", "Material request not found."));
         }
 
         var deliveredAt = DateTimeOffset.UtcNow;
@@ -78,6 +90,6 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
         context.MaterialDeliveries.Add(delivery);
         await context.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(MaterialDeliveryDto.FromEntity(delivery));
+        return Result.Success(MaterialDeliveryDto.FromEntity(delivery, objectName));
     }
 }

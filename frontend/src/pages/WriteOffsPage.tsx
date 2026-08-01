@@ -9,7 +9,6 @@ import { DataTable, type DataTableColumn } from "../components/tables/DataTable"
 import { EmptyState } from "../components/ui/EmptyState";
 import { ApiError, NetworkError } from "../api/apiClient";
 import { listMaterialConsumptionReports, type MaterialConsumptionReport } from "../api/materialConsumptionApi";
-import { listObjects, type ConstructionObject } from "../api/objectsApi";
 import { listBrigades, type Brigade } from "../api/brigadesApi";
 
 function describeError(error: unknown, fallback: string): string {
@@ -26,7 +25,6 @@ function describeError(error: unknown, fallback: string): string {
  */
 export default function WriteOffsPage() {
   const [reports, setReports] = useState<MaterialConsumptionReport[]>([]);
-  const [objects, setObjects] = useState<ConstructionObject[]>([]);
   const [brigades, setBrigades] = useState<Brigade[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState("");
@@ -34,13 +32,11 @@ export default function WriteOffsPage() {
   async function loadAll() {
     setLoadState("loading");
     try {
-      const [reportsResult, objectsResult, brigadesResult] = await Promise.all([
+      const [reportsResult, brigadesResult] = await Promise.all([
         listMaterialConsumptionReports(1, 100),
-        listObjects(1, 100),
         listBrigades(1, 100),
       ]);
       setReports(reportsResult.items);
-      setObjects(objectsResult.items);
       setBrigades(brigadesResult.items);
       setLoadState("ready");
     } catch (error) {
@@ -53,7 +49,6 @@ export default function WriteOffsPage() {
     void loadAll();
   }, []);
 
-  const objectNameById = useMemo(() => new Map(objects.map((o) => [o.id, o.name])), [objects]);
   const brigadeNameById = useMemo(() => new Map(brigades.map((b) => [b.id, b.name])), [brigades]);
 
   const kpis = useMemo(() => ({
@@ -63,7 +58,7 @@ export default function WriteOffsPage() {
 
   const columns: DataTableColumn<MaterialConsumptionReport>[] = [
     { key: "date", header: "Дата", render: (row) => <span className="text-ink-secondary">{row.date}</span> },
-    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{row.objectName}</span> },
     { key: "brigade", header: "Бригада", render: (row) => <span className="text-ink-secondary">{brigadeNameById.get(row.brigadeId) ?? "—"}</span> },
     { key: "material", header: "Материал", render: (row) => <span className="font-semibold text-ink">{row.materialName}</span> },
     { key: "qtyUsed", header: "Списано", render: (row) => <span className="text-ink-secondary">{row.qtyUsed} {row.unit}</span> },

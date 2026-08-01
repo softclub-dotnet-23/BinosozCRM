@@ -46,7 +46,11 @@ public sealed class CreateIndividualTaskCommandHandler(IApplicationDbContext con
             return Result.Failure<IndividualTaskDto>(new Error("WORK_ORDER_NOT_FOUND", "Work order not found."));
 
         // Same per-company sequence as WorkOrder.Code (§5.14) — one shared counter.
-        var company = await context.Companies.FirstAsync(cancellationToken);
+        // Company itself is not company-owned, so it is not covered by the
+        // CompanyId query filter. The shared WorkOrder/IndividualTask code
+        // sequence must therefore select the caller's company explicitly.
+        var company = await context.Companies
+            .SingleAsync(company => company.Id == currentUser.CompanyId!.Value, cancellationToken);
         var code = company.ReserveNextCode();
 
         var task = IndividualTask.Create(

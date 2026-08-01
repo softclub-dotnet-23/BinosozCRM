@@ -805,7 +805,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("WorkerId", "PeriodStart", "PeriodEnd")
                         .IsUnique();
 
-                    b.ToTable("PayrollEntries");
+                    b.ToTable("PayrollEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_PayrollEntries_Period_Range", "\"PeriodStart\" <= \"PeriodEnd\"");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.ProrabObjectAssignment", b =>
@@ -1128,6 +1131,9 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamptz");
 
@@ -1161,6 +1167,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
 
                     b.HasIndex("Phone")
                         .IsUnique();
@@ -1430,7 +1438,49 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Workers");
+                    b.ToTable("Workers", t =>
+                        {
+                            t.HasCheckConstraint("CK_Workers_PayRate_ByType", "(\"PayRateType\" = 0 AND \"PayRate\" > 0) OR (\"PayRateType\" = 1 AND \"PayRate\" >= 0)");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Entities.WorkerPayRateHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("ModifiedAt")
+                        .HasColumnType("timestamptz");
+
+                    b.Property<decimal>("PayRate")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PayRateType")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WorkerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("WorkerId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("WorkerPayRateHistories", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkerPayRateHistories_PayRate_ByType", "(\"PayRateType\" = 0 AND \"PayRate\" > 0) OR (\"PayRateType\" = 1 AND \"PayRate\" >= 0)");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Entities.AbsenceRecord", b =>
@@ -1822,6 +1872,15 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Entities.User", b =>
+                {
+                    b.HasOne("Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Entities.WorkOrder", b =>
                 {
                     b.HasOne("Domain.Entities.Brigade", null)
@@ -1925,6 +1984,21 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.Entities.WorkerPayRateHistory", b =>
+                {
+                    b.HasOne("Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Entities.Worker", null)
+                        .WithMany()
+                        .HasForeignKey("WorkerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

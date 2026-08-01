@@ -103,6 +103,7 @@ export function LoginVisualPanel({ strings }: LoginVisualPanelProps) {
           src="/images/construction-login-v2.png"
           alt=""
           aria-hidden="true"
+          decoding="async"
           onError={() => setImageFailed(true)}
         />
       )}

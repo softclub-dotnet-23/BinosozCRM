@@ -30,3 +30,13 @@ jobs:
 
       - name: Test
         run: dotnet test backend/backend.slnx --configuration Release --no-build
+
+      - name: Check for vulnerable packages (MASTER §11.8)
+        run: |
+          set -euo pipefail
+          result=$(dotnet list backend/backend.slnx package --vulnerable --include-transitive --format json)
+          echo "$result"
+          if echo "$result" | jq -e 'any(.projects[]; has("frameworks"))' > /dev/null; then
+            echo "::error::Vulnerable NuGet packages found — see the report above."
+            exit 1
+          fi

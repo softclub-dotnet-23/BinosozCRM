@@ -39,7 +39,7 @@ public sealed class RefreshTokenCommandHandler(
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash, cancellationToken);
 
-        if (existing is null)
+        if (existing is null || existing.IsDeleted)
             return Result.Failure<AuthTokensDto>(InvalidToken());
 
         if (existing.RevokedAt is not null)
@@ -65,8 +65,10 @@ public sealed class RefreshTokenCommandHandler(
         if (existing.ExpiresAt < DateTimeOffset.UtcNow)
             return Result.Failure<AuthTokensDto>(InvalidToken());
 
-        var user = await context.Users.FirstOrDefaultAsync(u => u.Id == existing.UserId, cancellationToken);
-        if (user is null || !user.IsActive)
+        var user = await context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == existing.UserId, cancellationToken);
+        if (user is null || user.IsDeleted || !user.IsActive || user.CompanyId != existing.CompanyId)
             return Result.Failure<AuthTokensDto>(InvalidToken());
 
         var companyId = existing.CompanyId;

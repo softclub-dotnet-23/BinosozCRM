@@ -26,10 +26,16 @@ const SIZE_CLASSNAMES: Record<Size, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "primary", size = "md", className, ...props }, ref) => {
+  // A native <button> with no type defaults to "submit" inside a <form> —
+  // every explicit submit button in this codebase already says so itself
+  // (verified: no form relies on the implicit default), so flipping the
+  // fallback to "button" only removes the risk of a Cancel/icon button
+  // accidentally submitting a form it was never meant to.
+  ({ variant = "primary", size = "md", className, type = "button", ...props }, ref) => {
     return (
       <button
         ref={ref}
+        type={type}
         className={cn(
           "inline-flex select-none items-center justify-center whitespace-nowrap rounded-[10px] font-semibold transition-colors duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1",

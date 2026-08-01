@@ -57,7 +57,12 @@ public sealed class ReportMaterialConsumptionCommandHandler(
         if (brigadeId is null)
             return Result.Failure<MaterialConsumptionReportDto>(new Error("WORKER_NOT_FOUND", "No worker record linked to this account."));
 
-        if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
+        var objectName = await context.ConstructionObjects
+            .AsNoTracking()
+            .Where(o => o.Id == request.ObjectId)
+            .Select(o => o.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (objectName is null)
             return Result.Failure<MaterialConsumptionReportDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
 
         var report = await context.MaterialConsumptionReports.FirstOrDefaultAsync(
@@ -102,6 +107,6 @@ public sealed class ReportMaterialConsumptionCommandHandler(
                 cancellationToken);
         }
 
-        return Result.Success(MaterialConsumptionReportDto.FromEntity(report));
+        return Result.Success(MaterialConsumptionReportDto.FromEntity(report, objectName));
     }
 }

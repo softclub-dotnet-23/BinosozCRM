@@ -59,4 +59,11 @@ public sealed class UsersController(ISender sender) : ControllerBase
         var result = await sender.Send(new RegenerateTemporaryPasswordCommand(userId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpPost("{userId:guid}/reset-password")]
+    public async Task<IActionResult> ResetPassword(Guid userId, OwnerResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ResetUserPasswordCommand(userId, request.NewPassword), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

@@ -15,6 +15,7 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
 {
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
+        EnsureWorkerRateHistories(eventData.Context);
         EnsureActor(eventData.Context);
         return base.SavingChanges(eventData, result);
     }
@@ -24,13 +25,14 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
         InterceptionResult<int> result,
         CancellationToken cancellationToken = default)
     {
+        EnsureWorkerRateHistories(eventData.Context);
         await EnsureActorAsync(eventData.Context, cancellationToken);
         return await base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
     private void EnsureActor(DbContext? context)
     {
-        if (context is null || currentUser.UserId is not { } userId || HasTrackedActor(context, userId))
+        if (context is null || currentUser.UserId is not { } userId || currentUser.CompanyId is not { } || HasTrackedActor(context, userId))
             return;
 
         if (!context.Set<User>().IgnoreQueryFilters().Any(u => u.Id == userId))
@@ -39,7 +41,7 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
 
     private async Task EnsureActorAsync(DbContext? context, CancellationToken cancellationToken)
     {
-        if (context is null || currentUser.UserId is not { } userId || HasTrackedActor(context, userId))
+        if (context is null || currentUser.UserId is not { } userId || currentUser.CompanyId is not { } || HasTrackedActor(context, userId))
             return;
 
         if (!await context.Set<User>().IgnoreQueryFilters().AnyAsync(u => u.Id == userId, cancellationToken))
@@ -52,6 +54,7 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
     private void AddActor(DbContext context, Guid userId)
     {
         var actor = User.Create(
+            currentUser.CompanyId!.Value,
             "Test actor",
             $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             "test-hash",
@@ -63,5 +66,28 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
         // test-only public domain setter.
         context.Entry(actor).Property(nameof(Entity.Id)).CurrentValue = userId;
         context.Set<User>().Add(actor);
+    }
+
+    // Production migrations backfill legacy rows and CreateWorkerCommand
+    // writes the initial row. Direct entity seeding is intentionally common
+    // in these integration tests, so mirror that production invariant here
+    // without changing production dependency registration.
+    private static void EnsureWorkerRateHistories(DbContext? context)
+    {
+        if (context is null)
+            return;
+
+        var workers = context.ChangeTracker.Entries<Worker>()
+            .Where(e => e.State == EntityState.Added)
+            .Select(e => e.Entity)
+            .ToList();
+        var historyWorkerIds = context.ChangeTracker.Entries<WorkerPayRateHistory>()
+            .Where(e => e.State != EntityState.Deleted)
+            .Select(e => e.Entity.WorkerId)
+            .ToHashSet();
+
+        foreach (var worker in workers.Where(w => !historyWorkerIds.Contains(w.Id)))
+            context.Set<WorkerPayRateHistory>().Add(WorkerPayRateHistory.Create(
+                worker.CompanyId, worker.Id, worker.PayRateType, worker.PayRate, worker.HireDate));
     }
 }
