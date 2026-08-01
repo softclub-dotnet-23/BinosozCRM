@@ -63,33 +63,25 @@ internal static class CalculatedAmountCalculator
         DateOnly periodEnd,
         CancellationToken cancellationToken)
     {
-        var shares = await context.WorkOrderPayoutShares
-            .Where(s => s.WorkerId == worker.Id)
-            .ToListAsync(cancellationToken);
+        // One bounded query replaces the former 1 + (2 × share-count)
+        // pattern. The grouped progress subquery retains the exact factual
+        // quantity formula while keeping tenant query filters active.
+        var amounts = await (
+            from share in context.WorkOrderPayoutShares.AsNoTracking()
+            join order in context.WorkOrders.AsNoTracking() on share.WorkOrderId equals order.Id
+            where share.WorkerId == worker.Id
+                  && (order.Status == WorkOrderStatus.Accepted || order.Status == WorkOrderStatus.Closed)
+                  && order.CompletedDate != null
+                  && order.CompletedDate >= periodStart && order.CompletedDate <= periodEnd
+            join progress in context.WorkOrderProgresses.AsNoTracking() on order.Id equals progress.WorkOrderId into progresses
+            select new
+            {
+                share.SharePercent,
+                order.UnitPrice,
+                ReportedQty = progresses.Sum(p => (decimal?)p.ReportedQty) ?? 0m
+            }).ToListAsync(cancellationToken);
 
-        decimal total = 0;
-        foreach (var share in shares)
-        {
-            var order = await context.WorkOrders.FirstOrDefaultAsync(
-                w => w.Id == share.WorkOrderId
-                     && (w.Status == WorkOrderStatus.Accepted || w.Status == WorkOrderStatus.Closed)
-                     && w.CompletedDate != null
-                     && w.CompletedDate >= periodStart && w.CompletedDate <= periodEnd,
-                cancellationToken);
-            if (order is null)
-                continue;
-
-            // Σ ReportedQty is the FACT, never PlannedQty — §8.0: "Сделали
-            // 45 м² из 50 запланированных — платим за 45."
-            var reportedQty = await context.WorkOrderProgresses
-                .Where(p => p.WorkOrderId == order.Id)
-                .SumAsync(p => (decimal?)p.ReportedQty, cancellationToken) ?? 0m;
-
-            var orderTotal = reportedQty * order.UnitPrice;
-            total += orderTotal * (share.SharePercent / 100m);
-        }
-
-        return total;
+        return amounts.Sum(x => x.ReportedQty * x.UnitPrice * (x.SharePercent / 100m));
     }
 
     // "Оплачиваемое отсутствие: средняя дневная ставка = Σ HoursWorked за
