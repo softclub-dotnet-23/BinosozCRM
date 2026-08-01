@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -25,19 +24,19 @@ public sealed class ApiTestFactory(PostgresFixture fixture) : WebApplicationFact
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
-        builder.ConfigureAppConfiguration((_, configuration) =>
-        {
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:Default"] = fixture.ConnectionString,
-                ["Jwt:SecretKey"] = AuthTestOptions.Jwt.Value.SecretKey,
-                ["Jwt:Issuer"] = AuthTestOptions.Jwt.Value.Issuer,
-                ["Jwt:Audience"] = AuthTestOptions.Jwt.Value.Audience,
-                ["FileStorage:RootPath"] = Path.Combine(Path.GetTempPath(), "brigadacrm-api-integration-tests"),
-                ["FileStorage:SignedUrlSecret"] = "test-only-file-storage-secret-with-at-least-32-bytes"
-            });
-        });
+        // Minimal-host Program executes AddInfrastructure while the application
+        // is first being built. ConfigureAppConfiguration is too late at that
+        // point, so put every required test setting on the host builder before
+        // Program runs. This keeps the tests independent of developer/CI
+        // environment variables without committing a real connection string.
+        builder
+            .UseEnvironment("Testing")
+            .UseSetting("ConnectionStrings:Default", fixture.ConnectionString)
+            .UseSetting("Jwt:SecretKey", AuthTestOptions.Jwt.Value.SecretKey)
+            .UseSetting("Jwt:Issuer", AuthTestOptions.Jwt.Value.Issuer)
+            .UseSetting("Jwt:Audience", AuthTestOptions.Jwt.Value.Audience)
+            .UseSetting("FileStorage:RootPath", Path.Combine(Path.GetTempPath(), "brigadacrm-api-integration-tests"))
+            .UseSetting("FileStorage:SignedUrlSecret", "test-only-file-storage-secret-with-at-least-32-bytes");
 
         builder.ConfigureServices(services =>
         {
