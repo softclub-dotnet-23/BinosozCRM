@@ -166,10 +166,6 @@ export function computeExpenseStructure(
   ].filter((c) => c.amount > 0);
 }
 
-export function getTopObjectsByProfit(rows: FinancialSummaryRow[], limit = 3): FinancialSummaryRow[] {
-  return [...rows].sort((a, b) => b.profit - a.profit).slice(0, limit);
-}
-
 // ---------------------------------------------------------------------------
 // Works report
 // ---------------------------------------------------------------------------

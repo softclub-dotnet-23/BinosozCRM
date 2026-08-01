@@ -61,7 +61,6 @@ import {
   computeFinancialKpis,
   computeDailyFinanceSeries,
   computeExpenseStructure,
-  getTopObjectsByProfit,
   computeProgressByObject,
   computeResponsibleStats,
   computeBrigadeWorkload,
@@ -123,12 +122,6 @@ const REFERENCE_EXPENSE_STRUCTURE = [
   { category: "Аренда техники", amount: 18192, color: "#5798F5" },
   { category: "Транспорт", amount: 11324, color: "#9B5DE5" },
   { category: "Прочие", amount: 13459, color: "#A8B1C2" },
-];
-
-const REFERENCE_TOP_OBJECTS = [
-  { objectId: "ref-somoni", objectName: "ЖК «Сомони»", income: 160000, expense: 120450, profit: 39550 },
-  { objectId: "ref-vatan", objectName: "БЦ «Ватан»", income: 75500, expense: 50120, profit: 25380 },
-  { objectId: "ref-warehouse", objectName: "Складской комплекс", income: 22850, expense: 15000, profit: 7850 },
 ];
 
 const TABS: { key: ReportTab; label: string }[] = [
@@ -410,7 +403,71 @@ function CompanyReportsPage() {
           ))}
         </div>
 
-        <div className="reports-content-grid">
+        <Card className="reports-filters-bar">
+          <h2 className="text-base font-bold text-ink">Фильтры</h2>
+          <div className="reports-filters-row">
+            <div className="reports-filters-field">
+              <p className="text-xs font-medium text-ink-secondary">Период</p>
+              <div className="reports-filter-period">
+                <span>{formatDateShort(filters.dateFrom)} – {formatDateShort(filters.dateTo)}</span>
+                <CalendarDays size={13} />
+              </div>
+            </div>
+            <div className="reports-filters-field">
+              <p className="text-xs font-medium text-ink-secondary">Объект</p>
+              <CustomSelect
+                searchable
+                size="md"
+                fullWidth
+                aria-label="Объект"
+                value={filters.objectName}
+                onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
+                options={[{ value: "all", label: "Все объекты" }, ...objectNames.map((o) => ({ value: o, label: o }))]}
+              />
+            </div>
+            <div className="reports-filters-field">
+              <p className="text-xs font-medium text-ink-secondary">Бригада</p>
+              <CustomSelect
+                searchable
+                size="md"
+                fullWidth
+                aria-label="Бригада"
+                value={filters.brigadeName}
+                onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
+                options={[{ value: "all", label: "Все бригады" }, ...brigadeNames.map((b) => ({ value: b, label: b }))]}
+              />
+            </div>
+            <div className="reports-filters-field">
+              <p className="text-xs font-medium text-ink-secondary">Статус</p>
+              <CustomSelect
+                size="md"
+                fullWidth
+                aria-label="Статус"
+                value={filters.status}
+                onValueChange={(v) => setFilters((f) => ({ ...f, status: v }))}
+                options={[
+                  { value: "all", label: "Все статусы" },
+                  ...(tab === "works"
+                    ? (Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((key) => ({ value: key, label: RU_WORK_STATUS_LABELS[key] }))
+                    : tab === "payroll"
+                      ? ["prepared", "needs_review", "pending_approval", "approved", "returned", "paid", "cancelled"].map((s) => ({
+                          value: s,
+                          label: payrollStatusLabel(s as never),
+                        }))
+                      : []),
+                ]}
+              />
+            </div>
+            <div className="reports-filters-actions">
+              <Button onClick={handleGenerate}>Применить</Button>
+              <Button variant="outline" onClick={resetFilters}>
+                <RefreshCw size={14} /> Сбросить
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <div className={tab === "financial" ? "reports-content-grid reports-content-grid--full" : "reports-content-grid"}>
           <div className="reports-main-column">
 
           <div className="flex items-center gap-5 overflow-x-auto border-b border-border">
@@ -501,83 +558,14 @@ function CompanyReportsPage() {
           {tab === "payroll" && <PayrollTab kpis={payrollKpis} buckets={payrollBuckets} records={filteredPayroll} />}
         </div>
 
-          <aside className="reports-aside">
-          <Card className="p-5">
-            <h2 className="text-lg font-bold text-ink">Фильтры</h2>
-            <div className="mt-4 space-y-3.5">
-              <FilterField label="Период">
-                <div className="reports-filter-period">
-                  <span>{formatDateShort(filters.dateFrom)} – {formatDateShort(filters.dateTo)}</span>
-                  <CalendarDays size={13} />
-                </div>
-              </FilterField>
-              <FilterField label="Объект">
-                <CustomSelect
-                  searchable
-                  size="sm"
-                  fullWidth
-                  aria-label="Объект"
-                  value={filters.objectName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
-                  options={[{ value: "all", label: "Все объекты" }, ...objectNames.map((o) => ({ value: o, label: o }))]}
-                />
-              </FilterField>
-              <FilterField label="Бригада">
-                <CustomSelect
-                  searchable
-                  size="sm"
-                  fullWidth
-                  aria-label="Бригада"
-                  value={filters.brigadeName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
-                  options={[{ value: "all", label: "Все бригады" }, ...brigadeNames.map((b) => ({ value: b, label: b }))]}
-                />
-              </FilterField>
-              <FilterField label="Статус">
-                <CustomSelect
-                  size="sm"
-                  fullWidth
-                  aria-label="Статус"
-                  value={filters.status}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, status: v }))}
-                  options={[
-                    { value: "all", label: "Все статусы" },
-                    ...(tab === "works"
-                      ? (Object.keys(WORK_STATUS_CONFIG) as WorkStatus[]).map((key) => ({ value: key, label: RU_WORK_STATUS_LABELS[key] }))
-                      : tab === "payroll"
-                        ? ["prepared", "needs_review", "pending_approval", "approved", "returned", "paid", "cancelled"].map((s) => ({
-                            value: s,
-                            label: payrollStatusLabel(s as never),
-                          }))
-                        : []),
-                  ]}
-                />
-              </FilterField>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button className="flex-1" onClick={handleGenerate}>
-                Применить
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={resetFilters}>
-                <RefreshCw size={14} /> Сбросить
-              </Button>
-            </div>
-          </Card>
-
-          <ShortSummaryCard
-            tab={tab}
-            stockKpis={stockKpis}
-            workAnalytics={workAnalytics}
-            brigadeKpis={brigadeKpis}
-            payrollKpis={payrollKpis}
-          />
-
-          {tab === "financial" && <TopObjectsCard rows={REFERENCE_TOP_OBJECTS} onSelectObject={(name) => setFilters((f) => ({ ...f, objectName: name }))} />}
-          {tab === "warehouse" && <TopMaterialsCard rows={topMaterialsByValue} materials={materials} />}
-          {tab === "works" && <TopWorksCard rows={progressByObject} />}
-          {tab === "brigades" && <TopBrigadesCard rows={brigadeActivity} />}
-          {tab === "payroll" && <UpcomingPaymentsCard rows={upcomingPayments} />}
-          </aside>
+          {tab !== "financial" && (
+            <aside className="reports-aside">
+              {tab === "warehouse" && <TopMaterialsCard rows={topMaterialsByValue} materials={materials} />}
+              {tab === "works" && <TopWorksCard rows={progressByObject} />}
+              {tab === "brigades" && <TopBrigadesCard rows={brigadeActivity} />}
+              {tab === "payroll" && <UpcomingPaymentsCard rows={upcomingPayments} />}
+            </aside>
+          )}
         </div>
       </div>
 
@@ -591,15 +579,6 @@ function CompanyReportsPage() {
         onGenerate={handleGenerateConfirm}
       />
     </AppLayout>
-  );
-}
-
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-ink-secondary">{label}</p>
-      <div className="mt-1.5">{children}</div>
-    </div>
   );
 }
 
@@ -1113,92 +1092,6 @@ function PayrollTab({
         </div>
       </Card>
     </>
-  );
-}
-
-function ShortSummaryCard({
-  tab,
-  stockKpis,
-  workAnalytics,
-  brigadeKpis,
-  payrollKpis,
-}: {
-  tab: ReportTab;
-  stockKpis: ReturnType<typeof computeStockKpis>;
-  workAnalytics: ReturnType<typeof computeWorkAnalytics>;
-  brigadeKpis: ReturnType<typeof computeBrigadeKpis>;
-  payrollKpis: ReturnType<typeof computePayrollKpis>;
-}) {
-  const rows: [string, string][] =
-    tab === "financial"
-      ? [
-          ["Договоров", "8"],
-          ["Авансы получено", "68 000 сомони"],
-          ["Выполнено работ", "78%"],
-          ["Просроченные платежи", "12 450 сомони"],
-          ["Задолженность клиентов", "23 800 сомони"],
-        ]
-      : tab === "warehouse"
-        ? [
-            ["Позиций", String(stockKpis.totalPositions)],
-            ["В наличии", String(stockKpis.inStock)],
-            ["Низкий остаток", String(stockKpis.lowStock)],
-            ["Критично", String(stockKpis.critical)],
-          ]
-        : tab === "works"
-          ? [
-              ["Всего работ", String(workAnalytics.total)],
-              ["Завершено", String(workAnalytics.completed)],
-              ["В процессе", String(workAnalytics.inProgress)],
-              ["Просрочено", String(workAnalytics.overdue)],
-              ["Средний прогресс", `${workAnalytics.averageProgress}%`],
-            ]
-          : tab === "brigades"
-            ? [
-                ["Бригад активно", String(brigadeKpis.activeBrigades)],
-                ["Сотрудников", String(brigadeKpis.totalMembers)],
-                ["Работ в работе", String(brigadeKpis.assignedWorksCount)],
-                ["Эффективность", `${brigadeKpis.averageEfficiency}%`],
-              ]
-            : [
-                ["Сотрудников", String(payrollKpis.employeeCount)],
-                ["Начислено", formatCurrency(payrollKpis.totalAccrued)],
-                ["Удержания", formatCurrency(payrollKpis.totalDeductions)],
-                ["К выплате", formatCurrency(payrollKpis.totalPayable)],
-              ];
-
-  return (
-    <Card className="p-5">
-      <h2 className="text-lg font-bold text-ink">Краткая сводка</h2>
-      <dl className="mt-3.5 space-y-2.5 text-sm">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <dt className="text-ink-secondary">{label}</dt>
-            <dd className="whitespace-nowrap font-bold text-ink tabular">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </Card>
-  );
-}
-
-function TopObjectsCard({ rows, onSelectObject }: { rows: ReturnType<typeof getTopObjectsByProfit>; onSelectObject: (name: string) => void }) {
-  return (
-    <Card className="p-5">
-      <h2 className="text-lg font-bold text-ink">Топ объектов по прибыли</h2>
-      <ul className="mt-3.5 space-y-2.5 text-sm">
-        {rows.map((r, i) => (
-          <li key={r.objectId}>
-            <button type="button" onClick={() => onSelectObject(r.objectName)} className="flex w-full items-center gap-2 text-left hover:text-primary">
-              <span className="min-w-0 flex-1 truncate text-ink-secondary">
-                {i + 1}. {r.objectName}
-              </span>
-              <span className="shrink-0 whitespace-nowrap font-semibold tabular text-ink">{formatCurrency(r.profit)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </Card>
   );
 }
 

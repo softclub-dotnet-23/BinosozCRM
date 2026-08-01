@@ -1,5 +1,6 @@
 import { Avatar } from "../ui/Avatar";
 import { OwnerAvatar } from "../ui/OwnerAvatar";
+import { cn } from "../../utils/cn";
 import type { SessionUser } from "../../types";
 
 interface SessionAvatarProps {
@@ -11,7 +12,13 @@ interface SessionAvatarProps {
 export function SessionAvatar({ user, className }: SessionAvatarProps) {
   if (user.role === "owner") return <OwnerAvatar className={className} />;
   if (user.role === "brigadir") {
-    return <img src="/images/people/komron-saidov.jpg" alt="Комрон Саидов" className={`h-10 w-10 rounded-full object-cover ${className ?? ""}`} />;
+    return (
+      <img
+        src="/images/people/komron-saidov.jpg"
+        alt={user.fullName}
+        className={cn("h-10 w-10 rounded-full object-cover", className)}
+      />
+    );
   }
   return <Avatar name={user.fullName} className={className} />;
 }

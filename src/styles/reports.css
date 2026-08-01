@@ -67,7 +67,14 @@
   grid-template-columns: minmax(0, 1fr) 218px;
   align-items: start;
   gap: 14px;
-  margin-top: 22px;
+  margin-top: 14px;
+}
+
+/* Financial tab has no aside content ("Топ объектов по прибыли" was the only card there) —
+   drop the 218px track entirely so the main column's charts/tables use the full width
+   instead of leaving an empty grid track. */
+.reports-content-grid--full {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .reports-main-column,
@@ -81,81 +88,34 @@
 
 .reports-aside > div {
   border-radius: 12px;
+  padding: 16px;
 }
 
-.reports-aside > div:first-child {
-  height: 300px;
-  padding: 14px;
-  overflow: hidden;
-}
-
-.reports-aside > div:first-child > div:nth-child(2) {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.reports-aside > div:first-child > div:nth-child(2) > * {
-  margin-block: 0 !important;
-}
-
-.reports-aside > div:first-child > div:last-child {
-  margin-top: 12px;
-}
-
-.reports-aside > div:not(:first-child) {
-  padding: 14px 16px;
-  font-size:14px;
-}
-
-.reports-aside > div:nth-child(2) {
-  height: 145px;
-  overflow: hidden;
-}
-
-.reports-aside > div:nth-child(2) dl > div {
-  gap: 6px;
-}
-
-.reports-aside > div:nth-child(2) dt,
-.reports-aside > div:nth-child(2) dd {
-  font-size:13px;
-  white-space: nowrap;
-}
-
-.reports-aside > div:nth-child(3) {
-  height: 150px;
-  overflow: hidden;
-}
-
-.reports-aside > div:not(:first-child) h2 {
+.reports-aside > div h2 {
   font-size:15px;
 }
 
-.reports-aside > div:not(:first-child) p,
-.reports-aside > div:not(:first-child) li,
-.reports-aside > div:not(:first-child) span {
+.reports-aside > div p,
+.reports-aside > div li,
+.reports-aside > div span {
   font-size:13px;
   line-height: 1.35;
 }
 
-.reports-aside > div:not(:first-child) dl,
-.reports-aside > div:not(:first-child) ul {
+.reports-aside > div ul {
   margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
 
-.reports-aside > div:not(:first-child) dl > *,
-.reports-aside > div:not(:first-child) ul > * {
+.reports-aside > div ul > * {
   margin-block: 0 !important;
 }
 
 .reports-filter-period {
-  height: 28px;
-  padding: 0 10px;
+  height: 40px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -167,18 +127,71 @@
   background: #fff;
 }
 
-.reports-aside > div:first-child button {
+/* Full-width horizontal Filters bar (replaces the old cramped 218px aside card). */
+.reports-filters-bar {
+  padding: 16px 18px;
+  border-radius: 14px;
+}
+
+.reports-filters-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.reports-filters-field {
   min-width: 0;
-  padding-inline: 10px;
+}
+
+.reports-filters-field label,
+.reports-filters-field p {
+  display: block;
+  margin-bottom: 6px;
   font-size:13px;
+  font-weight: 500;
+  color: #697386;
 }
 
-.reports-aside > div:first-child [role="button"][aria-haspopup="listbox"] {
-  height: 28px;
+.reports-filters-field [role="button"][aria-haspopup="listbox"] {
+  height: 42px;
 }
 
-.reports-aside > div:first-child > div:last-child button {
-  height: 28px;
+.reports-filters-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.reports-filters-actions button {
+  height: 42px;
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  .reports-filters-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-filters-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 639px) {
+  .reports-filters-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reports-filters-actions {
+    flex-direction: column;
+  }
+
+  .reports-filters-actions button {
+    width: 100%;
+    min-height: 44px;
+  }
 }
 
 .reports-kpi-grid {
@@ -289,11 +302,6 @@
   .reports-content-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .reports-aside {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 900px) {
@@ -309,10 +317,6 @@
     height: auto;
     min-height: 220px;
   }
-
-  .reports-aside {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 640px) {
@@ -327,7 +331,9 @@
 html[data-app-theme=dark] .reports-page { color: #f2f2f0; }
 html[data-app-theme=dark] .reports-summary-title,
 html[data-app-theme=dark] .reports-open-button,
-html[data-app-theme=dark] .reports-expense-legend li {
+html[data-app-theme=dark] .reports-expense-legend li,
+html[data-app-theme=dark] .reports-filters-field label,
+html[data-app-theme=dark] .reports-filters-field p {
   color: #b8bcc4;
 }
 html[data-app-theme=dark] .reports-summary-value,

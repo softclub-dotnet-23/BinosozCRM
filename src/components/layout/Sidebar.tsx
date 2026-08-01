@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   Bell,
   Building2,
@@ -14,7 +14,6 @@ import {
   HardHat,
   Home,
   LifeBuoy,
-  LogOut,
   Package,
   Settings,
   TriangleAlert,
@@ -28,6 +27,7 @@ import {
 import { cn } from "../../utils/cn";
 import { AppLogo } from "../common/AppLogo";
 import { SessionAvatar } from "./SessionAvatar";
+import { MobileProfileCard } from "./MobileProfileCard";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useToast } from "../../hooks/useToast";
@@ -206,8 +206,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }: SidebarProps) {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { strings } = useLanguage();
   const { showToast } = useToast();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
@@ -262,11 +261,6 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen, onCloseMobile]);
-
-  function handleLogout() {
-    logout();
-    navigate("/login", { replace: true });
-  }
 
   function toggleGroup(label: string) {
     setExpandedGroups((prev) => {
@@ -440,8 +434,35 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         </nav>
 
         {user && (
-          <div className="border-t border-border p-4">
-            <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+          <div className="space-y-3 border-t border-border p-4">
+            {!collapsed && user.role === "brigadir" && (
+              <div className="rounded-xl border border-border-strong bg-surface-1 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+                  <LifeBuoy size={14} className="text-primary" /> Нужна помощь?
+                </p>
+                <p className="mt-0.5 text-xs text-ink-secondary">Свяжитесь с прорабом</p>
+              </div>
+            )}
+
+            {user.role === "worker" && (
+              <button
+                type="button"
+                onClick={() => setProblemModalOpen(true)}
+                className={cn(
+                  "flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink",
+                  collapsed && "px-0",
+                )}
+                title={collapsed ? strings.worker.sidebarReportProblem : undefined}
+              >
+                <TriangleAlert size={16} />
+                {!collapsed && strings.worker.sidebarReportProblem}
+              </button>
+            )}
+
+            {/* Desktop/tablet: compact identity readout, no logout — that lives in the top-right
+                Header profile menu. Mobile: the drawer swaps this for the full MobileProfileCard
+                below, which carries its own logout action. */}
+            <div className={cn("hidden items-center gap-3 lg:flex", collapsed && "justify-center")}>
               <SessionAvatar user={user} />
               {!collapsed && (
                 <div className="min-w-0 flex-1 leading-tight">
@@ -457,41 +478,9 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
               {!collapsed && user.role === "brigadir" && <ChevronDown size={14} className="shrink-0 text-ink-muted" />}
             </div>
 
-            {!collapsed && user.role === "brigadir" && (
-              <div className="mt-3 rounded-xl border border-border-strong bg-surface-1 p-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
-                  <LifeBuoy size={14} className="text-primary" /> Нужна помощь?
-                </p>
-                <p className="mt-0.5 text-xs text-ink-secondary">Свяжитесь с прорабом</p>
-              </div>
-            )}
-
-            {user.role === "worker" && (
-              <button
-                type="button"
-                onClick={() => setProblemModalOpen(true)}
-                className={cn(
-                  "mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink",
-                  collapsed && "px-0",
-                )}
-                title={collapsed ? strings.worker.sidebarReportProblem : undefined}
-              >
-                <TriangleAlert size={16} />
-                {!collapsed && strings.worker.sidebarReportProblem}
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className={cn(
-                "mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink",
-              )}
-            >
-              <LogOut size={16} />
-              {!collapsed && strings.sidebar.logout}
-            </button>
-            {!collapsed && <p className="mt-3 text-center text-[11px] text-ink-muted">© 2026 BINOSOZ CRM</p>}
+            <div className="lg:hidden">
+              <MobileProfileCard onBeforeLogout={onCloseMobile} />
+            </div>
           </div>
         )}
       </aside>

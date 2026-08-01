@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from "lucide-react";
 import { SearchInput } from "../ui/SearchInput";
 import { SessionAvatar } from "./SessionAvatar";
 import { ProfileModal } from "./ProfileModal";
@@ -31,15 +31,11 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action, c
   const { user, logout } = useAuth();
   const { strings } = useLanguage();
   const [notifOpen, setNotifOpen] = useState(false);
-  const [dateOpen, setDateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [selectedRangeIndex, setSelectedRangeIndex] = useState(0);
   const [localSearch, setLocalSearch] = useState("");
-  const selectedRange = strings.header.dateRanges[selectedRangeIndex];
 
   const notifRef = useRef<HTMLDivElement>(null);
-  const dateRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   function handleLogout() {
@@ -67,7 +63,6 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action, c
   }, [criticalCount, strings]);
 
   useOnClickOutside(notifRef, () => setNotifOpen(false));
-  useOnClickOutside(dateRef, () => setDateOpen(false));
   useOnClickOutside(profileRef, () => setProfileOpen(false));
 
   return (
@@ -127,46 +122,15 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action, c
           )}
         </div>
 
-        <div className="relative" ref={dateRef}>
-          <button
-            type="button"
-            onClick={() => setDateOpen((v) => !v)}
-            className="flex h-10 items-center gap-2 rounded-[10px] border border-border-strong px-3.5 text-sm font-medium text-ink transition-colors hover:bg-surface-3"
-          >
-            <CalendarDays size={16} className="text-ink-secondary" />
-            <span className="hidden sm:inline">{selectedRange}</span>
-            <ChevronDown size={14} className="text-ink-muted" />
-          </button>
-          {dateOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]">
-              {strings.header.dateRanges.map((range, index) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={() => {
-                    setSelectedRangeIndex(index);
-                    setDateOpen(false);
-                  }}
-                  className={cn(
-                    "block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
-                    index === selectedRangeIndex ? "font-semibold text-primary" : "text-ink",
-                  )}
-                >
-                  {range}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {user && (
-          <div className="relative" ref={profileRef}>
+          <div className="relative hidden md:block" ref={profileRef}>
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2 hover:bg-surface-3"
+              aria-label={strings.header.profile}
+              className="flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2 hover:bg-surface-3"
             >
-              <SessionAvatar user={user} className="h-9 w-9" />
+              <SessionAvatar user={user} className="h-11 w-11" />
               <ChevronDown size={14} className="text-ink-muted" />
             </button>
             {profileOpen && (

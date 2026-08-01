@@ -51,7 +51,6 @@ export interface AppStrings {
     profile: string;
     settings: string;
     logout: string;
-    dateRanges: [string, string, string, string];
     demoNotificationOverdue: string;
     demoNotificationPayroll: string;
     criticalMaterialsNotification: (count: number) => string;
@@ -700,7 +699,6 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
     },
     header: {
       openMenu: "Открыть меню", searchPlaceholder: "Поиск...", notifications: "Уведомления", profile: "Профиль", settings: "Настройки", logout: "Выйти",
-      dateRanges: ["1 – 30 июль 2026", "1 – 30 июнь 2026", "1 – 31 май 2026", "Текущий квартал"],
       demoNotificationOverdue: "Заливка фундамента просрочена", demoNotificationPayroll: "Зарплата за июль готова к утверждению",
       criticalMaterialsNotification: (count) => `${count} ${pluralizeRu(count, "материал", "материала", "материалов")} ${count === 1 ? "имеет" : "имеют"} критический остаток на складе`,
       justNow: "Только что",
@@ -1372,7 +1370,6 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
     },
     header: {
       openMenu: "Кушодани меню", searchPlaceholder: "Ҷустуҷӯ...", notifications: "Огоҳиномаҳо", profile: "Профил", settings: "Танзимот", logout: "Баромадан",
-      dateRanges: ["1 – 30 июли 2026", "1 – 30 июни 2026", "1 – 31 майи 2026", "Семоҳаи ҷорӣ"],
       demoNotificationOverdue: "Рехтани фундамент таъхир кард", demoNotificationPayroll: "Маоши июл барои тасдиқ омода аст",
       criticalMaterialsNotification: (count) => `${count} мавод дар анбор мондаи интиқодӣ дорад`,
       justNow: "Ҳозир",
@@ -2044,7 +2041,6 @@ export const APP_STRINGS: Record<Language, AppStrings> = {
     },
     header: {
       openMenu: "Open menu", searchPlaceholder: "Search...", notifications: "Notifications", profile: "Profile", settings: "Settings", logout: "Log out",
-      dateRanges: ["Jul 1 – 30, 2026", "Jun 1 – 30, 2026", "May 1 – 31, 2026", "Current quarter"],
       demoNotificationOverdue: "Foundation pour is overdue", demoNotificationPayroll: "July payroll is ready for approval",
       criticalMaterialsNotification: (count) => `${count} material${count === 1 ? "" : "s"} at critical stock level`,
       justNow: "Just now",
