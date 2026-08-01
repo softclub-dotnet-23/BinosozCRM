@@ -15,6 +15,9 @@ public sealed class WorkerConfiguration : IEntityTypeConfiguration<Worker>
         builder.Property(x => x.Phone).HasMaxLength(20).IsRequired();
         builder.Property(x => x.Specialty).HasMaxLength(200);
         builder.Property(x => x.PayRate).HasColumnType("decimal(18,2)");
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_Workers_PayRate_ByType",
+            "(\"PayRateType\" = 0 AND \"PayRate\" > 0) OR (\"PayRateType\" = 1 AND \"PayRate\" >= 0)"));
         builder.Property(x => x.DocumentType).HasMaxLength(100);
         builder.Property(x => x.BirthDate).HasColumnType("date");
         builder.Property(x => x.DocumentExpiryDate).HasColumnType("date");

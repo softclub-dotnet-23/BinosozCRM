@@ -21,7 +21,7 @@ public sealed class ProrabObjectAssignmentIsolationTests(PostgresFixture fixture
         await using var context = fixture.CreateDbContext(owner);
 
         var company = Company.Create(companyId, $"Isolation Test Co {companyId}");
-        var prorabUser = User.Create("Test Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+        var prorabUser = User.Create(companyId, "Test Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
         context.Companies.Add(company);
         context.Users.Add(prorabUser);
         await context.SaveChangesAsync(CancellationToken.None);

@@ -12,9 +12,9 @@ public sealed class MaterialDeliveryAuthorizationTests(PostgresFixture fixture)
     {
         var companyId = Guid.NewGuid();
         var owner = new FixedCurrentUserService(companyId, Guid.NewGuid(), Role.Owner);
-        var assignedProrabUser = User.Create("Assigned Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
-        var unassignedProrabUser = User.Create("Unassigned Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
-        var brigadirUser = User.Create("Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var assignedProrabUser = User.Create(companyId, "Assigned Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+        var unassignedProrabUser = User.Create(companyId, "Unassigned Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+        var brigadirUser = User.Create(companyId, "Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
         var company = Company.Create(companyId, $"Delivery authorization {companyId}");
         var customer = Customer.Create(companyId, "Customer");
         var objectA = ConstructionObject.Create(companyId, "Object A", customer.Id);

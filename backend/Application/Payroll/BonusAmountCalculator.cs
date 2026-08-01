@@ -15,6 +15,7 @@ internal static class BonusAmountCalculator
         Worker worker,
         DateOnly periodStart,
         DateOnly periodEnd,
+        IBusinessTimeProvider businessTime,
         CancellationToken cancellationToken)
     {
         var confirmedBonusTasks = await context.IndividualTasks
@@ -25,7 +26,7 @@ internal static class BonusAmountCalculator
             .ToListAsync(cancellationToken);
 
         return confirmedBonusTasks
-            .Where(t => DateOnly.FromDateTime(t.CompletedAt!.Value.UtcDateTime) is var completedDate
+            .Where(t => businessTime.GetBusinessDate(t.CompletedAt!.Value) is var completedDate
                         && completedDate >= periodStart && completedDate <= periodEnd)
             .Sum(t => t.BonusAmount!.Value);
     }

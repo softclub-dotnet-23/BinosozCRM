@@ -37,6 +37,10 @@ public sealed class GetPayrollEntryQueryHandler(IApplicationDbContext context, I
                 return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ENTRY_NOT_FOUND", "Payroll entry not found."));
         }
 
-        return Result.Success(PayrollEntryDto.FromEntity(entry));
+        var workerName = await context.Workers.AsNoTracking()
+            .Where(worker => worker.Id == entry.WorkerId)
+            .Select(worker => worker.FullName)
+            .FirstOrDefaultAsync(cancellationToken);
+        return Result.Success(PayrollEntryDto.FromEntity(entry, workerName));
     }
 }

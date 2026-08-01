@@ -125,6 +125,11 @@ public sealed class WorkOrder : AuditableEntity, ICompanyOwned, ISoftDelete
         return Result.Success();
     }
 
+    // Replacing payout shares is a change to this aggregate. Marking the
+    // versioned root as modified makes PostgreSQL xmin protect the complete
+    // delete-and-insert replacement transaction from concurrent writers.
+    public void MarkPayoutSharesChanged(DateTimeOffset changedAt) => ModifiedAt = changedAt;
+
     private static Result InvalidTransition() =>
         Result.Failure(new Error("WORK_ORDER_INVALID_TRANSITION", "Transition is not allowed from the current status."));
 }

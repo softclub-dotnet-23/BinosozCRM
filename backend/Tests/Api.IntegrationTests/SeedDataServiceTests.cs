@@ -44,7 +44,9 @@ public sealed class SeedDataServiceTests(PostgresFixture fixture)
         await using (var verify = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
         {
             companyCountAfterFirstRun = await verify.Companies.CountAsync(c => c.Id == companyId);
-            ownerCountAfterFirstRun = await verify.Users.CountAsync(u => seededPhones.Contains(u.Phone));
+            ownerCountAfterFirstRun = await verify.Users
+                .IgnoreQueryFilters()
+                .CountAsync(u => seededPhones.Contains(u.Phone));
         }
 
         companyCountAfterFirstRun.Should().Be(1);
@@ -52,7 +54,10 @@ public sealed class SeedDataServiceTests(PostgresFixture fixture)
 
         await using (var verifyOwners = fixture.CreateDbContext(connectionString, new NullCurrentUserService()))
         {
-            var owners = await verifyOwners.Users.Where(u => seededPhones.Contains(u.Phone)).ToListAsync();
+            var owners = await verifyOwners.Users
+                .IgnoreQueryFilters()
+                .Where(u => seededPhones.Contains(u.Phone))
+                .ToListAsync();
             owners.Should().OnlyContain(u => u.Role == Role.Owner && u.ForcePasswordChange);
         }
 
@@ -63,7 +68,9 @@ public sealed class SeedDataServiceTests(PostgresFixture fixture)
 
         await using var verifyAgain = fixture.CreateDbContext(connectionString, new NullCurrentUserService());
         var companyCountAfterSecondRun = await verifyAgain.Companies.CountAsync(c => c.Id == companyId);
-        var ownerCountAfterSecondRun = await verifyAgain.Users.CountAsync(u => seededPhones.Contains(u.Phone));
+        var ownerCountAfterSecondRun = await verifyAgain.Users
+            .IgnoreQueryFilters()
+            .CountAsync(u => seededPhones.Contains(u.Phone));
 
         companyCountAfterSecondRun.Should().Be(companyCountAfterFirstRun);
         ownerCountAfterSecondRun.Should().Be(ownerCountAfterFirstRun);

@@ -15,6 +15,8 @@ public sealed class LoggingPasswordResetDeliveryService(
     ILogger<LoggingPasswordResetDeliveryService> logger,
     IHostEnvironment environment) : IPasswordResetDeliveryService
 {
+    public bool CanDeliver => environment.IsDevelopment();
+
     public Task DeliverAsync(Guid userId, string phone, string plainToken, bool hasTelegramLink, CancellationToken cancellationToken)
     {
         if (environment.IsDevelopment())

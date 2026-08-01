@@ -41,7 +41,11 @@ public sealed class ListPayrollEntriesQueryHandler(IApplicationDbContext context
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = items.Select(PayrollEntryDto.FromEntity).ToList();
+        var workerNames = await context.Workers.AsNoTracking()
+            .Where(worker => items.Select(entry => entry.WorkerId).Contains(worker.Id))
+            .Select(worker => new { worker.Id, worker.FullName })
+            .ToDictionaryAsync(worker => worker.Id, worker => worker.FullName, cancellationToken);
+        var dtos = items.Select(item => PayrollEntryDto.FromEntity(item, workerNames.GetValueOrDefault(item.WorkerId))).ToList();
 
         return Result.Success(new PagedResult<PayrollEntryDto>(dtos, request.Page, request.PageSize, totalCount));
     }

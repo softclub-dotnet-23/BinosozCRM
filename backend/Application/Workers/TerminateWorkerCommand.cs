@@ -42,7 +42,9 @@ public sealed class TerminateWorkerCommandValidator : AbstractValidator<Terminat
     }
 }
 
-public sealed class TerminateWorkerCommandHandler(IApplicationDbContext context)
+public sealed class TerminateWorkerCommandHandler(
+    IApplicationDbContext context,
+    IBusinessTimeProvider businessTime)
     : IRequestHandler<TerminateWorkerCommand, Result>
 {
     public async Task<Result> Handle(TerminateWorkerCommand request, CancellationToken cancellationToken)
@@ -80,7 +82,8 @@ public sealed class TerminateWorkerCommandHandler(IApplicationDbContext context)
         {
             var calculatedAmount = await CalculatedAmountCalculator.ComputeAsync(context, worker, periodStart, request.TerminationDate, cancellationToken);
             var latenessDeductionAmount = await LatenessDeductionCalculator.ComputeAsync(context, worker, periodStart, request.TerminationDate, cancellationToken);
-            var bonusAmount = await BonusAmountCalculator.ComputeAsync(context, worker, periodStart, request.TerminationDate, cancellationToken);
+            var bonusAmount = await BonusAmountCalculator.ComputeAsync(
+                context, worker, periodStart, request.TerminationDate, businessTime, cancellationToken);
             var advanceDeductedAmount = await AdvanceDeductedAmountCalculator.ComputeAsync(context, worker, request.TerminationDate, cancellationToken);
 
             entry.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, advanceDeductedAmount);

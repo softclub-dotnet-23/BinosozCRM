@@ -37,13 +37,13 @@ public sealed class ResetPasswordCommandHandler(IApplicationDbContext context, I
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
 
-        if (resetToken is null || resetToken.UsedAt is not null || resetToken.ExpiresAt < DateTimeOffset.UtcNow)
+        if (resetToken is null || resetToken.IsDeleted || resetToken.UsedAt is not null || resetToken.ExpiresAt < DateTimeOffset.UtcNow)
             return Result.Failure(InvalidToken());
 
         var user = await context.Users
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == resetToken.UserId, cancellationToken);
-        if (user is null || !user.IsActive)
+        if (user is null || user.IsDeleted || !user.IsActive || user.CompanyId != resetToken.CompanyId)
             return Result.Failure(InvalidToken());
 
         user.SetPassword(passwordHasher.Hash(request.NewPassword));

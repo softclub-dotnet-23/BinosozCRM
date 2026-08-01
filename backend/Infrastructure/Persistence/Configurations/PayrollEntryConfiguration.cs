@@ -24,6 +24,7 @@ public sealed class PayrollEntryConfiguration : IEntityTypeConfiguration<Payroll
         builder.Property(x => x.PaidAt).HasColumnType("timestamptz");
         builder.Property(x => x.CreatedAt).HasColumnType("timestamptz");
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
+        builder.ToTable(t => t.HasCheckConstraint("CK_PayrollEntries_Period_Range", "\"PeriodStart\" <= \"PeriodEnd\""));
 
         builder.HasIndex(x => new { x.WorkerId, x.PeriodStart, x.PeriodEnd }).IsUnique();
 

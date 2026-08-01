@@ -21,6 +21,7 @@ public sealed class RefreshTokenCommandHandlerTests(PostgresFixture fixture)
         // Role.Prorab, not Owner — see LoginCommandHandlerTests for why (shared
         // database with SeedDataServiceTests, which gates on "any Owner exists?").
         var user = User.Create(
+            company.Id,
             "Refresh Test User",
             $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             _passwordHasher.Hash("irrelevant"),

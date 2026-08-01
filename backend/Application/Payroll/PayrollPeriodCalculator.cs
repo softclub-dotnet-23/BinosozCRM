@@ -33,4 +33,10 @@ public static class PayrollPeriodCalculator
             ? (firstDayOfMonth, new DateOnly(date.Year, date.Month, 15))
             : (new DateOnly(date.Year, date.Month, 16), lastDayOfMonth);
     }
+
+    public static bool IsStandardPeriod(DateOnly periodStart, DateOnly periodEnd, PayrollPeriodType periodType)
+    {
+        var expected = GetPeriodContaining(periodStart, periodType);
+        return expected.Start == periodStart && expected.End == periodEnd;
+    }
 }

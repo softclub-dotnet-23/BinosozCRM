@@ -43,7 +43,12 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
 {
     public async Task<Result<MaterialDeliveryDto>> Handle(CreateMaterialDeliveryCommand request, CancellationToken cancellationToken)
     {
-        if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
+        var objectName = await context.ConstructionObjects
+            .AsNoTracking()
+            .Where(o => o.Id == request.ObjectId)
+            .Select(o => o.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (objectName is null)
             return Result.Failure<MaterialDeliveryDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
 
         var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
@@ -85,6 +90,6 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
         context.MaterialDeliveries.Add(delivery);
         await context.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(MaterialDeliveryDto.FromEntity(delivery));
+        return Result.Success(MaterialDeliveryDto.FromEntity(delivery, objectName));
     }
 }

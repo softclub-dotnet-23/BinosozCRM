@@ -27,7 +27,9 @@ public sealed class CreatePayrollEntryCommandValidator : AbstractValidator<Creat
     }
 }
 
-public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext context)
+public sealed class CreatePayrollEntryCommandHandler(
+    IApplicationDbContext context,
+    IBusinessTimeProvider businessTime)
     : IRequestHandler<CreatePayrollEntryCommand, Result<PayrollEntryDto>>
 {
     public async Task<Result<PayrollEntryDto>> Handle(CreatePayrollEntryCommand request, CancellationToken cancellationToken)
@@ -36,31 +38,42 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
         if (worker is null)
             return Result.Failure<PayrollEntryDto>(new Error("WORKER_NOT_FOUND", "Worker not found."));
 
-        var existingEntry = await context.PayrollEntries.FirstOrDefaultAsync(
-            e => e.WorkerId == request.WorkerId && e.PeriodStart == request.PeriodStart && e.PeriodEnd == request.PeriodEnd,
+        var company = await context.Companies.FirstOrDefaultAsync(c => c.Id == worker.CompanyId, cancellationToken);
+        if (company is null)
+            return Result.Failure<PayrollEntryDto>(new Error("COMPANY_NOT_FOUND", "Company not found."));
+
+        if (!PayrollPeriodCalculator.IsStandardPeriod(request.PeriodStart, request.PeriodEnd, company.PayrollPeriodType))
+            return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_PERIOD_NON_STANDARD", "Payroll entries must use a standard company payroll period."));
+
+        var overlapsExistingPeriod = await context.PayrollEntries.AnyAsync(
+            e => e.WorkerId == request.WorkerId
+                 && e.PeriodStart <= request.PeriodEnd
+                 && e.PeriodEnd >= request.PeriodStart,
             cancellationToken);
+        if (overlapsExistingPeriod)
+            return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_PERIOD_OVERLAP", "Payroll period overlaps an existing entry for this worker."));
 
         var calculatedAmount = await CalculatedAmountCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
         var latenessDeductionAmount = await LatenessDeductionCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
-        var bonusAmount = await BonusAmountCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
+        var bonusAmount = await BonusAmountCalculator.ComputeAsync(
+            context, worker, request.PeriodStart, request.PeriodEnd, businessTime, cancellationToken);
         var advanceDeductedAmount = await AdvanceDeductedAmountCalculator.ComputeAsync(context, worker, request.PeriodEnd, cancellationToken);
 
-        PayrollEntry entry;
-        if (existingEntry is null)
-        {
-            entry = PayrollEntry.Create(worker.CompanyId, worker.Id, request.PeriodStart, request.PeriodEnd);
-            context.PayrollEntries.Add(entry);
-        }
-        else
-        {
-            entry = existingEntry;
-        }
+        var entry = PayrollEntry.Create(worker.CompanyId, worker.Id, request.PeriodStart, request.PeriodEnd);
+        context.PayrollEntries.Add(entry);
 
         var updateResult = entry.UpdateDraft(calculatedAmount, latenessDeductionAmount, bonusAmount, advanceDeductedAmount);
         if (updateResult.IsFailure)
             return Result.Failure<PayrollEntryDto>(updateResult.Error);
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_PERIOD_OVERLAP", "Payroll period overlaps an existing entry for this worker."));
+        }
 
         return Result.Success(PayrollEntryDto.FromEntity(entry));
     }

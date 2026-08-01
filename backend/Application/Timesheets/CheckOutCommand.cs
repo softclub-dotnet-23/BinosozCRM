@@ -21,7 +21,10 @@ public sealed class CheckOutCommandValidator : AbstractValidator<CheckOutCommand
     }
 }
 
-public sealed class CheckOutCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class CheckOutCommandHandler(
+    IApplicationDbContext context,
+    ICurrentUserService currentUser,
+    IBusinessTimeProvider businessTime)
     : IRequestHandler<CheckOutCommand, Result<TimesheetDto>>
 {
     public async Task<Result<TimesheetDto>> Handle(CheckOutCommand request, CancellationToken cancellationToken)
@@ -31,7 +34,10 @@ public sealed class CheckOutCommandHandler(IApplicationDbContext context, ICurre
             return Result.Failure<TimesheetDto>(accessResult.Error);
 
         var timesheet = accessResult.Value;
-        timesheet.CheckOut(DateTimeOffset.UtcNow);
+        // This remains an UTC instant. The Timesheet.Date is fixed at
+        // check-in's business date, so an overnight checkout never creates a
+        // second attendance day merely because UTC/local midnight passed.
+        timesheet.CheckOut(businessTime.UtcNow);
 
         await context.SaveChangesAsync(cancellationToken);
 

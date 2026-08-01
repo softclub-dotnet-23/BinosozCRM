@@ -20,6 +20,8 @@ file sealed class TestCurrentUserService : ICurrentUserService
 [Collection(PostgresCollection.Name)]
 public sealed class PayrollCalculationTests(PostgresFixture fixture)
 {
+    private static readonly FixedBusinessTimeProvider BusinessTime = new(DateTimeOffset.UtcNow);
+
     private static (DateOnly PeriodStart, DateOnly PeriodEnd) CurrentPeriod()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -42,7 +44,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         var (periodStart, periodEnd) = CurrentPeriod();
         var worker = Worker.Create(company.Id, brigade.Id, "Hourly Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1));
-        var prorabUser = User.Create("Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Prorab);
+        var prorabUser = User.Create(company.Id, "Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Prorab);
 
         await using (var seed = fixture.CreateDbContext())
         {
@@ -71,7 +73,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
 
         var accountant = AsAccountant(company.Id, Guid.NewGuid());
         await using var context = fixture.CreateDbContext(accountant);
-        var result = await new CreatePayrollEntryCommandHandler(context).Handle(
+        var result = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
             new CreatePayrollEntryCommand(worker.Id, periodStart, periodEnd), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -93,13 +95,14 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         var (periodStart, periodEnd) = CurrentPeriod();
         var worker = Worker.Create(company.Id, brigade.Id, "Piecework Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Piecework, 0m, new DateOnly(2020, 1, 1));
-        var brigadirUser = User.Create("Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Brigadir);
+        var brigadirUser = User.Create(company.Id, "Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Brigadir);
 
         var workOrder = WorkOrder.Create(company.Id, $"BR-{Guid.NewGuid():N}"[..12], obj.Id, brigade.Id, "Plaster", "m2", 50m, 120m, brigadirUser.Id);
         workOrder.Assign(periodStart);
         workOrder.Start();
         var progress = WorkOrderProgress.Create(company.Id, workOrder.Id, brigadirUser.Id, 45m, DateTimeOffset.UtcNow);
         var share = WorkOrderPayoutShare.Create(company.Id, workOrder.Id, worker.Id, sharePercent, brigadirUser.Id);
+        share.Approve(brigadirUser.Id, 45m * 120m * (sharePercent / 100m));
 
         await using (var seed = fixture.CreateDbContext())
         {
@@ -125,7 +128,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         }
 
         await using var context = fixture.CreateDbContext(accountant);
-        var result = await new CreatePayrollEntryCommandHandler(context).Handle(
+        var result = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
             new CreatePayrollEntryCommand(worker.Id, periodStart, periodEnd), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -146,7 +149,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         var (periodStart, periodEnd) = CurrentPeriod();
         var worker = Worker.Create(company.Id, brigade.Id, "Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1));
-        var prorabUser = User.Create("Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Prorab);
+        var prorabUser = User.Create(company.Id, "Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Prorab);
 
         await using (var seed = fixture.CreateDbContext())
         {
@@ -175,7 +178,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
 
         var accountant = AsAccountant(company.Id, Guid.NewGuid());
         await using var context = fixture.CreateDbContext(accountant);
-        var result = await new CreatePayrollEntryCommandHandler(context).Handle(
+        var result = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
             new CreatePayrollEntryCommand(worker.Id, periodStart, periodEnd), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -194,8 +197,8 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         var (periodStart, periodEnd) = CurrentPeriod();
         var worker = Worker.Create(company.Id, brigade.Id, "Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1));
-        var prorabUser = User.Create("Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Prorab);
-        var accountantUser = User.Create("Accountant", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Accountant);
+        var prorabUser = User.Create(company.Id, "Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Prorab);
+        var accountantUser = User.Create(company.Id, "Accountant", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Accountant);
 
         int[] rawLateMinutes = [15, 0, 40, 10, 0];
         var timesheets = new List<Timesheet>();
@@ -244,7 +247,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         Guid entryId;
         await using (var context = fixture.CreateDbContext(accountant))
         {
-            var createResult = await new CreatePayrollEntryCommandHandler(context).Handle(
+            var createResult = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
                 new CreatePayrollEntryCommand(worker.Id, periodStart, periodEnd), CancellationToken.None);
             createResult.Value.CalculatedAmount.Should().Be(7040.00m);
             createResult.Value.LatenessDeductionAmount.Should().Be(43.33m);
@@ -269,7 +272,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         var (periodStart, periodEnd) = CurrentPeriod();
         var worker = Worker.Create(company.Id, brigade.Id, "Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1));
-        var accountantUser = User.Create("Accountant", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Accountant);
+        var accountantUser = User.Create(company.Id, "Accountant", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Accountant);
 
         await using (var seed = fixture.CreateDbContext())
         {
@@ -288,7 +291,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         Guid entryId;
         await using (var context = fixture.CreateDbContext(accountant))
         {
-            var createResult = await new CreatePayrollEntryCommandHandler(context).Handle(
+            var createResult = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
                 new CreatePayrollEntryCommand(worker.Id, periodStart, periodEnd), CancellationToken.None);
             createResult.Value.CalculatedAmount.Should().Be(0m);
             entryId = createResult.Value.Id;
@@ -323,11 +326,54 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
 
         var accountant = AsAccountant(company.Id, Guid.NewGuid());
         await using var context = fixture.CreateDbContext(accountant);
-        var result = await new CreatePayrollEntryCommandHandler(context).Handle(
+        var result = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
             new CreatePayrollEntryCommand(worker.Id, periodStart, periodEnd), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         result.Value.CalculatedAmount.Should().Be(0m);
         result.Value.Status.Should().Be(PayrollEntryStatus.Draft);
+    }
+
+    [Fact]
+    public async Task Confirmed_bonus_at_1900_utc_is_allocated_to_its_Dushanbe_payroll_month()
+    {
+        var company = Company.Create(Guid.NewGuid(), $"Business Time Payroll Co {Guid.NewGuid()}");
+        var brigade = Brigade.Create(company.Id, "Brigade");
+        var worker = Worker.Create(
+            company.Id, brigade.Id, "Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
+            new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1));
+        var accountant = User.Create(
+            company.Id, "Accountant", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Accountant);
+        var task = IndividualTask.Create(
+            company.Id,
+            "TIME-BONUS",
+            brigade.Id,
+            worker.Id,
+            "Boundary task",
+            accountant.Id,
+            dueAt: new DateTimeOffset(2026, 8, 2, 9, 0, 0, TimeSpan.Zero));
+        task.Start(new DateTimeOffset(2026, 7, 31, 18, 0, 0, TimeSpan.Zero));
+        task.Complete(new DateTimeOffset(2026, 7, 31, 19, 30, 0, TimeSpan.Zero)); // 2026-08-01 in Dushanbe
+        task.ProposeBonus(150m);
+        task.ApproveBonus(accountant.Id);
+
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Companies.Add(company);
+            seed.Brigades.Add(brigade);
+            seed.Users.Add(accountant);
+            seed.Workers.Add(worker);
+            seed.IndividualTasks.Add(task);
+            await seed.SaveChangesAsync(CancellationToken.None);
+        }
+
+        var caller = AsAccountant(company.Id, accountant.Id);
+        await using var context = fixture.CreateDbContext(caller);
+        var result = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
+            new CreatePayrollEntryCommand(worker.Id, new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.BonusAmount.Should().Be(150m);
     }
 }

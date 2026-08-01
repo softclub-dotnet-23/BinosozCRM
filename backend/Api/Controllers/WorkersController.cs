@@ -52,4 +52,12 @@ public sealed class WorkersController(ISender sender) : ControllerBase
         var result = await sender.Send(new TerminateWorkerCommand(workerId, request.TerminationDate), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpPut("workers/{workerId:guid}/pay-rate")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> ChangePayRate(Guid workerId, ChangeWorkerPayRateRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ChangeWorkerPayRateCommand(workerId, request.PayRateType, request.PayRate, request.EffectiveFrom), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

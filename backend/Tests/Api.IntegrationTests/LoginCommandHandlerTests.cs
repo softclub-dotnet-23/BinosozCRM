@@ -22,6 +22,7 @@ public sealed class LoginCommandHandlerTests(PostgresFixture fixture)
         // and gates its own seeding on "any Owner exists?"; an Owner created here
         // would make that check pass prematurely and break its no-op assertions.
         var user = User.Create(
+            company.Id,
             "Login Test User",
             $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             _passwordHasher.Hash(password),

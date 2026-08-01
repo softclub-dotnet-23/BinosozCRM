@@ -9,5 +9,9 @@ namespace Application.Common.Interfaces;
 // blocked on it, not faked to look like it works when it doesn't.
 public interface IPasswordResetDeliveryService
 {
+    // A delivery implementation must explicitly declare that it can put a
+    // secret into the user's hands. Returning success from an unavailable
+    // channel must never cause a usable token to be persisted.
+    bool CanDeliver { get; }
     Task DeliverAsync(Guid userId, string phone, string plainToken, bool hasTelegramLink, CancellationToken cancellationToken);
 }
