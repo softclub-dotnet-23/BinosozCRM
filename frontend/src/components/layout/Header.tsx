@@ -82,7 +82,7 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
             <Bell size={18} />
           </button>
           {notifOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-border bg-card p-2 shadow-(--shadow-popover)">
+            <div className="animate-dropdown-in absolute right-0 z-20 mt-2 w-80 rounded-xl border border-border bg-card p-2 shadow-(--shadow-popover)">
               <p className="px-3 py-2 text-sm font-bold text-ink">Уведомления</p>
               <p className="px-3 py-2 text-sm text-ink-muted">Уведомления пока не подключены к backend.</p>
             </div>
@@ -100,7 +100,7 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
             <ChevronDown size={14} className="text-ink-muted" />
           </button>
           {dateOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)">
+            <div className="animate-dropdown-in absolute right-0 z-20 mt-2 w-56 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)">
               {DATE_RANGES.map((range) => (
                 <button
                   key={range}
@@ -132,7 +132,7 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
               <ChevronDown size={14} className="text-ink-muted" />
             </button>
             {profileOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)">
+              <div className="animate-dropdown-in absolute right-0 z-20 mt-2 w-52 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)">
                 <div className="px-3 py-2">
                   <p className="text-sm font-semibold text-ink">{user.fullName}</p>
                   <p className="text-xs text-ink-muted">{ROLE_LABEL[user.role]}</p>

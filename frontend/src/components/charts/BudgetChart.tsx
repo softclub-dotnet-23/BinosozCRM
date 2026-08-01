@@ -3,6 +3,7 @@ import type { BudgetPoint } from "../../types";
 import { ChartTooltip } from "./ChartTooltip";
 import { formatCompact } from "../../utils/format";
 import { computeNiceTicks } from "../../utils/chart";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 const SERIES = [
   { key: "planned", label: "Запланировано", color: "#2869C9" },
@@ -10,6 +11,7 @@ const SERIES = [
 ];
 
 export function BudgetChart({ data }: { data: BudgetPoint[] }) {
+  const chartAnim = useChartAnimation();
   const maxValue = Math.max(0, ...data.map((d) => Math.max(d.planned, d.spent)));
   const ticks = computeNiceTicks(maxValue);
   const niceMax = ticks[ticks.length - 1];
@@ -47,8 +49,8 @@ export function BudgetChart({ data }: { data: BudgetPoint[] }) {
           iconSize={8}
           formatter={(value) => <span className="text-xs text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="planned" name="Запланировано" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={7} />
-        <Bar dataKey="spent" name="Потрачено" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={7} />
+        <Bar dataKey="planned" name="Запланировано" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={7} {...chartAnim} />
+        <Bar dataKey="spent" name="Потрачено" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={7} {...chartAnim} />
       </BarChart>
     </ResponsiveContainer>
   );

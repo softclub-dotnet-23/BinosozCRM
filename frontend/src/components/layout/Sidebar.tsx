@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { SessionAvatar } from "./SessionAvatar";
+import { MobileProfileCard } from "./MobileProfileCard";
 import { useAuth } from "../../context/AuthContext";
 import { isRouteAllowed, ROLE_LABEL } from "../../lib/auth/roleAccess";
 
@@ -100,6 +101,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const navRef = useRef<HTMLElement>(null);
 
   const visibleNavItems = useMemo(
     () =>
@@ -118,6 +120,24 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
       }
     });
   }, [location.pathname, visibleNavItems]);
+
+  // Keep the active item (and its expanded group) in view when the sidebar's own list is taller
+  // than the viewport — otherwise navigating can leave the active link scrolled out of sight.
+  useEffect(() => {
+    const active = navRef.current?.querySelector('[aria-current="page"]');
+    active?.scrollIntoView({ block: "nearest" });
+  }, [location.pathname, expandedGroups]);
+
+  // The mobile drawer's backdrop and X button already close it; Escape didn't — bring the mobile
+  // sidebar drawer in line with the Escape-closes convention Modal/Drawer already use elsewhere.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onCloseMobile?.();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileOpen, onCloseMobile]);
 
   function handleLogout() {
     logout();
@@ -183,7 +203,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
           </button>
         </div>
 
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+        <nav ref={navRef} className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
           {visibleNavItems.map((entry) => {
             if (isNavGroup(entry)) {
               const isGroupActive = entry.children.some((c) => location.pathname.startsWith(c.to));
@@ -278,7 +298,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         </nav>
 
         {user && (
-          <div className="border-t border-border p-4">
+          <div className="hidden border-t border-border p-4 lg:block">
             <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
               <SessionAvatar user={user} />
               {!collapsed && (
@@ -298,6 +318,14 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
               <LogOut size={16} />
               {!collapsed && "Выйти"}
             </button>
+          </div>
+        )}
+
+        {/* Mobile-only equivalent of the footer above — the desktop footer hides itself below
+            the lg breakpoint instead, so logout lives in exactly one visible place per breakpoint. */}
+        {user && (
+          <div className="p-4 lg:hidden">
+            <MobileProfileCard onBeforeLogout={onCloseMobile} />
           </div>
         )}
       </aside>

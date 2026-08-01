@@ -1,6 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { CategorySpend } from "../../types";
 import { formatCurrency } from "../../utils/format";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 interface DonutChartProps {
   data: CategorySpend[];
@@ -13,6 +14,7 @@ interface DonutChartProps {
 const INNER_RADIUS_PERCENT = 64;
 
 export function DonutChart({ data, centerLabel, centerValue, size = 208, valueFormatter = formatCurrency }: DonutChartProps) {
+  const chartAnim = useChartAnimation(550);
   const innerDiameter = size * (INNER_RADIUS_PERCENT / 100);
   const textMaxWidth = Math.round(innerDiameter - 28);
 
@@ -29,7 +31,9 @@ export function DonutChart({ data, centerLabel, centerValue, size = 208, valueFo
             paddingAngle={2}
             stroke="#FFFFFF"
             strokeWidth={2}
-            isAnimationActive={false}
+            isAnimationActive={chartAnim.isAnimationActive}
+            animationDuration={chartAnim.animationDuration}
+            animationEasing={chartAnim.animationEasing}
           >
             {data.map((entry) => (
               <Cell key={entry.category} fill={entry.color} />

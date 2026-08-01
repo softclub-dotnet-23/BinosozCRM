@@ -76,4 +76,34 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  @keyframes dropdown-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-dropdown-in {
+    animation: dropdown-in 140ms ease-out;
+  }
+}
+
+/* Respected in addition to the useChartAnimation/MotionSection/StaggeredGrid/ProgressBar JS
+   checks (which skip their own animations under this same media query) — this is the blanket
+   fallback for every other transition/animation in the app (Modal's entrance, hover states,
+   etc.) that doesn't go through one of those hooks. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

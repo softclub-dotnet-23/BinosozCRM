@@ -15,7 +15,7 @@ interface MetricCardProps {
 
 export function MetricCard({ label, value, icon, tone, footer, progress, progressLabel }: MetricCardProps) {
   return (
-    <Card className="p-5">
+    <Card className="p-5 transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-border-strong hover:shadow-(--shadow-card-hover)">
       <div className="flex items-start gap-3.5">
         <IconContainer icon={icon} tone={tone} />
         <div className="min-w-0 flex-1 pt-0.5">

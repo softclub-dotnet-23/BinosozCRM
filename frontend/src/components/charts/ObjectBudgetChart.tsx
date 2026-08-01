@@ -2,6 +2,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { ChartTooltip } from "./ChartTooltip";
 import { formatCompact } from "../../utils/format";
 import { computeNiceTicks } from "../../utils/chart";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 interface ObjectBudgetPoint {
   objectName: string;
@@ -15,6 +16,7 @@ const SERIES = [
 ];
 
 export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
+  const chartAnim = useChartAnimation();
   const maxValue = Math.max(0, ...data.map((d) => Math.max(d.budget, d.spent)));
   const ticks = computeNiceTicks(maxValue);
   const niceMax = ticks[ticks.length - 1];
@@ -42,8 +44,8 @@ export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
           iconSize={8}
           formatter={(value) => <span className="text-xs text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="budget" name="Бюджет" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} />
-        <Bar dataKey="spent" name="Потрачено" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="budget" name="Бюджет" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} {...chartAnim} />
+        <Bar dataKey="spent" name="Потрачено" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} {...chartAnim} />
       </BarChart>
     </ResponsiveContainer>
   );
