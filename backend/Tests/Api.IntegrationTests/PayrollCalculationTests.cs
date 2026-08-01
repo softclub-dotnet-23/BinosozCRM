@@ -100,6 +100,7 @@ public sealed class PayrollCalculationTests(PostgresFixture fixture)
         workOrder.Start();
         var progress = WorkOrderProgress.Create(company.Id, workOrder.Id, brigadirUser.Id, 45m, DateTimeOffset.UtcNow);
         var share = WorkOrderPayoutShare.Create(company.Id, workOrder.Id, worker.Id, sharePercent, brigadirUser.Id);
+        share.Approve(brigadirUser.Id, 45m * 120m * (sharePercent / 100m));
 
         await using (var seed = fixture.CreateDbContext())
         {

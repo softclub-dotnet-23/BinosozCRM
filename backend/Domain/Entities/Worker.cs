@@ -43,6 +43,7 @@ public sealed class Worker : AuditableEntity, ICompanyOwned, ISoftDelete
     {
         if (AgeAt(birthDate, hireDate) < MinimumAgeYears)
             throw new ArgumentException($"Worker must be at least {MinimumAgeYears} on HireDate.", nameof(birthDate));
+        ValidatePayRate(payRateType, payRate);
 
         return new Worker
         {
@@ -72,8 +73,17 @@ public sealed class Worker : AuditableEntity, ICompanyOwned, ISoftDelete
 
     public void ChangePayRate(PayRateType payRateType, decimal payRate)
     {
+        ValidatePayRate(payRateType, payRate);
         PayRateType = payRateType;
         PayRate = payRate;
+    }
+
+    internal static void ValidatePayRate(PayRateType payRateType, decimal payRate)
+    {
+        if (payRateType == PayRateType.Hourly && payRate <= 0)
+            throw new ArgumentOutOfRangeException(nameof(payRate), "Hourly pay rate must be positive.");
+        if (payRateType == PayRateType.Piecework && payRate < 0)
+            throw new ArgumentOutOfRangeException(nameof(payRate), "Piecework pay rate cannot be negative.");
     }
 
     private static int AgeAt(DateOnly birthDate, DateOnly onDate)

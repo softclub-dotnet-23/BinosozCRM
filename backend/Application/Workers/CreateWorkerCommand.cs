@@ -32,6 +32,7 @@ public sealed class CreateWorkerCommandValidator : AbstractValidator<CreateWorke
         RuleFor(x => x.BirthDate).NotEmpty().LessThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow));
         RuleFor(x => x.PayRateType).IsInEnum();
         RuleFor(x => x.PayRate).GreaterThanOrEqualTo(0);
+        When(x => x.PayRateType == PayRateType.Hourly, () => RuleFor(x => x.PayRate).GreaterThan(0));
         RuleFor(x => x.HireDate).NotEmpty();
         RuleFor(x => x.Specialty).MaximumLength(200);
         RuleFor(x => x.DocumentType).MaximumLength(100);
@@ -79,6 +80,8 @@ public sealed class CreateWorkerCommandHandler(IApplicationDbContext context, IC
         }
 
         context.Workers.Add(worker);
+        context.WorkerPayRateHistories.Add(WorkerPayRateHistory.Create(
+            worker.CompanyId, worker.Id, request.PayRateType, request.PayRate, request.HireDate));
         await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(WorkerDto.FromEntity(worker, currentUser.Role));

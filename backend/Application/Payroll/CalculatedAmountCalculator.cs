@@ -39,14 +39,23 @@ internal static class CalculatedAmountCalculator
         DateOnly periodEnd,
         CancellationToken cancellationToken)
     {
-        var approvedTimesheets = await context.Timesheets
+        var approvedTimesheets = await context.Timesheets.AsNoTracking()
             .Where(t => t.WorkerId == worker.Id
                         && t.Date >= periodStart && t.Date <= periodEnd
                         && t.ApprovedAt != null
                         && t.HoursWorked != null)
             .ToListAsync(cancellationToken);
 
-        return approvedTimesheets.Sum(t => t.HoursWorked!.Value * worker.PayRate);
+        var rates = await context.WorkerPayRateHistories.AsNoTracking()
+            .Where(r => r.WorkerId == worker.Id && r.EffectiveFrom <= periodEnd)
+            .OrderBy(r => r.EffectiveFrom)
+            .ToListAsync(cancellationToken);
+
+        return approvedTimesheets.Sum(t =>
+        {
+            var rate = rates.LastOrDefault(r => r.EffectiveFrom <= t.Date);
+            return rate?.PayRateType == PayRateType.Hourly ? t.HoursWorked!.Value * rate.PayRate : 0m;
+        });
     }
 
     // Piecework: "Для каждого WorkOrder... CompletedDate ∈ период:
@@ -63,9 +72,8 @@ internal static class CalculatedAmountCalculator
         DateOnly periodEnd,
         CancellationToken cancellationToken)
     {
-        // One bounded query replaces the former 1 + (2 × share-count)
-        // pattern. The grouped progress subquery retains the exact factual
-        // quantity formula while keeping tenant query filters active.
+        // Approved Amount is the financial snapshot; piecework must never be
+        // recalculated from a mutable Worker.PayRate.
         var amounts = await (
             from share in context.WorkOrderPayoutShares.AsNoTracking()
             join order in context.WorkOrders.AsNoTracking() on share.WorkOrderId equals order.Id
@@ -73,15 +81,10 @@ internal static class CalculatedAmountCalculator
                   && (order.Status == WorkOrderStatus.Accepted || order.Status == WorkOrderStatus.Closed)
                   && order.CompletedDate != null
                   && order.CompletedDate >= periodStart && order.CompletedDate <= periodEnd
-            join progress in context.WorkOrderProgresses.AsNoTracking() on order.Id equals progress.WorkOrderId into progresses
-            select new
-            {
-                share.SharePercent,
-                order.UnitPrice,
-                ReportedQty = progresses.Sum(p => (decimal?)p.ReportedQty) ?? 0m
-            }).ToListAsync(cancellationToken);
+                  && share.Amount != null
+            select share.Amount!.Value).ToListAsync(cancellationToken);
 
-        return amounts.Sum(x => x.ReportedQty * x.UnitPrice * (x.SharePercent / 100m));
+        return amounts.Sum();
     }
 
     // "Оплачиваемое отсутствие: средняя дневная ставка = Σ HoursWorked за
@@ -127,16 +130,30 @@ internal static class CalculatedAmountCalculator
         var threeMonthsAgo = asOf.AddMonths(-3);
 
         var recentTimesheets = await context.Timesheets
+            .AsNoTracking()
             .Where(t => t.WorkerId == worker.Id
                         && t.Date > threeMonthsAgo && t.Date <= asOf
                         && t.ApprovedAt != null
                         && t.HoursWorked != null)
             .ToListAsync(cancellationToken);
 
-        if (recentTimesheets.Count < 10)
-            return 8m * worker.PayRate;
+        var rates = await context.WorkerPayRateHistories.AsNoTracking()
+            .Where(r => r.WorkerId == worker.Id && r.EffectiveFrom <= asOf)
+            .OrderBy(r => r.EffectiveFrom)
+            .ToListAsync(cancellationToken);
 
-        var totalHours = recentTimesheets.Sum(t => t.HoursWorked!.Value);
-        return (totalHours / recentTimesheets.Count) * worker.PayRate;
+        var applicableAsOf = rates.LastOrDefault(r => r.EffectiveFrom <= asOf);
+        if (applicableAsOf?.PayRateType != PayRateType.Hourly)
+            return 0m;
+
+        if (recentTimesheets.Count < 10)
+            return 8m * applicableAsOf.PayRate;
+
+        var totalAmount = recentTimesheets.Sum(t =>
+        {
+            var rate = rates.LastOrDefault(r => r.EffectiveFrom <= t.Date);
+            return rate?.PayRateType == PayRateType.Hourly ? t.HoursWorked!.Value * rate.PayRate : 0m;
+        });
+        return totalAmount / recentTimesheets.Count;
     }
 }

@@ -10,6 +10,7 @@ public interface IApplicationDbContext
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Brigade> Brigades { get; }
     DbSet<Worker> Workers { get; }
+    DbSet<WorkerPayRateHistory> WorkerPayRateHistories { get; }
     DbSet<Customer> Customers { get; }
     DbSet<ConstructionObject> ConstructionObjects { get; }
     DbSet<EstimateItem> EstimateItems { get; }
