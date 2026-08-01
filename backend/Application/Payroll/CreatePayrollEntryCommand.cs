@@ -36,6 +36,13 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
         if (worker is null)
             return Result.Failure<PayrollEntryDto>(new Error("WORKER_NOT_FOUND", "Worker not found."));
 
+        var company = await context.Companies.FirstOrDefaultAsync(c => c.Id == worker.CompanyId, cancellationToken);
+        if (company is null)
+            return Result.Failure<PayrollEntryDto>(new Error("COMPANY_NOT_FOUND", "Company not found."));
+
+        if (!PayrollPeriodCalculator.IsStandardPeriod(request.PeriodStart, request.PeriodEnd, company.PayrollPeriodType))
+            return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_PERIOD_NON_STANDARD", "Payroll entries must use a standard company payroll period."));
+
         var overlapsExistingPeriod = await context.PayrollEntries.AnyAsync(
             e => e.WorkerId == request.WorkerId
                  && e.PeriodStart <= request.PeriodEnd

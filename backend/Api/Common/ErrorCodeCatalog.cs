@@ -72,6 +72,8 @@ public static class ErrorCodeCatalog
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ENTRY_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["PAYROLL_PERIOD_NON_STANDARD"] = StatusCodes.Status400BadRequest,
+        ["PAYROLL_PERIOD_OVERLAP"] = StatusCodes.Status409Conflict,
         ["BONUS_NOT_ELIGIBLE"] = StatusCodes.Status400BadRequest,
         ["PRORAB_NOT_ASSIGNED_TO_OBJECT"] = StatusCodes.Status404NotFound,
         ["PRORAB_ALREADY_ASSIGNED"] = StatusCodes.Status409Conflict,
