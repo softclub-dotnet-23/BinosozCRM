@@ -5,6 +5,8 @@ import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { PageHeader } from "../components/ui/PageHeader";
+import { MotionSection } from "../components/ui/MotionSection";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { ObjectStateTable } from "../components/tables/ObjectStateTable";
 import { AttentionList } from "../components/tables/AttentionList";
 import { BudgetChart } from "../components/charts/BudgetChart";
@@ -144,7 +146,7 @@ function CompanyDashboard() {
 
   return (
     <AppLayout title={d.pageTitle} subtitle={d.pageSubtitle}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" staggerMs={70}>
         <MetricCard
           label={d.kpiTotalBudget}
           value={formatCurrency(dashboardKpis.totalBudget)}
@@ -180,13 +182,13 @@ function CompanyDashboard() {
           tone="purple"
           footer={d.kpiOverallProgress}
         />
-      </div>
+      </StaggeredGrid>
 
-      <div className="mt-4">
+      <MotionSection className="mt-4" delayMs={220}>
         <WorkStatusFromBackendCard />
-      </div>
+      </MotionSection>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <MotionSection className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]" delayMs={280}>
         <Card className="min-w-0">
           <PageHeader
             title={d.objectsStateTitle}
@@ -207,9 +209,9 @@ function CompanyDashboard() {
           <PageHeader title={d.attentionTitle} />
           <AttentionList items={attentionItems} />
         </Card>
-      </div>
+      </MotionSection>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <MotionSection className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]" delayMs={340}>
         <Card className="min-w-0 p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-ink">{d.budgetChartTitle}</h2>
@@ -253,7 +255,7 @@ function CompanyDashboard() {
             }}
           />
         )}
-      </div>
+      </MotionSection>
     </AppLayout>
   );
 }

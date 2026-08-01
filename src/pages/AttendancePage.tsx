@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { CalendarCheck, CalendarClock, CalendarX2, Download, Eye, MoreVertical, Pencil, Plus, RefreshCw, Trash2, UserCheck } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
@@ -277,7 +278,7 @@ function CompanyAttendancePage() {
       }}
     >
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StaggeredGrid className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MetricCard label="Всего посещений" value={String(kpis.total)} icon={CalendarCheck} tone="green" footer="За выбранный период" />
           <MetricCard
             label="Присутствовали"
@@ -300,7 +301,7 @@ function CompanyAttendancePage() {
             tone="purple"
             footer={`${kpis.latePercent}% от общего`}
           />
-        </div>
+        </StaggeredGrid>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-2.5">

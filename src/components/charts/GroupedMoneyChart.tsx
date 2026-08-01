@@ -1,6 +1,7 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./ChartTooltip";
 import { computeNiceTicks } from "../../utils/chart";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 interface SeriesConfig {
   key: string;
@@ -60,6 +61,7 @@ export function GroupedMoneyChart({
   tooltipLabelKey,
   tickInterval = 0,
 }: GroupedMoneyChartProps) {
+  const chartAnim = useChartAnimation();
   const maxValue = Math.max(0, ...data.flatMap((row) => series.map((s) => Number(row[s.key]) || 0)));
   const ticks = computeNiceTicks(maxValue);
   const niceMax = ticks[ticks.length - 1];
@@ -102,7 +104,7 @@ export function GroupedMoneyChart({
             content={(props) => <ChartTooltip {...props} series={series} labelKey={tooltipLabelKey} />}
           />
           {series.map((s) => (
-            <Bar key={s.key} dataKey={s.key} name={s.label} fill={s.color} radius={[3, 3, 0, 0]} maxBarSize={maxBarSize} />
+            <Bar key={s.key} dataKey={s.key} name={s.label} fill={s.color} radius={[3, 3, 0, 0]} maxBarSize={maxBarSize} {...chartAnim} />
           ))}
         </BarChart>
       </ResponsiveContainer>

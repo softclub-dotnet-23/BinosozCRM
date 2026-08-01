@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Avatar } from "../components/ui/Avatar";
@@ -277,12 +278,12 @@ export default function TransfersPage() {
         placeholder: "Поиск по перемещениям...",
       }}
     >
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <MetricCard label="Всего перемещений" value={String(kpis.count)} icon={ArrowLeftRight} tone="orange" footer="документов" />
         <MetricCard label="Перемещено материалов" value={formatCompactAmount(kpis.totalQuantity)} icon={Layers} tone="blue" footer="ед. измерения" />
         <MetricCard label="Общая стоимость" value={formatCompactAmount(kpis.totalCost)} icon={Banknote} tone="orange" footer="сомони" />
         <MetricCard label="Ср. стоимость" value={formatCompactAmount(kpis.averageCost)} icon={TrendingUp} tone="purple" footer="сомони" />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">

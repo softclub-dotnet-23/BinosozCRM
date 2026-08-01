@@ -21,7 +21,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useToast } from "../../hooks/useToast";
 import { useWorkerScope } from "../../utils/workerAccess";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
-import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 import { attendanceRepository, notificationsRepository } from "../../data/repositories";
 import { WorkerAttendanceTooltip } from "../../components/worker/WorkerAttendanceTooltip";
 import { WorkerCircleKpiCard, WorkerCircleStat } from "../../components/worker/WorkerCircleKpiCard";
@@ -81,7 +81,7 @@ export default function WorkerAttendancePage() {
   const { employee, object, prorab, brigadeWorks } = useWorkerScope(user);
   const attendance = useRepositorySnapshot(attendanceRepository);
   const notifications = useRepositorySnapshot(notificationsRepository);
-  const reduceMotion = usePrefersReducedMotion();
+  const chartAnim = useChartAnimation(900);
 
   const today = todayIso();
   const [period, setPeriod] = useState<PeriodPreset>("month");
@@ -359,7 +359,7 @@ export default function WorkerAttendancePage() {
                           />
                         )}
                       />
-                      <Bar dataKey="attendancePercent" radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={!reduceMotion} animationDuration={900} animationEasing="ease-out">
+                      <Bar dataKey="attendancePercent" radius={[4, 4, 0, 0]} maxBarSize={36} {...chartAnim}>
                         {weeklyChart.map((point) => (
                           <Cell key={point.date} fill={CHART_BAR_COLOR[point.status]} />
                         ))}

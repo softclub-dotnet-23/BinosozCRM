@@ -3,6 +3,7 @@ import { ClipboardCheck, Gauge, Plus, Users, UsersRound } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Pagination } from "../components/ui/Pagination";
@@ -169,7 +170,7 @@ function CompanyBrigadesPage() {
         </Button>
       }
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label={s.kpiTotalBrigades}
           value={String(kpis.totalBrigades)}
@@ -198,7 +199,7 @@ function CompanyBrigadesPage() {
           tone="purple"
           footer={s.kpiCurrentPeriodFooter}
         />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_250px]">
         <Card className="min-w-0">

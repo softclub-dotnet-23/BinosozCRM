@@ -1,6 +1,8 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card } from "../../ui/Card";
 import { useLanguage } from "../../../context/LanguageContext";
+import { useChartAnimation } from "../../../hooks/useChartAnimation";
+import { AnimatedNumber } from "../../ui/AnimatedNumber";
 import type { ProfileStats } from "../../../utils/workerProfileAnalytics";
 
 const ATTENDANCE_COLOR = "#18A957";
@@ -8,6 +10,7 @@ const ATTENDANCE_COLOR = "#18A957";
 export function ProfileStatisticsCard({ stats }: { stats: ProfileStats }) {
   const { strings } = useLanguage();
   const s = strings.worker;
+  const chartAnim = useChartAnimation();
 
   const labelByKey: Record<string, string> = {
     completedTasks: s.profileStatCompletedTasks,
@@ -24,7 +27,7 @@ export function ProfileStatisticsCard({ stats }: { stats: ProfileStats }) {
         <div className="relative shrink-0" style={{ width: 108, height: 108 }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={displayData} dataKey="value" nameKey="label" innerRadius="66%" outerRadius="100%" paddingAngle={2} stroke="#FFFFFF" strokeWidth={2} isAnimationActive={false}>
+              <Pie data={displayData} dataKey="value" nameKey="label" innerRadius="66%" outerRadius="100%" paddingAngle={2} stroke="#FFFFFF" strokeWidth={2} {...chartAnim}>
                 {displayData.map((entry) => (
                   <Cell key={entry.key} fill={entry.color} />
                 ))}
@@ -47,7 +50,7 @@ export function ProfileStatisticsCard({ stats }: { stats: ProfileStats }) {
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-            <p className="text-xl font-bold leading-none tabular text-ink">{stats.total}</p>
+            <AnimatedNumber value={stats.total} className="text-xl font-bold leading-none tabular text-ink" />
             <p className="mt-1 text-[10px] text-ink-secondary">{s.profileStatsTotalLabel}</p>
           </div>
         </div>

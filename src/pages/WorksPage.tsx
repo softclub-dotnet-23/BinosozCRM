@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Clock, ClipboardList, Plus } from "lucide-
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Button } from "../components/ui/Button";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -354,7 +355,7 @@ function CompanyWorksPage() {
         </div>
       }
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label={s.kpiTotal} value={String(analytics.total)} icon={ClipboardList} tone="blue" footer={s.kpiTotalFooter} />
         <MetricCard
           label={s.kpiCompleted}
@@ -377,7 +378,7 @@ function CompanyWorksPage() {
           tone="red"
           footer={s.kpiPercentOfTotal(analytics.overduePercent)}
         />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_260px]">
         <div className="flex min-w-0 flex-col gap-4">

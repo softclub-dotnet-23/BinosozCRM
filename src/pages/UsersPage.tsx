@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Avatar } from "../components/ui/Avatar";
+import { AppImage } from "../components/ui/AppImage";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
@@ -308,7 +309,11 @@ function UserKpi({ icon: Icon, tone, label, value, suffix }: { icon: typeof User
 
 function UserAvatar({ user }: { user: UserAccount }) {
   const src = resolvePersonPhoto(user.fullName);
-  return src ? <img className="users-row-avatar" src={src} alt={user.fullName} /> : <Avatar name={user.fullName} size="sm" />;
+  return src ? (
+    <AppImage className="users-row-avatar rounded-full" src={src} alt={user.fullName} loading="lazy" />
+  ) : (
+    <Avatar name={user.fullName} size="sm" />
+  );
 }
 
 function FilterLabel({ label, children }: { label: string; children: React.ReactNode }) {

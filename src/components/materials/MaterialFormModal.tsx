@@ -81,12 +81,17 @@ export function MaterialFormModal({ open, material, onClose, onSave }: MaterialF
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
+  // Reads the file as a data: URL rather than URL.createObjectURL(file) — an object URL is
+  // only valid for the current page session and goes stale (broken image) the moment this
+  // material is persisted to localStorage and the page is reloaded. A data: URL is a plain
+  // string that survives that round trip like any other stored imageUrl.
   function handleImageChange(file: File | undefined) {
     if (!file) return;
-    setImagePreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   }
 
   function validate(): boolean {

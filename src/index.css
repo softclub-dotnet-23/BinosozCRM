@@ -91,6 +91,19 @@
   animation-iteration-count: 1 !important;
 }
 
+/* Row-mount fade for DataTable (see components/tables/DataTable.tsx) — plays once when a <tr>
+   is actually inserted into the DOM (a fresh key: new row, new page of results), and never
+   replays for a row React just re-renders in place (e.g. a background refetch with the same
+   rows), since the element itself isn't recreated. */
+@keyframes row-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

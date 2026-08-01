@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Boxes, Download, Eye, LayoutGrid, MoreVertical, Pencil, RefreshCw, TrendingDown } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
@@ -264,12 +265,12 @@ export default function StockPage() {
         placeholder: "Поиск по материалам...",
       }}
     >
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <MetricCard label="Всего позиций" value={String(kpis.totalPositions)} icon={LayoutGrid} tone="blue" footer="наименований" />
         <MetricCard label="В наличии" value={String(kpis.inStock)} icon={Boxes} tone="green" footer="позиций" />
         <MetricCard label="Низкий остаток" value={String(kpis.lowStock)} icon={TrendingDown} tone="orange" footer="позиций" />
         <MetricCard label="Критический остаток" value={String(kpis.critical)} icon={AlertTriangle} tone="red" footer="позиций" />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4">

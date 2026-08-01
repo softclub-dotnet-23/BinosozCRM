@@ -1,9 +1,12 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useLanguage } from "../../context/LanguageContext";
 import type { SpecializationSlice } from "../../utils/brigadeAnalytics";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
+import { AnimatedNumber } from "../ui/AnimatedNumber";
 
 export function SpecializationDonut({ slices, total, size = 176 }: { slices: SpecializationSlice[]; total: number; size?: number }) {
   const { strings } = useLanguage();
+  const chartAnim = useChartAnimation();
   const chartData = slices.filter((s) => s.value > 0);
   const displayData = chartData.length > 0 ? chartData : slices;
 
@@ -20,7 +23,7 @@ export function SpecializationDonut({ slices, total, size = 176 }: { slices: Spe
             paddingAngle={2}
             stroke="#FFFFFF"
             strokeWidth={2}
-            isAnimationActive={false}
+            {...chartAnim}
           >
             {displayData.map((entry) => (
               <Cell key={entry.key} fill={entry.color} />
@@ -44,7 +47,7 @@ export function SpecializationDonut({ slices, total, size = 176 }: { slices: Spe
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <p className="text-2xl font-bold leading-none tabular text-ink">{total}</p>
+        <AnimatedNumber value={total} className="text-2xl font-bold leading-none tabular text-ink" />
         <p className="mt-1.5 text-xs text-ink-secondary">{strings.brigades.peopleUnitLabel}</p>
       </div>
     </div>

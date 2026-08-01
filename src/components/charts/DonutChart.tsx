@@ -2,6 +2,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { CategorySpend } from "../../types";
 import { formatCurrency } from "../../utils/format";
 import { AnimatedNumber } from "../ui/AnimatedNumber";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 interface DonutChartProps {
   data: CategorySpend[];
@@ -9,8 +10,9 @@ interface DonutChartProps {
   centerValue: string;
   size?: number;
   valueFormatter?: (value: number) => string;
-  /** Opt-in slice-in animation — defaults to off, matching every existing caller's current
-   * (instant) behavior, since this component is shared across several pages. */
+  /** Segment sweep-in animation, on by default (skips automatically under prefers-reduced-motion
+   * via useChartAnimation) — pass `false` only for a caller that genuinely needs the old instant
+   * render, e.g. re-rendering the same chart rapidly. */
   animate?: boolean;
   /** Opt-in: animate the center total counting up/down instead of swapping `centerValue` instantly. */
   animatedCenterValue?: number;
@@ -24,9 +26,10 @@ export function DonutChart({
   centerValue,
   size = 208,
   valueFormatter = formatCurrency,
-  animate = false,
+  animate = true,
   animatedCenterValue,
 }: DonutChartProps) {
+  const chartAnim = useChartAnimation(550);
   const innerDiameter = size * (INNER_RADIUS_PERCENT / 100);
   const textMaxWidth = Math.round(innerDiameter - 28);
 
@@ -43,9 +46,9 @@ export function DonutChart({
             paddingAngle={2}
             stroke="#FFFFFF"
             strokeWidth={2}
-            isAnimationActive={animate}
-            animationDuration={500}
-            animationEasing="ease-out"
+            isAnimationActive={animate && chartAnim.isAnimationActive}
+            animationDuration={chartAnim.animationDuration}
+            animationEasing={chartAnim.animationEasing}
           >
             {data.map((entry) => (
               <Cell key={entry.category} fill={entry.color} />

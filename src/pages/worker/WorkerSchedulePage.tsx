@@ -23,7 +23,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useToast } from "../../hooks/useToast";
 import { useWorkerScope } from "../../utils/workerAccess";
 import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
-import { usePrefersReducedMotion } from "../../hooks/usePrefersReducedMotion";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 import { attendanceRepository, notificationsRepository } from "../../data/repositories";
 import { WorkerCircleKpiCard, WorkerCircleStat } from "../../components/worker/WorkerCircleKpiCard";
 import { WorkerScheduleCalendarCard } from "../../components/worker/WorkerScheduleCalendarCard";
@@ -71,7 +71,7 @@ export default function WorkerSchedulePage() {
   const { showToast } = useToast();
   const { employee, object, prorab, brigadeWorks } = useWorkerScope(user);
   const attendance = useRepositorySnapshot(attendanceRepository);
-  const reduceMotion = usePrefersReducedMotion();
+  const chartAnim = useChartAnimation(900);
   const [messageModalOpen, setMessageModalOpen] = useState(false);
 
   const today = todayIso();
@@ -204,8 +204,8 @@ export default function WorkerSchedulePage() {
                         formatter={(value: string) => (value === "planHours" ? s.planHoursLabel : s.factLabel)}
                         wrapperStyle={{ fontSize: 12 }}
                       />
-                      <Bar dataKey="planHours" name="planHours" fill="#1E293B" radius={[4, 4, 0, 0]} maxBarSize={20} isAnimationActive={!reduceMotion} animationDuration={900} animationEasing="ease-out" />
-                      <Bar dataKey="factHours" name="factHours" fill="#F58A1F" radius={[4, 4, 0, 0]} maxBarSize={20} isAnimationActive={!reduceMotion} animationDuration={900} animationEasing="ease-out" />
+                      <Bar dataKey="planHours" name="planHours" fill="#1E293B" radius={[4, 4, 0, 0]} maxBarSize={20} {...chartAnim} />
+                      <Bar dataKey="factHours" name="factHours" fill="#F58A1F" radius={[4, 4, 0, 0]} maxBarSize={20} {...chartAnim} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

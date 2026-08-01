@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useChartAnimation } from "../hooks/useChartAnimation";
 import { AppLayout } from "../components/layout/AppLayout";
 import { useToast } from "../hooks/useToast";
 import { cn } from "../utils/cn";
@@ -90,6 +91,7 @@ function DayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: 
 export default function BrigadirTeamPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const chartAnim = useChartAnimation();
   const [search, setSearch] = useState("");
   const visibleTeam = team.filter((row) => `${row[0]} ${row[1]} ${row[2]} ${row[4]}`.toLowerCase().includes(search.toLowerCase()));
   const visibleTasks = tasks.filter((row) => `${row[0]} ${row[1]} ${row[2]}`.toLowerCase().includes(search.toLowerCase()));
@@ -211,7 +213,7 @@ export default function BrigadirTeamPage() {
                     itemStyle={{ padding: 0, color: "#1e4f7a", fontSize: "10px", fontWeight: 700 }}
                     separator=": "
                   />
-                  <Bar dataKey="value" name="Посещаемость" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                  <Bar dataKey="value" name="Посещаемость" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={28} {...chartAnim}>
                     <LabelList dataKey="value" content={<BarValueLabel />} />
                   </Bar>
                 </BarChart>

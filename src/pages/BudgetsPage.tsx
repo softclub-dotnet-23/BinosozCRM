@@ -10,6 +10,7 @@ import { ObjectImage } from "../components/ui/ObjectImage";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { RiskList } from "../components/tables/RiskList";
@@ -280,7 +281,7 @@ export default function BudgetsPage() {
       subtitle={s.pageSubtitle}
       search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label={s.kpiTotalBudget}
           value={formatCurrency(budgetKpis.totalBudget)}
@@ -309,7 +310,7 @@ export default function BudgetsPage() {
           tone="red"
           footer={<span className="text-red">{s.kpiOverBudgetFooter(budgetKpis.overBudgetObjectCount)}</span>}
         />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.85fr_1fr]">
         <Card className="min-w-0">

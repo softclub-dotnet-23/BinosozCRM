@@ -3,6 +3,7 @@ import { ChartTooltip } from "./ChartTooltip";
 import { formatCompact } from "../../utils/format";
 import { computeNiceTicks } from "../../utils/chart";
 import { useLanguage } from "../../context/LanguageContext";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 interface ObjectBudgetPoint {
   objectName: string;
@@ -12,6 +13,7 @@ interface ObjectBudgetPoint {
 
 export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
   const { strings } = useLanguage();
+  const chartAnim = useChartAnimation();
   const SERIES = [
     { key: "budget", label: strings.objects.colBudget, color: "#2869C9" },
     { key: "spent", label: strings.common.spentLabel, color: "#FF6B00" },
@@ -43,8 +45,8 @@ export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
           iconSize={9}
           formatter={(value) => <span className="text-sm text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="budget" name={strings.objects.colBudget} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={30} />
-        <Bar dataKey="spent" name={strings.common.spentLabel} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={30} />
+        <Bar dataKey="budget" name={strings.objects.colBudget} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={30} {...chartAnim} />
+        <Bar dataKey="spent" name={strings.common.spentLabel} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={30} {...chartAnim} />
       </BarChart>
     </ResponsiveContainer>
   );

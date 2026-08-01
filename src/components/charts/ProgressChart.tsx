@@ -2,9 +2,11 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import type { ObjectProgressPoint } from "../../types";
 import { ChartTooltip } from "./ChartTooltip";
 import { useLanguage } from "../../context/LanguageContext";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 export function ProgressChart({ data }: { data: ObjectProgressPoint[] }) {
   const { strings } = useLanguage();
+  const chartAnim = useChartAnimation();
   const s = strings.objects;
   const SERIES = [
     { key: "planned", label: s.chartSeriesPlanned, color: "#2869C9", unit: "%" },
@@ -40,8 +42,8 @@ export function ProgressChart({ data }: { data: ObjectProgressPoint[] }) {
           iconSize={9}
           formatter={(value) => <span className="text-sm text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="planned" name={`${s.chartSeriesPlanned} (%)`} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={30} />
-        <Bar dataKey="actual" name={`${s.chartSeriesActual} (%)`} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={30} />
+        <Bar dataKey="planned" name={`${s.chartSeriesPlanned} (%)`} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={30} {...chartAnim} />
+        <Bar dataKey="actual" name={`${s.chartSeriesActual} (%)`} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={30} {...chartAnim} />
       </BarChart>
     </ResponsiveContainer>
   );

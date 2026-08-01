@@ -2,6 +2,8 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { WorkAnalytics } from "../../types";
 import { useLanguage } from "../../context/LanguageContext";
 import type { AppStrings } from "../../lib/i18n/appStrings";
+import { useChartAnimation } from "../../hooks/useChartAnimation";
+import { AnimatedNumber } from "../ui/AnimatedNumber";
 
 interface DonutSegment {
   key: string;
@@ -22,6 +24,7 @@ function buildSegments(s: AppStrings["works"], analytics: WorkAnalytics): DonutS
 
 export function WorkSummaryDonut({ analytics, size = 176 }: { analytics: WorkAnalytics; size?: number }) {
   const { strings } = useLanguage();
+  const chartAnim = useChartAnimation();
   const segments = buildSegments(strings.works, analytics);
   const chartData = segments.filter((s) => s.value > 0);
   const displayData = chartData.length > 0 ? chartData : segments;
@@ -39,7 +42,7 @@ export function WorkSummaryDonut({ analytics, size = 176 }: { analytics: WorkAna
             paddingAngle={2}
             stroke="#FFFFFF"
             strokeWidth={2}
-            isAnimationActive={false}
+            {...chartAnim}
           >
             {displayData.map((entry) => (
               <Cell key={entry.key} fill={entry.color} />
@@ -63,7 +66,7 @@ export function WorkSummaryDonut({ analytics, size = 176 }: { analytics: WorkAna
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <p className="text-2xl font-bold leading-none tabular text-ink">{analytics.total}</p>
+        <AnimatedNumber value={analytics.total} className="text-2xl font-bold leading-none tabular text-ink" />
         <p className="mt-1.5 text-xs text-ink-secondary">{strings.works.donutSuffix}</p>
       </div>
     </div>

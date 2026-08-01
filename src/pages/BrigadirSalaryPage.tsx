@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useChartAnimation } from "../hooks/useChartAnimation";
 import { AppLayout } from "../components/layout/AppLayout";
 import { useToast } from "../hooks/useToast";
 import {
@@ -81,6 +82,7 @@ function BarValueLabel({ x = 0, y = 0, width = 0, value }: { x?: number; y?: num
 
 export default function BrigadirSalaryPage() {
   const { showToast } = useToast();
+  const chartAnim = useChartAnimation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -290,7 +292,7 @@ export default function BrigadirSalaryPage() {
                       itemStyle={{ padding: 0, color: "#1e4f7a", fontSize: "10px", fontWeight: 700 }}
                       separator=": "
                     />
-                    <Bar dataKey="value" name="Начислено" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={44}>
+                    <Bar dataKey="value" name="Начислено" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={44} {...chartAnim}>
                       <LabelList dataKey="value" content={<BarValueLabel />} />
                     </Bar>
                   </BarChart>

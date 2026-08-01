@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppLayout } from "../components/layout/AppLayout";
+import { useChartAnimation } from "../hooks/useChartAnimation";
 import { useToast } from "../hooks/useToast";
 import { cn } from "../utils/cn";
 import {
@@ -113,6 +114,7 @@ function DayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: 
 
 export default function BrigadirAttendancePage() {
   const { showToast } = useToast();
+  const chartAnim = useChartAnimation();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all" | AttendanceStatus>("all");
   const [selected, setSelected] = useState(0);
@@ -282,7 +284,7 @@ export default function BrigadirAttendancePage() {
                       itemStyle={{ padding: 0, color: "#1e4f7a", fontSize: "10px", fontWeight: 700 }}
                       separator=": "
                     />
-                    <Bar dataKey="value" name="Посещаемость" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                    <Bar dataKey="value" name="Посещаемость" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={28} {...chartAnim}>
                       <LabelList dataKey="value" content={<BarValueLabel />} />
                     </Bar>
                   </BarChart>

@@ -1,4 +1,5 @@
 import { createCollectionRepository } from "../lib/storage/createCollectionRepository";
+import { OBJECT_TYPE_IMAGE_FALLBACK } from "../utils/objectImages";
 import type {
   Assignment,
   AttendanceRecord,
@@ -35,7 +36,7 @@ import { mockEmployees } from "./mockEmployees";
 import { mockAssignments } from "./mockAssignments";
 import { mockStaff } from "./mockStaff";
 import { mockAttendance } from "./mockAttendance";
-import { mockMaterials } from "./mockMaterials";
+import { mockMaterials, CATEGORY_IMAGE } from "./mockMaterials";
 import { mockMaterialReceipts } from "./mockMaterialReceipts";
 import { mockMaterialWriteOffs } from "./mockMaterialWriteOffs";
 import { mockMaterialTransfers } from "./mockMaterialTransfers";
@@ -63,6 +64,21 @@ import { mockPhotoReportComments } from "./mockPhotoReportComments";
  * implementation of the same CollectionRepository interface.
  */
 export const objectsRepository = createCollectionRepository<ConstructionObject>("objects.v1", mockObjects);
+
+// One-time migration: a browser that persisted "objects.v1" before the image-upload fix in
+// AddObjectModal (blob: URL -> data: URL) may still have an object whose imageUrl is a blob:
+// reference from a previous page session — that reference can never resolve again (the browser
+// only keeps it alive for the tab that created it), so it would otherwise render as a permanently
+// broken image. Fall back to the type's default photo instead of leaving it dead.
+(() => {
+  const snapshot = objectsRepository.getSnapshot();
+  const needsMigration = snapshot.some((o) => o.imageUrl?.startsWith("blob:"));
+  if (needsMigration) {
+    void objectsRepository.setAll(
+      snapshot.map((o) => (o.imageUrl?.startsWith("blob:") ? { ...o, imageUrl: OBJECT_TYPE_IMAGE_FALLBACK[o.objectType] } : o)),
+    );
+  }
+})();
 export const estimatesRepository = createCollectionRepository<Estimate>("estimates.v1", mockEstimates);
 export const budgetsRepository = createCollectionRepository<BudgetLine>("budgets.v1", mockBudgetLines);
 // v2: brigade/object assignment in the generated seed rows was fixed (previously every brigade's
@@ -89,6 +105,20 @@ export const materialsRepository = createCollectionRepository<Material>("materia
   if (needsMigration) {
     void materialsRepository.setAll(
       snapshot.map((m) => (m.updatedAt ? m : { ...m, updatedAt: new Date().toISOString() })),
+    );
+  }
+})();
+
+// One-time migration: same blob: URL problem as "objects.v1" above, for materials uploaded
+// through MaterialFormModal before it switched to persisting a data: URL.
+(() => {
+  const snapshot = materialsRepository.getSnapshot();
+  const needsMigration = snapshot.some((m) => m.imageUrl?.startsWith("blob:"));
+  if (needsMigration) {
+    void materialsRepository.setAll(
+      snapshot.map((m) =>
+        m.imageUrl?.startsWith("blob:") ? { ...m, imageUrl: CATEGORY_IMAGE[m.category] ?? "/images/materials/cement-m400.jpg" } : m,
+      ),
     );
   }
 })();

@@ -68,12 +68,16 @@ export function AddObjectModal({ open, onClose, onCreate }: AddObjectModalProps)
     { value: "completed", label: c.statusCompleted },
   ];
 
+  // A data: URL (not URL.createObjectURL) — this object gets persisted to localStorage, and an
+  // object URL only lives for the current page session, so it would render as a broken image
+  // the moment the page reloads and the same string is read back out of storage.
   function handleImageChange(file: File | undefined) {
     if (!file) return;
-    setImagePreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {

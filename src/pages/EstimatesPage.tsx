@@ -20,6 +20,7 @@ import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -246,7 +247,7 @@ export default function EstimatesPage() {
         </Button>
       }
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label={s.kpiTotal}
           value={String(estimateKpis.total)}
@@ -275,7 +276,7 @@ export default function EstimatesPage() {
           tone="blue"
           footer={<>{s.kpiTotalOfPrefix} <span className="font-semibold text-ink">{formatCurrency(estimateKpis.draftAmount)}</span></>}
         />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 flex min-w-0 flex-col gap-4">
         <Card>

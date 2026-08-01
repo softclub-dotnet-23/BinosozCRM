@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
@@ -341,7 +342,7 @@ function CompanyMaterialsPage() {
         placeholder: "Поиск по материалам...",
       }}
     >
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <MetricCard
           label="Всего материалов"
           value={String(kpis.totalCount)}
@@ -365,7 +366,7 @@ function CompanyMaterialsPage() {
             <Download size={16} /> Экспорт
           </Button>
         </Card>
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 flex min-w-0 flex-col gap-4">
         <Card>

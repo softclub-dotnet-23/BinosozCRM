@@ -11,6 +11,7 @@ import { Avatar } from "../components/ui/Avatar";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { Pagination } from "../components/ui/Pagination";
 import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -213,7 +214,7 @@ export default function ObjectsPage() {
       subtitle={s.pageSubtitle}
       search={{ value: search, onChange: handleSearchChange, placeholder: s.searchPlaceholder }}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label={s.kpiTotal} value={String(kpis.total)} icon={Building2} tone="orange" footer={s.kpiTotalFooter} />
         <MetricCard
           label={s.kpiInWork}
@@ -236,7 +237,7 @@ export default function ObjectsPage() {
           tone="red"
           footer={s.kpiPercentOfTotal(Math.round((kpis.atRisk / kpis.total) * 100))}
         />
-      </div>
+      </StaggeredGrid>
 
       <div className="mt-4 flex min-w-0 flex-col gap-4">
         <Card className="min-w-0">

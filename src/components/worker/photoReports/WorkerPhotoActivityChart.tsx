@@ -3,14 +3,14 @@ import { Camera, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { Card } from "../../ui/Card";
 import { WorkerCircleStat } from "../WorkerCircleKpiCard";
 import { useLanguage } from "../../../context/LanguageContext";
-import { usePrefersReducedMotion } from "../../../hooks/usePrefersReducedMotion";
+import { useChartAnimation } from "../../../hooks/useChartAnimation";
 import type { PhotoActivityPoint } from "../../../utils/workerPhotoReportsAnalytics";
 import type { PhotoReportStats } from "../../../utils/workerPhotoReportsAnalytics";
 
 export function WorkerPhotoActivityChart({ points, stats }: { points: PhotoActivityPoint[]; stats: PhotoReportStats }) {
   const { strings } = useLanguage();
   const s = strings.worker;
-  const reduceMotion = usePrefersReducedMotion();
+  const chartAnim = useChartAnimation(900);
 
   return (
     <Card className="p-4">
@@ -44,8 +44,8 @@ export function WorkerPhotoActivityChart({ points, stats }: { points: PhotoActiv
                   </div>
                 )}
               />
-              <Bar dataKey="uploaded" name="uploaded" fill="#2F6FED" radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={!reduceMotion} animationDuration={900} animationEasing="ease-out" />
-              <Bar dataKey="approved" name="approved" fill="#20B15A" radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={!reduceMotion} animationDuration={900} animationEasing="ease-out" />
+              <Bar dataKey="uploaded" name="uploaded" fill="#2F6FED" radius={[4, 4, 0, 0]} maxBarSize={22} {...chartAnim} />
+              <Bar dataKey="approved" name="approved" fill="#20B15A" radius={[4, 4, 0, 0]} maxBarSize={22} {...chartAnim} />
             </BarChart>
           </ResponsiveContainer>
         </div>
