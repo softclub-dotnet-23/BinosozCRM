@@ -13,6 +13,7 @@ export function OwnerAvatar({ className }: { className?: string }) {
     <img
       src="/images/avatar-owner.jpg"
       alt="Садди Имомов"
+      decoding="async"
       onError={() => setFailed(true)}
       className={cn("h-10 w-10 shrink-0 rounded-full object-cover", className)}
     />

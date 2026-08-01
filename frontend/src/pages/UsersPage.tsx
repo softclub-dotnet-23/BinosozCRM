@@ -435,7 +435,11 @@ function UserKpi({ icon: Icon, tone, label, value, suffix }: { icon: typeof User
 
 function UserAvatar({ user }: { user: AppUser }) {
   const src = resolvePersonPhoto(user.fullName);
-  return src ? <img className="users-row-avatar" src={src} alt={user.fullName} /> : <Avatar name={user.fullName} size="sm" />;
+  return src ? (
+    <img className="users-row-avatar" src={src} alt={user.fullName} loading="lazy" decoding="async" />
+  ) : (
+    <Avatar name={user.fullName} size="sm" />
+  );
 }
 
 function FilterLabel({ label, children }: { label: string; children: React.ReactNode }) {
