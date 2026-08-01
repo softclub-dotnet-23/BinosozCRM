@@ -39,6 +39,11 @@ public sealed class ForgotPasswordCommandHandler(
         if (user is null || !user.IsActive)
             return Result.Success();
 
+        // Preserve the indistinguishable success response, but never create
+        // a reset credential that production cannot actually deliver.
+        if (!deliveryService.CanDeliver)
+            return Result.Success();
+
         // Single-tenant assumption, same as LoginCommand's own CompanyId
         // lookup — one Company row per deployment in this MVP.
         var companyId = await context.Companies.Select(c => c.Id).FirstAsync(cancellationToken);
