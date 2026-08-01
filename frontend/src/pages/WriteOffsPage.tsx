@@ -8,6 +8,8 @@ import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ApiError, NetworkError } from "../api/apiClient";
+import { useAuth } from "../context/AuthContext";
+import BrigadirMaterialsPage from "./BrigadirMaterialsPage";
 import { listMaterialConsumptionReports, type MaterialConsumptionReport } from "../api/materialConsumptionApi";
 import { listBrigades, type Brigade } from "../api/brigadesApi";
 
@@ -24,6 +26,8 @@ function describeError(error: unknown, fallback: string): string {
  * panel. There is no "create a write-off" action for this page to offer.
  */
 export default function WriteOffsPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirMaterialsPage consumption />;
   const [reports, setReports] = useState<MaterialConsumptionReport[]>([]);
   const [brigades, setBrigades] = useState<Brigade[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
@@ -76,7 +80,7 @@ export default function WriteOffsPage() {
       <Card style={{ marginTop: 16, padding: 16 }}>
         <div className="flex items-start gap-2 text-sm text-ink-secondary">
           <Info size={16} className="mt-0.5 shrink-0" />
-          <span>Списания создаёт бригадир через Telegram-бот при закрытии смены. На этой странице — только просмотр.</span>
+          <span>Списания доступны для просмотра операционным ролям; бригадир отправляет их через web-форму этой страницы.</span>
         </div>
       </Card>
 

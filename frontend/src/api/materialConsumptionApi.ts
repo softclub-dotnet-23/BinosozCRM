@@ -18,3 +18,16 @@ export interface MaterialConsumptionReport {
 export function listMaterialConsumptionReports(page: number, pageSize: number): Promise<PagedResult<MaterialConsumptionReport>> {
   return request<PagedResult<MaterialConsumptionReport>>(`/api/v1/material-consumption-reports?page=${page}&pageSize=${pageSize}`);
 }
+export interface ReportMaterialConsumptionInput {
+  objectId: string;
+  date: string;
+  materialName: string;
+  unit: string;
+  qtyUsed: number;
+  qtyShortage: number;
+  comment?: string;
+}
+
+export function reportMaterialConsumption(input: ReportMaterialConsumptionInput): Promise<MaterialConsumptionReport> {
+  return request<MaterialConsumptionReport>("/api/v1/material-consumption-reports", { method: "POST", body: input });
+}

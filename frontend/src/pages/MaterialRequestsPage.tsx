@@ -10,6 +10,8 @@ import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
+import { useAuth } from "../context/AuthContext";
+import BrigadirMaterialsPage from "./BrigadirMaterialsPage";
 import { ApiError, NetworkError } from "../api/apiClient";
 import {
   approveMaterialRequest,
@@ -38,6 +40,8 @@ const STATUS_TONE: Record<MaterialRequestStatus, "blue" | "green" | "orange" | "
 
 /** Create is Brigadir-only (Telegram bot) — this page only reads and acts on requests already raised there. */
 export default function MaterialRequestsPage() {
+  const { user } = useAuth();
+  if (user?.role === "brigadir") return <BrigadirMaterialsPage />;
   const { showToast } = useToast();
 
   const [requests, setRequests] = useState<MaterialRequest[]>([]);

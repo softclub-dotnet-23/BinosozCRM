@@ -40,3 +40,14 @@ export function markMaterialRequestOrdered(id: string): Promise<MaterialRequest>
 export function forceCloseMaterialRequest(id: string, comment: string): Promise<MaterialRequest> {
   return request<MaterialRequest>(`/api/v1/material-requests/${id}/force-close`, { method: "POST", body: { comment } });
 }
+
+export interface CreateMaterialRequestInput {
+  objectId: string;
+  materialName: string;
+  unit: string;
+  qty: number;
+}
+
+export function createMaterialRequest(input: CreateMaterialRequestInput): Promise<MaterialRequest> {
+  return request<MaterialRequest>("/api/v1/material-requests", { method: "POST", body: input });
+}
