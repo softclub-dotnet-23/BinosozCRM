@@ -24,6 +24,10 @@ export interface LoginStrings {
   secureDescription: string;
   loginRequired: string;
   passwordRequired: string;
+  invalidCredentials: string;
+  accountDeactivated: string;
+  networkError: string;
+  serverError: string;
 }
 
 export const LOGIN_LANGUAGES: { value: LoginLanguage; label: string }[] = [
@@ -45,8 +49,8 @@ export const LOGIN_STRINGS: Record<LoginLanguage, LoginStrings> = {
     copyright: "© 2026 BINOSOZ CRM. Все права защищены.",
     welcomeTitle: "Добро пожаловать!",
     welcomeSubtitle: "Войдите в систему, чтобы продолжить работу",
-    loginLabel: "Логин",
-    loginPlaceholder: "Введите логин",
+    loginLabel: "Телефон",
+    loginPlaceholder: "Введите номер телефона",
     passwordLabel: "Пароль",
     passwordPlaceholder: "Введите пароль",
     showPassword: "Показать пароль",
@@ -59,8 +63,12 @@ export const LOGIN_STRINGS: Record<LoginLanguage, LoginStrings> = {
     qrLogin: "Войти через QR-код",
     secureTitle: "Безопасный доступ",
     secureDescription: "Все данные защищены и передаются по зашифрованному соединению",
-    loginRequired: "Введите логин",
+    loginRequired: "Введите номер телефона",
     passwordRequired: "Введите пароль",
+    invalidCredentials: "Неверный телефон или пароль",
+    accountDeactivated: "Учётная запись отключена",
+    networkError: "Не удалось подключиться к серверу. Проверьте соединение и попробуйте снова.",
+    serverError: "Ошибка сервера. Попробуйте позже.",
   },
   tj: {
     languageName: "Тоҷикӣ",
@@ -74,8 +82,8 @@ export const LOGIN_STRINGS: Record<LoginLanguage, LoginStrings> = {
     copyright: "© 2026 BINOSOZ CRM. Ҳамаи ҳуқуқҳо ҳифз шудаанд.",
     welcomeTitle: "Хуш омадед!",
     welcomeSubtitle: "Барои идомаи кор ба система ворид шавед",
-    loginLabel: "Логин",
-    loginPlaceholder: "Логинро ворид кунед",
+    loginLabel: "Телефон",
+    loginPlaceholder: "Рақами телефонро ворид кунед",
     passwordLabel: "Рамз",
     passwordPlaceholder: "Рамзро ворид кунед",
     showPassword: "Рамзи намоён",
@@ -88,8 +96,12 @@ export const LOGIN_STRINGS: Record<LoginLanguage, LoginStrings> = {
     qrLogin: "Воридшавӣ тавассути QR-код",
     secureTitle: "Дастрасии бехатар",
     secureDescription: "Ҳамаи маълумот ҳифз шуда, тавассути пайвасти рамзгузоришуда интиқол дода мешавад",
-    loginRequired: "Логинро ворид кунед",
+    loginRequired: "Рақами телефонро ворид кунед",
     passwordRequired: "Рамзро ворид кунед",
+    invalidCredentials: "Рақами телефон ё рамз нодуруст аст",
+    accountDeactivated: "Ҳисоб ғайрифаъол карда шудааст",
+    networkError: "Пайваст ба сервер имконнопазир аст. Пайвастшавиро санҷед ва аз нав кӯшиш кунед.",
+    serverError: "Хатои сервер. Баъдтар кӯшиш кунед.",
   },
   en: {
     languageName: "English",
@@ -103,8 +115,8 @@ export const LOGIN_STRINGS: Record<LoginLanguage, LoginStrings> = {
     copyright: "© 2026 BINOSOZ CRM. All rights reserved.",
     welcomeTitle: "Welcome!",
     welcomeSubtitle: "Sign in to continue working",
-    loginLabel: "Login",
-    loginPlaceholder: "Enter your login",
+    loginLabel: "Phone",
+    loginPlaceholder: "Enter your phone number",
     passwordLabel: "Password",
     passwordPlaceholder: "Enter your password",
     showPassword: "Show password",
@@ -117,7 +129,11 @@ export const LOGIN_STRINGS: Record<LoginLanguage, LoginStrings> = {
     qrLogin: "Sign in with QR code",
     secureTitle: "Secure access",
     secureDescription: "All data is protected and transmitted through an encrypted connection",
-    loginRequired: "Enter your login",
+    loginRequired: "Enter your phone number",
     passwordRequired: "Enter your password",
+    invalidCredentials: "Invalid phone number or password",
+    accountDeactivated: "This account has been deactivated",
+    networkError: "Couldn't reach the server. Check your connection and try again.",
+    serverError: "Server error. Please try again later.",
   },
 };

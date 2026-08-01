@@ -1,11 +1,13 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  CalendarDays,
-  Download,
+  AlertCircle,
+  Check,
+  Copy,
   Eye,
   Grid2X2,
+  KeyRound,
+  Loader2,
   MoreVertical,
-  Pencil,
   Plus,
   Search,
   ShieldCheck,
@@ -20,146 +22,243 @@ import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { Modal } from "../components/ui/Modal";
 import { useAuth } from "../context/AuthContext";
-import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { usersRepository } from "../data/repositories";
+import { useToast } from "../hooks/useToast";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { BACKEND_ROLES, mapToBackendRole, type BackendRole } from "../api/authApi";
+import {
+  activateUser,
+  changeUserRole,
+  createUser,
+  deactivateUser,
+  listUsers,
+  regenerateTemporaryPassword,
+  type AppUser,
+  type CreatedUser,
+} from "../api/usersApi";
 import { ROLE_LABEL } from "../lib/auth/roleAccess";
 import { resolvePersonPhoto } from "../utils/personPhotos";
-import type { UserAccount, UserAccountStatus, UserRole } from "../types";
+import type { UserRole } from "../types";
 import "../styles/users.css";
 
 type UserTab = "all" | "active" | "inactive";
 
-const ROLE_CLASS_NAME: Record<UserRole, string> = {
+const ROLE_CLASS_NAME: Partial<Record<UserRole, string>> = {
   owner: "role-owner",
-  administrator: "role-admin",
   prorab: "role-prorab",
   brigadir: "role-brigadir",
-  storekeeper: "role-supply",
   accountant: "role-accountant",
 };
 
-const ROLE_OPTIONS = (Object.keys(ROLE_LABEL) as UserRole[]).map((value) => ({ value, label: ROLE_LABEL[value] }));
+// Only the four roles the backend can actually assign — administrator/storekeeper
+// have no server-side equivalent (roleAccess.ts) and can never appear here.
+const ROLE_OPTIONS = BACKEND_ROLES.map((backendRole) => {
+  const role = mapToBackendRoleReverseLabel(backendRole);
+  return { value: backendRole, label: ROLE_LABEL[role] };
+});
 
-const EMPTY_FORM: Omit<UserAccount, "id" | "registeredAt"> = {
-  fullName: "",
-  login: "",
-  role: "brigadir",
-  phone: "",
-  email: "",
-  status: "active",
-};
+function mapToBackendRoleReverseLabel(role: BackendRole): UserRole {
+  switch (role) {
+    case "Owner":
+      return "owner";
+    case "Prorab":
+      return "prorab";
+    case "Brigadir":
+      return "brigadir";
+    case "Accountant":
+      return "accountant";
+  }
+}
 
-const TAJIK_PHONE_RE = /^\+992 \d{2} \d{3} ?\d{2} ?\d{2}$|^\+992 9\d{2} \d{2} \d{2} \d{2}$/;
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case "PHONE_ALREADY_IN_USE":
+        return "Пользователь с этим номером телефона уже существует";
+      case "CANNOT_MODIFY_OWN_ACCOUNT":
+        return "Нельзя изменить собственную учётную запись";
+      case "USER_NOT_FOUND":
+        return "Пользователь не найден";
+      default:
+        return error.message || fallback;
+    }
+  }
+  return fallback;
+}
+
+const CREATE_FORM_INITIAL = { fullName: "", phone: "", role: "Brigadir" as BackendRole };
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useRepositoryState(usersRepository);
+  const { showToast } = useToast();
+
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<UserTab>("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = usePersistentState("users.page.size.v1", 10);
-  const [modalMode, setModalMode] = useState<"add" | "edit" | "view" | null>(null);
-  const [selected, setSelected] = useState<UserAccount | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState("");
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(CREATE_FORM_INITIAL);
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const [viewUser, setViewUser] = useState<AppUser | null>(null);
+  const [roleTarget, setRoleTarget] = useState<AppUser | null>(null);
+  const [roleChangeValue, setRoleChangeValue] = useState<BackendRole>("Brigadir");
+  const [roleChangeError, setRoleChangeError] = useState("");
+  const [savingRole, setSavingRole] = useState(false);
+
+  const [revealedPassword, setRevealedPassword] = useState<CreatedUser | null>(null);
+  const [copyConfirmed, setCopyConfirmed] = useState(false);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+
+  async function loadUsers() {
+    setLoadState("loading");
+    try {
+      // Users is a small, Owner-only administrative list (no server-side
+      // search/filter endpoint exists) — one bulk fetch at the backend's own
+      // page-size cap, filtered/paginated client-side, rather than a request
+      // per keystroke or per filter change.
+      const result = await listUsers(1, 100);
+      setUsers(result.items);
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить пользователей"));
+      setLoadState("error");
+    }
+  }
+
+  useEffect(() => {
+    void loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return users.filter((user) => {
-      if (tab === "active" && user.status !== "active") return false;
-      if (tab === "inactive" && user.status === "active") return false;
+      if (tab === "active" && !user.isActive) return false;
+      if (tab === "inactive" && user.isActive) return false;
       if (roleFilter !== "all" && user.role !== roleFilter) return false;
-      if (statusFilter !== "all" && user.status !== statusFilter) return false;
-      if (dateFrom && user.registeredAt < dateFrom) return false;
-      if (dateTo && user.registeredAt > dateTo) return false;
-      if (query && !`${user.fullName} ${user.login} ${user.email} ${user.phone}`.toLowerCase().includes(query)) return false;
+      if (query && !`${user.fullName} ${user.phone}`.toLowerCase().includes(query)) return false;
       return true;
     });
-  }, [users, search, tab, roleFilter, statusFilter, dateFrom, dateTo]);
+  }, [users, search, tab, roleFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const visibleUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
   const stats = useMemo(() => {
-    const active = users.filter((u) => u.status === "active").length;
-    const inactive = users.filter((u) => u.status !== "active").length;
-    const administrators = users.filter((u) => u.role === "administrator" || u.role === "owner").length;
-    return { total: users.length, active, inactive, administrators, roleCount: ROLE_OPTIONS.length };
+    const active = users.filter((u) => u.isActive).length;
+    const inactive = users.filter((u) => !u.isActive).length;
+    const owners = users.filter((u) => u.role === "owner").length;
+    const pendingPasswordChange = users.filter((u) => u.forcePasswordChange).length;
+    return { total: users.length, active, inactive, owners, pendingPasswordChange };
   }, [users]);
 
   const roleDistribution = useMemo(() => {
     const total = users.length || 1;
     return ROLE_OPTIONS.map(({ value, label }) => {
-      const count = users.filter((u) => u.role === value).length;
-      return { role: value, label, count, percent: (count / total) * 100 };
+      const role = mapToBackendRoleReverseLabel(value);
+      const count = users.filter((u) => u.role === role).length;
+      return { role, label, count, percent: (count / total) * 100 };
     }).filter((entry) => entry.count > 0);
   }, [users]);
 
   function resetFilters() {
     setSearch("");
     setRoleFilter("all");
-    setStatusFilter("all");
-    setDateFrom("");
-    setDateTo("");
     setPage(1);
   }
 
-  function openAdd() {
-    setSelected(null);
-    setForm(EMPTY_FORM);
-    setFormError("");
-    setModalMode("add");
+  function openCreate() {
+    setCreateForm(CREATE_FORM_INITIAL);
+    setCreateError("");
+    setCreateOpen(true);
   }
 
-  function openUser(user: UserAccount, mode: "view" | "edit") {
-    setSelected(user);
-    setForm({ fullName: user.fullName, login: user.login, role: user.role, phone: user.phone, email: user.email, status: user.status });
-    setFormError("");
-    setModalMode(mode);
-  }
-
-  function submitUser(event: FormEvent) {
+  async function submitCreate(event: FormEvent) {
     event.preventDefault();
-    if (!form.fullName.trim() || !form.login.trim() || !form.email.trim()) {
-      setFormError("Заполните имя, логин и email");
+    if (creating) return;
+    if (!createForm.fullName.trim() || !createForm.phone.trim()) {
+      setCreateError("Заполните имя и телефон");
       return;
     }
-    if (form.phone.trim() && !TAJIK_PHONE_RE.test(form.phone.trim())) {
-      setFormError("Формат телефона: +992 XX XXX XX XX");
-      return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createUser(createForm.fullName.trim(), createForm.phone.trim(), createForm.role);
+      setUsers((current) => [created.user, ...current]);
+      setCreateOpen(false);
+      setCopyConfirmed(false);
+      setRevealedPassword(created);
+    } catch (error) {
+      setCreateError(describeError(error, "Не удалось создать пользователя"));
+    } finally {
+      setCreating(false);
     }
-    const normalizedLogin = form.login.trim().toLowerCase();
-    const loginTaken = users.some(
-      (user) => user.login.toLowerCase() === normalizedLogin && user.id !== selected?.id,
-    );
-    if (loginTaken) {
-      setFormError("Этот логин уже занят другим пользователем");
-      return;
-    }
-    if (modalMode === "edit" && selected) {
-      setUsers((current) => current.map((user) => (user.id === selected.id ? { ...user, ...form, login: normalizedLogin } : user)));
-    } else {
-      setUsers((current) => [
-        { ...form, login: normalizedLogin, id: `user-${Date.now()}`, registeredAt: new Date().toISOString().slice(0, 10) },
-        ...current,
-      ]);
-    }
-    setModalMode(null);
   }
 
-  function toggleStatus(user: UserAccount) {
-    if (user.id === currentUser?.id) return;
-    setUsers((current) => current.map((row) => (row.id === user.id ? { ...row, status: row.status === "active" ? "inactive" : "active" } : row)));
+  function openRoleChange(user: AppUser) {
+    setRoleTarget(user);
+    setRoleChangeValue(mapToBackendRole(user.role));
+    setRoleChangeError("");
+  }
+
+  async function submitRoleChange(event: FormEvent) {
+    event.preventDefault();
+    if (!roleTarget || savingRole) return;
+    setSavingRole(true);
+    setRoleChangeError("");
+    try {
+      const updated = await changeUserRole(roleTarget.id, roleChangeValue);
+      setUsers((current) => current.map((u) => (u.id === updated.id ? updated : u)));
+      setRoleTarget(null);
+      showToast("Роль обновлена");
+    } catch (error) {
+      setRoleChangeError(describeError(error, "Не удалось изменить роль"));
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
+  async function toggleStatus(user: AppUser) {
+    if (user.id === currentUser?.id || busyUserId) return;
+    setBusyUserId(user.id);
+    try {
+      const updated = user.isActive ? await deactivateUser(user.id) : await activateUser(user.id);
+      setUsers((current) => current.map((u) => (u.id === updated.id ? updated : u)));
+      showToast(updated.isActive ? "Пользователь активирован" : "Пользователь деактивирован");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось изменить статус"), "error");
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  async function handleRegeneratePassword(user: AppUser) {
+    if (busyUserId) return;
+    setBusyUserId(user.id);
+    try {
+      const result = await regenerateTemporaryPassword(user.id);
+      setUsers((current) => current.map((u) => (u.id === result.user.id ? result.user : u)));
+      setCopyConfirmed(false);
+      setRevealedPassword(result);
+    } catch (error) {
+      showToast(describeError(error, "Не удалось сгенерировать новый пароль"), "error");
+    } finally {
+      setBusyUserId(null);
+    }
   }
 
   function exportCsv() {
-    const rows = filteredUsers.map((user) => [user.fullName, ROLE_LABEL[user.role], user.phone, user.email, user.status]);
-    const csv = [["Пользователь", "Роль", "Телефон", "Email", "Статус"], ...rows]
+    const rows = filteredUsers.map((user) => [user.fullName, ROLE_LABEL[user.role], user.phone, user.isActive ? "Активен" : "Неактивен"]);
+    const csv = [["Пользователь", "Роль", "Телефон", "Статус"], ...rows]
       .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
       .join("\n");
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
@@ -171,103 +270,161 @@ export default function UsersPage() {
   }
 
   return (
-    <AppLayout title="Пользователи" subtitle="Управление учетными записями и правами доступа" search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "Поиск по пользователям..." }}>
+    <AppLayout title="Пользователи" subtitle="Управление учётными записями и правами доступа" search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "Поиск по пользователям..." }}>
       <div className="users-page">
         <div className="users-overview-row">
           <div className="users-kpi-grid">
             <UserKpi icon={UserRound} tone="green" label="Всего пользователей" value={String(stats.total)} suffix="учётных записей" />
             <UserKpi icon={UserCheck} tone="blue" label="Активные" value={String(stats.active)} suffix="пользователя" />
             <UserKpi icon={UserX} tone="orange" label="Неактивные" value={String(stats.inactive)} suffix="пользователя" />
-            <UserKpi icon={ShieldCheck} tone="purple" label="Администраторы" value={String(stats.administrators)} suffix="пользователя" />
-            <UserKpi icon={Grid2X2} tone="yellow" label="Роли" value={String(stats.roleCount)} suffix="ролей в системе" />
+            <UserKpi icon={ShieldCheck} tone="purple" label="Владельцы" value={String(stats.owners)} suffix="учётных записей" />
+            <UserKpi icon={Grid2X2} tone="yellow" label="Требуют смены пароля" value={String(stats.pendingPasswordChange)} suffix="пользователей" />
           </div>
           <div className="users-top-actions">
-            <Button onClick={openAdd}><Plus size={15} /> Добавить пользователя</Button>
-            <Button variant="secondary" onClick={exportCsv}><Download size={15} /> Экспорт</Button>
+            <Button onClick={openCreate}><Plus size={15} /> Добавить пользователя</Button>
+            <Button variant="secondary" onClick={exportCsv} disabled={loadState !== "ready"}>Экспорт</Button>
           </div>
         </div>
 
-        <div className="users-content-grid">
-          <Card className="users-table-card">
-            <div className="users-tabs">
-              {([['all', 'Все пользователи'], ['active', 'Активные'], ['inactive', 'Неактивные']] as [UserTab, string][]).map(([key, label]) => (
-                <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); setPage(1); }}>{label}</button>
-              ))}
-            </div>
-            <div className="users-table-scroll">
-              <table>
-                <thead><tr><th><input type="checkbox" aria-label="Выбрать всех" /></th><th>Пользователь</th><th>Роль</th><th>Телефон</th><th>Email</th><th>Статус</th><th>Дата регистрации</th><th>Действия</th></tr></thead>
-                <tbody>
-                  {visibleUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td><input type="checkbox" aria-label={`Выбрать ${user.fullName}`} /></td>
-                      <td><div className="users-person"><UserAvatar user={user} /><div><strong>{user.fullName}</strong><span>@{user.login}</span></div></div></td>
-                      <td><span className={`user-role ${ROLE_CLASS_NAME[user.role]}`}>{ROLE_LABEL[user.role]}</span></td>
-                      <td className="nowrap">{user.phone}</td>
-                      <td>{user.email}</td>
-                      <td><span className={`user-status ${user.status === "active" ? "active" : "inactive"}`}>{user.status === "active" ? "Активен" : user.status === "blocked" ? "Заблокирован" : "Неактивен"}</span></td>
-                      <td className="nowrap">{user.registeredAt}</td>
-                      <td>
-                        <div className="user-row-actions">
-                          <button type="button" aria-label="Просмотреть" onClick={() => openUser(user, "view")}><Eye size={14} /></button>
-                          <button type="button" aria-label="Редактировать" onClick={() => openUser(user, "edit")}><Pencil size={14} /></button>
-                          <button
-                            type="button"
-                            aria-label="Изменить статус"
-                            title={user.id === currentUser?.id ? "Нельзя изменить статус своей учётной записи" : "Изменить статус"}
-                            disabled={user.id === currentUser?.id}
-                            onClick={() => toggleStatus(user)}
-                          >
-                            <MoreVertical size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="users-pagination">
-              <span>Показано {visibleUsers.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filteredUsers.length)} из {filteredUsers.length} пользователей</span>
-              <div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>‹</button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} className={page === index + 1 ? "active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>›</button></div>
-              <label>
-                Показывать по:{" "}
-                <CustomSelect
-                  size="sm"
-                  value={String(pageSize)}
-                  onValueChange={(value) => { setPageSize(Number(value)); setPage(1); }}
-                  options={[{ value: "10", label: "10" }, { value: "25", label: "25" }, { value: "50", label: "50" }]}
-                />
-              </label>
-            </div>
+        {loadState === "error" && (
+          <Card className="users-table-card" style={{ padding: 24 }}>
+            <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+            <Button size="sm" variant="secondary" onClick={() => void loadUsers()} style={{ marginTop: 12 }}>Повторить</Button>
           </Card>
+        )}
 
-          <aside className="users-aside">
-            <Card className="users-filter-card">
-              <h2>Фильтры</h2>
-              <FilterLabel label="Поиск"><div className="users-filter-search"><Search size={13} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email или телефон..." /></div></FilterLabel>
-              <FilterLabel label="Роль"><CustomSelect size="sm" fullWidth value={roleFilter} onValueChange={(value) => { setRoleFilter(value); setPage(1); }} options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS]} /></FilterLabel>
-              <FilterLabel label="Статус"><CustomSelect size="sm" fullWidth value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }} options={[{ value: "all", label: "Все статусы" }, { value: "active", label: "Активные" }, { value: "inactive", label: "Неактивные" }, { value: "blocked", label: "Заблокированные" }]} /></FilterLabel>
-              <FilterLabel label="Дата регистрации"><div className="users-date-range"><CalendarDays size={13} /><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /><span>–</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></div></FilterLabel>
-              <div className="users-filter-actions"><Button size="sm" onClick={() => setPage(1)}>Применить</Button><Button size="sm" variant="secondary" onClick={resetFilters}>Сбросить</Button></div>
-            </Card>
+        {loadState === "loading" && (
+          <Card className="users-table-card" style={{ padding: 40, textAlign: "center" }}>
+            <Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} />
+          </Card>
+        )}
 
-            <Card className="users-role-card">
-              <h2>Пользователей по ролям</h2>
-              <div className="users-role-content">
-                <div className="users-role-donut" aria-label="Распределение пользователей по ролям" />
-                <ul>
-                  {roleDistribution.map((entry) => (
-                    <li key={entry.role}><i className={ROLE_CLASS_NAME[entry.role]} />{entry.label} <b>{entry.count} ({entry.percent.toFixed(1)}%)</b></li>
-                  ))}
-                </ul>
+        {loadState === "ready" && (
+          <div className="users-content-grid">
+            <Card className="users-table-card">
+              <div className="users-tabs">
+                {([['all', 'Все пользователи'], ['active', 'Активные'], ['inactive', 'Неактивные']] as [UserTab, string][]).map(([key, label]) => (
+                  <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); setPage(1); }}>{label}</button>
+                ))}
+              </div>
+              {filteredUsers.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "var(--color-ink-muted)" }}>Пользователи не найдены</div>
+              ) : (
+                <div className="users-table-scroll">
+                  <table>
+                    <thead><tr><th>Пользователь</th><th>Роль</th><th>Телефон</th><th>Статус</th><th>Действия</th></tr></thead>
+                    <tbody>
+                      {visibleUsers.map((user) => (
+                        <tr key={user.id}>
+                          <td><div className="users-person"><UserAvatar user={user} /><div><strong>{user.fullName}</strong>{user.forcePasswordChange && <span title="Ожидает смены пароля">· временный пароль</span>}</div></div></td>
+                          <td><span className={`user-role ${ROLE_CLASS_NAME[user.role] ?? ""}`}>{ROLE_LABEL[user.role]}</span></td>
+                          <td className="nowrap">{user.phone}</td>
+                          <td><span className={`user-status ${user.isActive ? "active" : "inactive"}`}>{user.isActive ? "Активен" : "Неактивен"}</span></td>
+                          <td>
+                            <div className="user-row-actions">
+                              <button type="button" aria-label="Просмотреть" onClick={() => setViewUser(user)}><Eye size={14} /></button>
+                              <button
+                                type="button"
+                                aria-label="Изменить роль"
+                                title={user.id === currentUser?.id ? "Нельзя изменить свою роль" : "Изменить роль"}
+                                disabled={user.id === currentUser?.id}
+                                onClick={() => openRoleChange(user)}
+                              >
+                                <ShieldCheck size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Сгенерировать новый пароль"
+                                title="Сгенерировать новый временный пароль"
+                                disabled={busyUserId === user.id}
+                                onClick={() => void handleRegeneratePassword(user)}
+                              >
+                                <KeyRound size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Изменить статус"
+                                title={user.id === currentUser?.id ? "Нельзя изменить статус своей учётной записи" : "Изменить статус"}
+                                disabled={user.id === currentUser?.id || busyUserId === user.id}
+                                onClick={() => void toggleStatus(user)}
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="users-pagination">
+                <span>Показано {visibleUsers.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filteredUsers.length)} из {filteredUsers.length} пользователей</span>
+                <div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>‹</button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} className={page === index + 1 ? "active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>›</button></div>
+                <label>
+                  Показывать по:{" "}
+                  <CustomSelect
+                    size="sm"
+                    value={String(pageSize)}
+                    onValueChange={(value) => { setPageSize(Number(value)); setPage(1); }}
+                    options={[{ value: "10", label: "10" }, { value: "25", label: "25" }, { value: "50", label: "50" }]}
+                  />
+                </label>
               </div>
             </Card>
-          </aside>
-        </div>
+
+            <aside className="users-aside">
+              <Card className="users-filter-card">
+                <h2>Фильтры</h2>
+                <FilterLabel label="Поиск"><div className="users-filter-search"><Search size={13} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя или телефон..." /></div></FilterLabel>
+                <FilterLabel label="Роль"><CustomSelect size="sm" fullWidth value={roleFilter} onValueChange={(value) => { setRoleFilter(value); setPage(1); }} options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS.map((o) => ({ value: mapToBackendRoleReverseLabel(o.value), label: o.label }))]} /></FilterLabel>
+                <div className="users-filter-actions"><Button size="sm" onClick={() => setPage(1)}>Применить</Button><Button size="sm" variant="secondary" onClick={resetFilters}>Сбросить</Button></div>
+              </Card>
+
+              <Card className="users-role-card">
+                <h2>Пользователей по ролям</h2>
+                <div className="users-role-content">
+                  <div className="users-role-donut" aria-label="Распределение пользователей по ролям" />
+                  <ul>
+                    {roleDistribution.map((entry) => (
+                      <li key={entry.role}><i className={ROLE_CLASS_NAME[entry.role]} />{entry.label} <b>{entry.count} ({entry.percent.toFixed(1)}%)</b></li>
+                    ))}
+                  </ul>
+                </div>
+              </Card>
+            </aside>
+          </div>
+        )}
       </div>
 
-      <UserModal mode={modalMode} selected={selected} form={form} error={formError} setForm={setForm} onSubmit={submitUser} onClose={() => setModalMode(null)} />
+      <CreateUserModal
+        open={createOpen}
+        form={createForm}
+        error={createError}
+        submitting={creating}
+        setForm={setCreateForm}
+        onSubmit={submitCreate}
+        onClose={() => setCreateOpen(false)}
+      />
+
+      <ViewUserModal user={viewUser} onClose={() => setViewUser(null)} />
+
+      <RoleChangeModal
+        user={roleTarget}
+        value={roleChangeValue}
+        error={roleChangeError}
+        submitting={savingRole}
+        onChange={setRoleChangeValue}
+        onSubmit={submitRoleChange}
+        onClose={() => setRoleTarget(null)}
+      />
+
+      <TemporaryPasswordModal
+        result={revealedPassword}
+        copyConfirmed={copyConfirmed}
+        onCopy={() => setCopyConfirmed(true)}
+        onClose={() => setRevealedPassword(null)}
+      />
     </AppLayout>
   );
 }
@@ -276,7 +433,7 @@ function UserKpi({ icon: Icon, tone, label, value, suffix }: { icon: typeof User
   return <Card className="user-kpi"><span className={`user-kpi-icon ${tone}`}><Icon size={20} /></span><div><p>{label}</p><strong>{value}</strong><span>{suffix}</span></div></Card>;
 }
 
-function UserAvatar({ user }: { user: UserAccount }) {
+function UserAvatar({ user }: { user: AppUser }) {
   const src = resolvePersonPhoto(user.fullName);
   return src ? <img className="users-row-avatar" src={src} alt={user.fullName} /> : <Avatar name={user.fullName} size="sm" />;
 }
@@ -285,18 +442,139 @@ function FilterLabel({ label, children }: { label: string; children: React.React
   return <label className="users-filter-label"><span>{label}</span>{children}</label>;
 }
 
-function UserModal({ mode, selected, form, error, setForm, onSubmit, onClose }: { mode: "add" | "edit" | "view" | null; selected: UserAccount | null; form: typeof EMPTY_FORM; error: string; setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>; onSubmit: (event: FormEvent) => void; onClose: () => void }) {
-  const readOnly = mode === "view";
-  return <Modal open={mode !== null} onClose={onClose} title={mode === "add" ? "Добавить пользователя" : mode === "edit" ? "Редактировать пользователя" : "Профиль пользователя"} description={selected ? `@${selected.login}` : "Создайте новую учётную запись"} size="md">
-    <form className="users-modal-form" onSubmit={onSubmit}>
-      <label><span>ФИО</span><input readOnly={readOnly} value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder="Имя и фамилия" /></label>
-      <label><span>Логин</span><input readOnly={readOnly} value={form.login} onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))} placeholder="username" /></label>
-      <label><span>Email</span><input readOnly={readOnly} type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@binosoz.tj" /></label>
-      <label><span>Телефон</span><input readOnly={readOnly} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+992 00 000 00 00" /></label>
-      <label><span>Роль</span><CustomSelect fullWidth value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as UserRole }))} disabled={readOnly} options={ROLE_OPTIONS} /></label>
-      <label><span>Статус</span><CustomSelect fullWidth value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as UserAccountStatus }))} disabled={readOnly} options={[{ value: "active", label: "Активен" }, { value: "inactive", label: "Неактивен" }, { value: "blocked", label: "Заблокирован" }]} /></label>
-      {error && <p className="users-modal-error" role="alert">{error}</p>}
-      <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={onClose}>{readOnly ? "Закрыть" : "Отмена"}</Button>{!readOnly && <Button type="submit">{mode === "add" ? "Добавить" : "Сохранить"}</Button>}</div>
-    </form>
-  </Modal>;
+function CreateUserModal({
+  open,
+  form,
+  error,
+  submitting,
+  setForm,
+  onSubmit,
+  onClose,
+}: {
+  open: boolean;
+  form: typeof CREATE_FORM_INITIAL;
+  error: string;
+  submitting: boolean;
+  setForm: React.Dispatch<React.SetStateAction<typeof CREATE_FORM_INITIAL>>;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title="Добавить пользователя" description="Пароль будет сгенерирован автоматически" size="md">
+      <form className="users-modal-form" onSubmit={onSubmit}>
+        <label><span>ФИО</span><input value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder="Имя и фамилия" autoFocus /></label>
+        <label><span>Телефон</span><input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+992 00 000 00 00" autoComplete="tel" /></label>
+        <label><span>Роль</span><CustomSelect fullWidth value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as BackendRole }))} options={ROLE_OPTIONS} /></label>
+        {error && <p className="users-modal-error" role="alert">{error}</p>}
+        <div className="users-modal-actions">
+          <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button type="submit" disabled={submitting}>{submitting ? "Создание..." : "Создать"}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ViewUserModal({ user, onClose }: { user: AppUser | null; onClose: () => void }) {
+  return (
+    <Modal open={user !== null} onClose={onClose} title="Профиль пользователя" description={user?.phone} size="sm">
+      {user && (
+        <div className="users-modal-form">
+          <label><span>ФИО</span><input readOnly value={user.fullName} /></label>
+          <label><span>Телефон</span><input readOnly value={user.phone} /></label>
+          <label><span>Роль</span><input readOnly value={ROLE_LABEL[user.role]} /></label>
+          <label><span>Статус</span><input readOnly value={user.isActive ? "Активен" : "Неактивен"} /></label>
+          <label><span>Смена пароля при входе</span><input readOnly value={user.forcePasswordChange ? "Требуется" : "Не требуется"} /></label>
+          <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={onClose}>Закрыть</Button></div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function RoleChangeModal({
+  user,
+  value,
+  error,
+  submitting,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  user: AppUser | null;
+  value: BackendRole;
+  error: string;
+  submitting: boolean;
+  onChange: (value: BackendRole) => void;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open={user !== null} onClose={onClose} title="Изменить роль" description={user?.fullName} size="sm">
+      <form className="users-modal-form" onSubmit={onSubmit}>
+        <label><span>Новая роль</span><CustomSelect fullWidth value={value} onValueChange={(v) => onChange(v as BackendRole)} options={ROLE_OPTIONS} /></label>
+        {error && <p className="users-modal-error" role="alert">{error}</p>}
+        <div className="users-modal-actions">
+          <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button type="submit" disabled={submitting}>{submitting ? "Сохранение..." : "Сохранить"}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function TemporaryPasswordModal({
+  result,
+  copyConfirmed,
+  onCopy,
+  onClose,
+}: {
+  result: CreatedUser | null;
+  copyConfirmed: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(result?.temporaryPassword ?? "");
+    } catch {
+      // clipboard API unavailable — the password is still selectable/visible in the field below
+    }
+    onCopy();
+  }
+
+  return (
+    <Modal
+      open={result !== null}
+      onClose={copyConfirmed ? onClose : () => {}}
+      title="Временный пароль создан"
+      description={result ? `${result.user.fullName} — ${result.user.phone}` : undefined}
+      size="sm"
+    >
+      {result && (
+        <div className="users-modal-form">
+          <div className="flex items-start gap-2 rounded-[10px] bg-[#FFF4E5] p-3 text-sm text-ink-secondary">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>Пароль показывается только один раз. Передайте его пользователю сейчас — после закрытия этого окна увидеть его снова будет нельзя.</span>
+          </div>
+          <label>
+            <span>Временный пароль</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input readOnly value={result.temporaryPassword} style={{ fontFamily: "monospace", fontSize: 16, letterSpacing: 1 }} onFocus={(e) => e.target.select()} />
+              <Button type="button" variant="secondary" onClick={() => void handleCopy()}><Copy size={14} /></Button>
+            </div>
+          </label>
+          <label className="users-filter-search" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={copyConfirmed} onChange={onCopy} />
+            <span>Я сохранил(а) или передал(а) пароль</span>
+          </label>
+          <div className="users-modal-actions">
+            <Button type="button" disabled={!copyConfirmed} onClick={onClose}>
+              {copyConfirmed ? <><Check size={14} /> Закрыть</> : "Закрыть"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
 }

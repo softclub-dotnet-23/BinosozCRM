@@ -42,7 +42,15 @@ builder.Host.UseSerilog((context, configuration) => configuration
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddControllers();
+// No JsonStringEnumConverter meant every enum field (Role, PayRateType,
+// ConstructionObjectStatus, WorkOrderStatus, PayrollEntryStatus, ...) was
+// serializing/deserializing as its raw underlying int — invisible until now
+// because no test in this codebase exercises real HTTP JSON (integration
+// tests call handlers directly, in-process). Found while wiring the first
+// enum-typed request DTO a real frontend actually calls
+// (Api/Contracts/Users/CreateUserRequest.cs's Role field).
+builder.Services.AddControllers()
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 
 // Swagger/OpenAPI — dev-only interactive API explorer. Lets anyone on the
 // team browse every controller's endpoints (Shahrom's Zone B + Ahmad's
@@ -126,7 +134,6 @@ builder.Services.AddScoped<IMaterialShortageNotifier, SignalRMaterialShortageNot
 builder.Services.AddScoped<IOverdueNotifier, SignalROverdueNotifier>();
 builder.Services.AddScoped<IPasswordResetDeliveryService, LoggingPasswordResetDeliveryService>();
 
-builder.Services.AddScoped<PayrollDraftGenerator>();
 builder.Services.AddHostedService<PayrollDraftBackgroundService>();
 builder.Services.AddHostedService<OverdueCheckBackgroundService>();
 

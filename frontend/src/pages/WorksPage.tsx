@@ -1,53 +1,48 @@
-import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, ClipboardList, Plus } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, ClipboardList, Loader2, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/StatusBadge";
+import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
-import { Pagination } from "../components/ui/Pagination";
-import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { WorksTable } from "../components/works/WorksTable";
-import { AddWorkModal } from "../components/works/AddWorkModal";
-import { EditWorkModal } from "../components/works/EditWorkModal";
-import { ProgressUpdateModal } from "../components/works/ProgressUpdateModal";
-import { WorkDetailsDrawer } from "../components/works/WorkDetailsDrawer";
-import { WorkSummaryDonut, WorkSummaryLegend } from "../components/works/WorkSummaryDonut";
-import { WorkFiltersCard, DEFAULT_WORK_FILTERS, type WorkFiltersState } from "../components/works/WorkFilters";
-import { CriticalWorksCard } from "../components/works/CriticalWorksCard";
-import { WorksBySections } from "../components/works/WorksBySections";
-import { ExportDropdown } from "../components/works/ExportDropdown";
-import { WorkDynamicsChart } from "../components/charts/WorkDynamicsChart";
-import type { WorkActionKind } from "../components/works/WorkActionMenu";
-import { WORK_SECTIONS } from "../data/mockWorks";
-import { mockWorkDynamics } from "../data/mockWorkDynamics";
-import { worksRepository, objectsRepository } from "../data/repositories";
-import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
-import { usePersistentState } from "../hooks/usePersistentState";
-import { computeCriticalWorks, computeSectionBreakdown, computeWorkAnalytics } from "../utils/workAnalytics";
+import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
-import type { Work, WorkStatus } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { ApiError, NetworkError } from "../api/apiClient";
+import {
+  acceptWorkOrder,
+  assignWorkOrder,
+  closeWorkOrder,
+  createWorkOrder,
+  getWorkOrderLog,
+  listWorkOrders,
+  rejectWorkOrder,
+  type TaskLogEntry,
+  type WorkOrder,
+  type WorkOrderStatus,
+} from "../api/workOrdersApi";
+import { listObjects, type ConstructionObject } from "../api/objectsApi";
+import { listBrigades, type Brigade } from "../api/brigadesApi";
+import { formatCurrency } from "../utils/format";
 import BrigadirAssignmentsPage from "./BrigadirAssignmentsPage";
 
-const TODAY_ISO = "2026-07-17";
-
-type TabKey = "all" | "in_progress" | "completed" | "overdue";
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "all", label: "Все работы" },
-  { key: "in_progress", label: "В процессе" },
-  { key: "completed", label: "Завершенные" },
-  { key: "overdue", label: "Просроченные" },
-];
-
-function matchesTab(status: WorkStatus, tab: TabKey): boolean {
-  if (tab === "all") return true;
-  if (tab === "in_progress") return status === "in_progress";
-  if (tab === "completed") return status === "completed";
-  return status === "overdue";
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) return error.message || fallback;
+  return fallback;
 }
+
+const STATUS_LABEL: Record<WorkOrderStatus, string> = {
+  New: "Новый", Assigned: "Назначен", InProgress: "Выполняется", OnReview: "На проверке", Accepted: "Принят", Rejected: "Отклонён", Closed: "Закрыт",
+};
+const STATUS_TONE: Record<WorkOrderStatus, "blue" | "green" | "orange" | "purple" | "red"> = {
+  New: "blue", Assigned: "blue", InProgress: "orange", OnReview: "purple", Accepted: "green", Rejected: "red", Closed: "green",
+};
+
+const CREATE_FORM_INITIAL = { objectId: "", brigadeId: "", title: "", unit: "", plannedQty: "", unitPrice: "", dueDate: "" };
 
 export default function WorksPage() {
   const { user } = useAuth();
@@ -58,509 +53,298 @@ export default function WorksPage() {
 function CompanyWorksPage() {
   const { showToast } = useToast();
 
-  const [works, setWorks] = useRepositoryState(worksRepository);
-  const mockObjects = useRepositorySnapshot(objectsRepository);
-  const [loading] = useState(false);
-  const [search, setSearch] = usePersistentState("filters.works.search", "");
-  const [tab, setTab] = usePersistentState<TabKey>("filters.works.tab", "all");
-  const [filters, setFilters] = usePersistentState<WorkFiltersState>("filters.works.filters", DEFAULT_WORK_FILTERS);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [objects, setObjects] = useState<ConstructionObject[]>([]);
+  const [brigades, setBrigades] = useState<Brigade[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderStatus>("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Work | null>(null);
-  const [drawerTarget, setDrawerTarget] = useState<Work | null>(null);
-  const [progressTarget, setProgressTarget] = useState<Work | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Work | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(CREATE_FORM_INITIAL);
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const analytics = useMemo(() => computeWorkAnalytics(works), [works]);
-  const sectionBreakdown = useMemo(() => computeSectionBreakdown(works), [works]);
-  const criticalWorks = useMemo(() => computeCriticalWorks(works, TODAY_ISO, 3), [works]);
+  const [rejectTarget, setRejectTarget] = useState<WorkOrder | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
+  const [rejecting, setRejecting] = useState(false);
 
-  const nextCode = useMemo(() => {
-    const n = works.length + 1;
-    return `${n}.1`;
-  }, [works.length]);
+  const [logTarget, setLogTarget] = useState<WorkOrder | null>(null);
+  const [logEntries, setLogEntries] = useState<TaskLogEntry[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
 
-  const filteredWorks = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return works.filter((w) => {
-      if (!matchesTab(w.status, tab)) return false;
-      if (query) {
-        const haystack = `${w.title} ${w.code} ${w.objectName} ${w.sectionName} ${w.responsible.name} ${w.brigadeName}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (filters.status !== "all" && w.status !== filters.status) return false;
-      if (filters.objectId !== "all" && w.objectId !== filters.objectId) return false;
-      if (filters.sectionId !== "all" && w.sectionId !== filters.sectionId) return false;
-      if (filters.responsible !== "all" && w.responsible.name !== filters.responsible) return false;
-      if (filters.brigadeId !== "all" && w.brigadeId !== filters.brigadeId) return false;
-      if (filters.dateFrom && w.plannedEnd < filters.dateFrom) return false;
-      if (filters.dateTo && w.plannedStart > filters.dateTo) return false;
-      return true;
-    });
-  }, [works, tab, search, filters]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredWorks.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageRows = filteredWorks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const allSelected = pageRows.length > 0 && pageRows.every((w) => selectedIds.has(w.id));
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
-
-  function handleTabChange(next: TabKey) {
-    setTab(next);
-    setPage(1);
-  }
-
-  function updateFilters(next: WorkFiltersState) {
-    setFilters(next);
-    setPage(1);
-  }
-
-  function handleResetFilters() {
-    setFilters(DEFAULT_WORK_FILTERS);
-    setSearch("");
-    setTab("all");
-    setPage(1);
-  }
-
-  function toggleRow(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (allSelected) {
-        pageRows.forEach((w) => next.delete(w.id));
-      } else {
-        pageRows.forEach((w) => next.add(w.id));
-      }
-      return next;
-    });
-  }
-
-  function handleComplete(id: string) {
-    setWorks((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              status: "completed",
-              progress: 100,
-              actualStart: w.actualStart ?? w.plannedStart,
-              actualEnd: w.actualEnd ?? TODAY_ISO,
-              progressHistory: [
-                ...w.progressHistory,
-                { id: `${id}-hist-${w.progressHistory.length + 1}`, date: TODAY_ISO, progress: 100, note: "Работа завершена", author: "Садди Имомов" },
-              ],
-            }
-          : w,
-      ),
-    );
-    setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "completed", progress: 100 } : prev));
-    showToast("Работа завершена");
-  }
-
-  function handlePause(id: string) {
-    setWorks((prev) => prev.map((w) => (w.id === id ? { ...w, status: "paused" } : w)));
-    setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status: "paused" } : prev));
-    showToast("Работа приостановлена", "info");
-  }
-
-  function handleChangeStatus(id: string, status: WorkStatus) {
-    setWorks((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              status,
-              progress: status === "completed" ? 100 : w.progress,
-              actualEnd: status === "completed" ? w.actualEnd ?? TODAY_ISO : w.actualEnd,
-            }
-          : w,
-      ),
-    );
-    setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status, progress: status === "completed" ? 100 : prev.progress } : prev));
-    showToast("Статус обновлён");
-  }
-
-  function handleUpdateProgress(id: string, progress: number, note: string) {
-    setWorks((prev) =>
-      prev.map((w) => {
-        if (w.id !== id) return w;
-        const becomesCompleted = progress >= 100 && w.status !== "completed";
-        return {
-          ...w,
-          progress,
-          status: becomesCompleted ? "completed" : w.status,
-          actualStart: w.actualStart ?? TODAY_ISO,
-          actualEnd: becomesCompleted ? TODAY_ISO : w.actualEnd,
-          progressHistory: [
-            ...w.progressHistory,
-            {
-              id: `${id}-hist-${w.progressHistory.length + 1}`,
-              date: TODAY_ISO,
-              progress,
-              note: note || "Обновление прогресса",
-              author: "Садди Имомов",
-            },
-          ],
-        };
-      }),
-    );
-    setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, progress } : prev));
-    showToast("Прогресс обновлён");
-  }
-
-  function handleAddComment(id: string, text: string) {
-    setWorks((prev) =>
-      prev.map((w) =>
-        w.id === id
-          ? {
-              ...w,
-              comments: [...w.comments, { id: `${id}-c-${w.comments.length + 1}`, author: "Садди Имомов", text, date: TODAY_ISO }],
-            }
-          : w,
-      ),
-    );
-    setDrawerTarget((prev) =>
-      prev && prev.id === id
-        ? { ...prev, comments: [...prev.comments, { id: `${id}-c-${prev.comments.length + 1}`, author: "Садди Имомов", text, date: TODAY_ISO }] }
-        : prev,
-    );
-  }
-
-  function handleDuplicate(work: Work) {
-    const suffix = Date.now().toString().slice(-4);
-    const duplicated: Work = {
-      ...work,
-      id: `work-copy-${suffix}`,
-      code: `${work.code}-к${suffix.slice(-2)}`,
-      title: `${work.title} (копия)`,
-      status: "planned",
-      progress: 0,
-      actualStart: null,
-      actualEnd: null,
-      attachments: [],
-      comments: [],
-      progressHistory: [{ id: `work-copy-${suffix}-hist-1`, date: TODAY_ISO, progress: 0, note: "Работа дублирована", author: "Садди Имомов" }],
-    };
-    setWorks((prev) => [duplicated, ...prev]);
-    showToast("Работа дублирована");
-  }
-
-  function handleSaveWork(work: Work) {
-    const isEdit = Boolean(editTarget);
-    setWorks((prev) => {
-      const exists = prev.some((w) => w.id === work.id);
-      return exists ? prev.map((w) => (w.id === work.id ? work : w)) : [work, ...prev];
-    });
-    setFormOpen(false);
-    setEditTarget(null);
-    showToast(isEdit ? "Работа обновлена" : "Работа добавлена");
-  }
-
-  function handleDeleteConfirmed() {
-    if (!deleteTarget) return;
-    setWorks((prev) => prev.filter((w) => w.id !== deleteTarget.id));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(deleteTarget.id);
-      return next;
-    });
-    if (drawerTarget?.id === deleteTarget.id) setDrawerTarget(null);
-    showToast("Работа удалена", "info");
-    setDeleteTarget(null);
-  }
-
-  function handleBulkComplete() {
-    setWorks((prev) => prev.map((w) => (selectedIds.has(w.id) ? { ...w, status: "completed", progress: 100 } : w)));
-    showToast(`Завершено работ: ${selectedIds.size}`);
-    setSelectedIds(new Set());
-  }
-
-  function handleBulkDelete() {
-    setWorks((prev) => prev.filter((w) => !selectedIds.has(w.id)));
-    showToast(`Удалено работ: ${selectedIds.size}`, "info");
-    setSelectedIds(new Set());
-  }
-
-  function handleWorkAction(action: WorkActionKind, work: Work) {
-    switch (action) {
-      case "open":
-        setDrawerTarget(work);
-        break;
-      case "edit":
-      case "assignResponsible":
-      case "assignBrigade":
-        setEditTarget(work);
-        setFormOpen(true);
-        break;
-      case "progress":
-        setProgressTarget(work);
-        break;
-      case "duplicate":
-        handleDuplicate(work);
-        break;
-      case "complete":
-        handleComplete(work.id);
-        break;
-      case "pause":
-        handlePause(work.id);
-        break;
-      case "delete":
-        setDeleteTarget(work);
-        break;
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [ordersResult, objectsResult, brigadesResult] = await Promise.all([
+        listWorkOrders(1, 100),
+        listObjects(1, 100),
+        listBrigades(1, 100),
+      ]);
+      setWorkOrders(ordersResult.items);
+      setObjects(objectsResult.items);
+      setBrigades(brigadesResult.items);
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить наряды"));
+      setLoadState("error");
     }
   }
 
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const objectNameById = useMemo(() => new Map(objects.map((o) => [o.id, o.name])), [objects]);
+  const brigadeNameById = useMemo(() => new Map(brigades.map((b) => [b.id, b.name])), [brigades]);
+
+  const filteredOrders = useMemo(
+    () => (statusFilter === "all" ? workOrders : workOrders.filter((w) => w.status === statusFilter)),
+    [workOrders, statusFilter],
+  );
+
+  const kpis = useMemo(() => ({
+    total: workOrders.length,
+    inProgress: workOrders.filter((w) => w.status === "InProgress" || w.status === "Assigned").length,
+    onReview: workOrders.filter((w) => w.status === "OnReview").length,
+    closed: workOrders.filter((w) => w.status === "Closed").length,
+  }), [workOrders]);
+
+  function openCreate() {
+    setCreateForm({ ...CREATE_FORM_INITIAL, objectId: objects[0]?.id ?? "", brigadeId: brigades[0]?.id ?? "" });
+    setCreateError("");
+    setCreateOpen(true);
+  }
+
+  async function submitCreate(event: FormEvent) {
+    event.preventDefault();
+    if (creating) return;
+    const { objectId, brigadeId, title, unit, plannedQty, unitPrice } = createForm;
+    if (!objectId || !brigadeId || !title.trim() || !unit.trim() || !plannedQty || !unitPrice) {
+      setCreateError("Заполните объект, бригаду, название, единицу, объём и цену");
+      return;
+    }
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createWorkOrder({
+        objectId,
+        brigadeId,
+        title: title.trim(),
+        unit: unit.trim(),
+        plannedQty: Number(plannedQty),
+        unitPrice: Number(unitPrice),
+        dueDate: createForm.dueDate || undefined,
+      });
+      setWorkOrders((current) => [created, ...current]);
+      setCreateOpen(false);
+      showToast("Наряд создан");
+    } catch (error) {
+      setCreateError(describeError(error, "Не удалось создать наряд"));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleAssign(order: WorkOrder) {
+    if (busyId) return;
+    setBusyId(order.id);
+    try {
+      const updated = await assignWorkOrder(order.id);
+      setWorkOrders((current) => current.map((w) => (w.id === updated.id ? updated : w)));
+      showToast("Наряд назначен бригаде");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось назначить наряд"), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleAccept(order: WorkOrder) {
+    if (busyId) return;
+    setBusyId(order.id);
+    try {
+      const updated = await acceptWorkOrder(order.id);
+      setWorkOrders((current) => current.map((w) => (w.id === updated.id ? updated : w)));
+      showToast("Наряд принят");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось принять наряд"), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleClose(order: WorkOrder) {
+    if (busyId) return;
+    setBusyId(order.id);
+    try {
+      const updated = await closeWorkOrder(order.id);
+      setWorkOrders((current) => current.map((w) => (w.id === updated.id ? updated : w)));
+      showToast("Наряд закрыт");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось закрыть наряд"), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function openReject(order: WorkOrder) {
+    setRejectTarget(order);
+    setRejectReason("");
+    setRejectError("");
+  }
+
+  async function submitReject(event: FormEvent) {
+    event.preventDefault();
+    if (!rejectTarget || rejecting) return;
+    if (!rejectReason.trim()) {
+      setRejectError("Укажите причину отклонения");
+      return;
+    }
+    setRejecting(true);
+    setRejectError("");
+    try {
+      const updated = await rejectWorkOrder(rejectTarget.id, rejectReason.trim());
+      setWorkOrders((current) => current.map((w) => (w.id === updated.id ? updated : w)));
+      setRejectTarget(null);
+      showToast("Наряд отклонён");
+    } catch (error) {
+      setRejectError(describeError(error, "Не удалось отклонить наряд"));
+    } finally {
+      setRejecting(false);
+    }
+  }
+
+  async function openLog(order: WorkOrder) {
+    setLogTarget(order);
+    setLogEntries([]);
+    setLogLoading(true);
+    try {
+      setLogEntries(await getWorkOrderLog(order.id));
+    } catch {
+      // log is supplementary — the drawer still shows the order's own fields without it
+    } finally {
+      setLogLoading(false);
+    }
+  }
+
+  const columns: DataTableColumn<WorkOrder>[] = [
+    { key: "code", header: "Наряд", render: (row) => <div><span className="font-semibold text-ink">{row.code}</span><div className="text-xs text-ink-muted">{row.title}</div></div> },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
+    { key: "brigade", header: "Бригада", render: (row) => <span className="text-ink-secondary">{brigadeNameById.get(row.brigadeId) ?? "—"}</span> },
+    { key: "volume", header: "Объём", render: (row) => <span className="text-ink-secondary">{row.plannedQty} {row.unit}</span> },
+    { key: "price", header: "Сумма", render: (row) => <span className="tabular text-ink">{formatCurrency(row.plannedQty * row.unitPrice)}</span> },
+    { key: "status", header: "Статус", render: (row) => <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge> },
+    {
+      key: "actions",
+      header: "Действия",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (row) => (
+        <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="secondary" onClick={() => void openLog(row)}>История</Button>
+          {row.status === "New" && <Button size="sm" disabled={busyId === row.id} onClick={() => void handleAssign(row)}>Назначить</Button>}
+          {row.status === "OnReview" && (
+            <>
+              <Button size="sm" disabled={busyId === row.id} onClick={() => void handleAccept(row)}>Принять</Button>
+              <Button size="sm" variant="danger" disabled={busyId === row.id} onClick={() => openReject(row)}>Отклонить</Button>
+            </>
+          )}
+          {row.status === "Accepted" && <Button size="sm" disabled={busyId === row.id} onClick={() => void handleClose(row)}>Закрыть</Button>}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <AppLayout
-      title="Работы"
-      subtitle="Планирование, контроль и отслеживание выполнения работ"
-      search={{ value: search, onChange: handleSearchChange, placeholder: "Поиск по работам..." }}
-      action={
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => {
-              setEditTarget(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus size={15} /> Добавить работу
-          </Button>
-          <ExportDropdown />
-        </div>
-      }
+      title="Наряды"
+      subtitle="Наряды на работы для бригад"
+      action={<Button onClick={openCreate} disabled={objects.length === 0 || brigades.length === 0}><Plus size={15} /> Создать наряд</Button>}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Всего работ" value={String(analytics.total)} icon={ClipboardList} tone="blue" footer="Включая подзадачи" />
-        <MetricCard
-          label="Завершено"
-          value={String(analytics.completed)}
-          icon={CheckCircle2}
-          tone="green"
-          footer={`${analytics.completedPercent}% от общего объёма`}
-        />
-        <MetricCard
-          label="В процессе"
-          value={String(analytics.inProgress)}
-          icon={Clock}
-          tone="orange"
-          footer={`${analytics.inProgressPercent}% от общего объёма`}
-        />
-        <MetricCard
-          label="Просрочено"
-          value={String(analytics.overdue)}
-          icon={AlertTriangle}
-          tone="red"
-          footer={`${analytics.overduePercent}% от общего объёма`}
-        />
+        <MetricCard label="Всего нарядов" value={String(kpis.total)} icon={ClipboardList} tone="orange" footer="Все наряды" />
+        <MetricCard label="В работе" value={String(kpis.inProgress)} icon={ClipboardList} tone="blue" footer="Назначены или выполняются" />
+        <MetricCard label="На проверке" value={String(kpis.onReview)} icon={ClipboardList} tone="purple" footer="Ждут решения" />
+        <MetricCard label="Закрыты" value={String(kpis.closed)} icon={ClipboardList} tone="green" footer="Завершённые наряды" />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_260px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-              <div className="flex flex-wrap gap-2">
-                {TABS.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => handleTabChange(t.key)}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                      tab === t.key ? "bg-primary text-white" : "bg-[#F5F5F4] text-ink-secondary hover:bg-[#ECECEB]"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
 
-              <div className="flex flex-wrap items-center gap-2">
-                <CustomSelect
-                  size="sm"
-                  searchable
-                  aria-label="Объект"
-                  value={filters.objectId}
-                  onValueChange={(v) => updateFilters({ ...filters, objectId: v })}
-                  options={[{ value: "all", label: "Все объекты" }, ...mockObjects.map((o) => ({ value: o.id, label: o.name }))]}
-                />
-                <CustomSelect
-                  size="sm"
-                  aria-label="Раздел"
-                  value={filters.sectionId}
-                  onValueChange={(v) => updateFilters({ ...filters, sectionId: v as WorkFiltersState["sectionId"] })}
-                  options={[{ value: "all", label: "Все разделы" }, ...WORK_SECTIONS.map((s) => ({ value: s.id, label: s.name }))]}
-                />
-                <CustomSelect
-                  size="sm"
-                  aria-label="Статус"
-                  value={filters.status}
-                  onValueChange={(v) => updateFilters({ ...filters, status: v as WorkFiltersState["status"] })}
-                  options={[
-                    { value: "all", label: "Статус: Все" },
-                    { value: "completed", label: "Завершено" },
-                    { value: "in_progress", label: "В процессе" },
-                    { value: "overdue", label: "Просрочено" },
-                    { value: "planned", label: "Запланировано" },
-                  ]}
-                />
-              </div>
-            </div>
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-            {selectedIds.size > 0 && (
-              <div className="mx-5 mt-4 flex items-center justify-between gap-3 rounded-xl bg-primary-soft px-4 py-2.5 sm:mx-6">
-                <p className="text-sm font-medium text-primary">Выбрано работ: {selectedIds.size}</p>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="secondary" onClick={handleBulkComplete}>
-                    Завершить
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={handleBulkDelete}>
-                    Удалить
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4">
-              {pageRows.length > 0 || loading ? (
-                <WorksTable
-                  works={pageRows}
-                  loading={loading}
-                  selectedIds={selectedIds}
-                  allSelected={allSelected}
-                  onToggleRow={toggleRow}
-                  onToggleAll={toggleAll}
-                  onRowClick={(work) => setDrawerTarget(work)}
-                  onAction={handleWorkAction}
-                  todayIso={TODAY_ISO}
-                />
-              ) : (
-                <EmptyState
-                  icon={ClipboardList}
-                  title="Работы не найдены"
-                  description="Измените параметры поиска или сбросьте фильтры"
-                  action={
-                    <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                      Сбросить фильтры
-                    </Button>
-                  }
-                />
-              )}
-            </div>
-
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              total={filteredWorks.length}
-              itemLabel="работ"
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
+      {loadState === "ready" && (
+        <Card className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+            <h2 className="text-[17px] font-bold text-ink">Список нарядов</h2>
+            <CustomSelect
+              size="sm"
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+              options={[{ value: "all", label: "Все статусы" }, ...(Object.keys(STATUS_LABEL) as WorkOrderStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
             />
-          </Card>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card className="flex min-w-0 flex-col p-5 sm:p-6">
-              <h2 className="text-[17px] font-bold text-ink">Динамика выполнения работ</h2>
-              <div className="mt-4 flex-1">
-                <WorkDynamicsChart data={mockWorkDynamics} />
-              </div>
-            </Card>
-
-            <WorksBySections data={sectionBreakdown} />
           </div>
-        </div>
+          <div className="mt-4">
+            {filteredOrders.length > 0 ? (
+              <DataTable columns={columns} rows={filteredOrders} rowKey={(row) => row.id} />
+            ) : (
+              <EmptyState icon={ClipboardList} title="Наряды не найдены" description="Создайте первый наряд" />
+            )}
+          </div>
+        </Card>
+      )}
 
-        <div className="flex flex-col gap-4">
-          <Card className="p-5 sm:p-6">
-            <h2 className="text-[17px] font-bold text-ink">Сводка по работам</h2>
-            <div className="mt-4 flex flex-col items-center gap-5">
-              <WorkSummaryDonut analytics={analytics} />
-              <WorkSummaryLegend analytics={analytics} />
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Создать наряд" size="md">
+        <form className="users-modal-form" onSubmit={submitCreate}>
+          <label><span>Объект</span><CustomSelect fullWidth value={createForm.objectId} onValueChange={(v) => setCreateForm((f) => ({ ...f, objectId: v }))} options={objects.map((o) => ({ value: o.id, label: o.name }))} /></label>
+          <label><span>Бригада</span><CustomSelect fullWidth value={createForm.brigadeId} onValueChange={(v) => setCreateForm((f) => ({ ...f, brigadeId: v }))} options={brigades.map((b) => ({ value: b.id, label: b.name }))} /></label>
+          <label><span>Название</span><input value={createForm.title} onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))} placeholder="Штукатурка стен" autoFocus /></label>
+          <label><span>Единица измерения</span><input value={createForm.unit} onChange={(e) => setCreateForm((f) => ({ ...f, unit: e.target.value }))} placeholder="м²" /></label>
+          <label><span>Плановый объём</span><input type="number" min="0" step="0.01" value={createForm.plannedQty} onChange={(e) => setCreateForm((f) => ({ ...f, plannedQty: e.target.value }))} /></label>
+          <label><span>Цена за единицу</span><input type="number" min="0" step="0.01" value={createForm.unitPrice} onChange={(e) => setCreateForm((f) => ({ ...f, unitPrice: e.target.value }))} /></label>
+          <label><span>Срок</span><input type="date" value={createForm.dueDate} onChange={(e) => setCreateForm((f) => ({ ...f, dueDate: e.target.value }))} /></label>
+          {createError && <p className="users-modal-error" role="alert">{createError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={creating}>{creating ? "Создание..." : "Создать"}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={rejectTarget !== null} onClose={() => setRejectTarget(null)} title="Отклонить наряд" description={rejectTarget?.code} size="sm">
+        <form className="users-modal-form" onSubmit={submitReject}>
+          <label><span>Причина</span><input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} autoFocus /></label>
+          {rejectError && <p className="users-modal-error" role="alert">{rejectError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setRejectTarget(null)}>Отмена</Button>
+            <Button type="submit" variant="danger" disabled={rejecting}>{rejecting ? "Сохранение..." : "Отклонить"}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={logTarget !== null} onClose={() => setLogTarget(null)} title="История наряда" description={logTarget?.code} size="sm">
+        <div className="users-modal-form">
+          {logLoading && <p className="text-sm text-ink-muted">Загрузка...</p>}
+          {!logLoading && logEntries.length === 0 && <p className="text-sm text-ink-muted">Изменений пока нет</p>}
+          {logEntries.map((entry) => (
+            <div key={entry.id} className="rounded-lg bg-[#F5F5F4] px-3 py-2 text-sm">
+              <div className="font-medium text-ink">{entry.fromStatus} → {entry.toStatus}</div>
+              <div className="text-xs text-ink-muted">{new Date(entry.changedAt).toLocaleString("ru-RU")}</div>
+              {entry.comment && <div className="mt-1 text-ink-secondary">{entry.comment}</div>}
             </div>
-          </Card>
-
-          <WorkFiltersCard filters={filters} onChange={updateFilters} onApply={() => setPage(1)} onReset={handleResetFilters} />
-
-          <CriticalWorksCard
-            items={criticalWorks}
-            onOpen={(work) => setDrawerTarget(work)}
-            onSeeAll={() => updateFilters({ ...filters, status: "overdue" })}
-          />
+          ))}
+          <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={() => setLogTarget(null)}>Закрыть</Button></div>
         </div>
-      </div>
-
-      <AddWorkModal
-        open={formOpen && !editTarget}
-        onClose={() => {
-          setFormOpen(false);
-          setEditTarget(null);
-        }}
-        onSave={handleSaveWork}
-        allWorks={works}
-        nextCode={nextCode}
-      />
-
-      <EditWorkModal
-        open={formOpen && Boolean(editTarget)}
-        onClose={() => {
-          setFormOpen(false);
-          setEditTarget(null);
-        }}
-        onSave={handleSaveWork}
-        work={editTarget}
-        allWorks={works}
-      />
-
-      <ProgressUpdateModal
-        open={Boolean(progressTarget)}
-        onClose={() => setProgressTarget(null)}
-        work={progressTarget}
-        onSave={handleUpdateProgress}
-      />
-
-      <WorkDetailsDrawer
-        open={Boolean(drawerTarget)}
-        onClose={() => setDrawerTarget(null)}
-        work={drawerTarget}
-        allWorks={works}
-        onEdit={(work) => {
-          setEditTarget(work);
-          setDrawerTarget(null);
-          setFormOpen(true);
-        }}
-        onUpdateProgress={(work) => setProgressTarget(work)}
-        onChangeStatus={handleChangeStatus}
-        onComplete={handleComplete}
-        onAddComment={handleAddComment}
-      />
-
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        title="Удалить работу?"
-        description={deleteTarget ? `Работа «${deleteTarget.title}» (${deleteTarget.code}) будет удалена.` : undefined}
-        confirmLabel="Удалить"
-        danger
-        onConfirm={handleDeleteConfirmed}
-      />
+      </Modal>
     </AppLayout>
   );
 }

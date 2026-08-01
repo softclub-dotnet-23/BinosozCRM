@@ -1,4 +1,8 @@
 using Application.Payroll;
+using Api.BackgroundServices;
+using Domain.Entities;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.BackgroundJobs;
 
@@ -22,9 +26,7 @@ public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFact
         {
             try
             {
-                using var scope = scopeFactory.CreateScope();
-                var generator = scope.ServiceProvider.GetRequiredService<PayrollDraftGenerator>();
-                await generator.GenerateForMostRecentlyEndedPeriodsAsync(DateOnly.FromDateTime(DateTime.UtcNow), stoppingToken);
+                await RunOnceAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -36,5 +38,31 @@ public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFact
             }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+
+    private async Task RunOnceAsync(CancellationToken cancellationToken)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<ApplicationDbContext>>();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        List<Company> companies;
+        await using (var lookupContext = new ApplicationDbContext(dbOptions, new SystemCompanyCurrentUserService(Guid.Empty)))
+        {
+            companies = await lookupContext.Companies.ToListAsync(cancellationToken);
+        }
+
+        foreach (var company in companies)
+        {
+            try
+            {
+                await using var context = new ApplicationDbContext(dbOptions, new SystemCompanyCurrentUserService(company.Id));
+                await PayrollDraftGenerator.GenerateForCompanyAsync(context, company, today, logger, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Payroll draft generation failed for company {CompanyId}", company.Id);
+            }
+        }
     }
 }

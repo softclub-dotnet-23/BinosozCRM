@@ -29,6 +29,22 @@ public sealed class MaterialDeliveriesController(ISender sender) : ControllerBas
         return result.ToActionResult(HttpContext);
     }
 
+    // Bulk "receipt document" path — several material lines in one call,
+    // one transaction, sharing a generated DocumentId. See
+    // CreateMaterialDeliveryDocumentCommand for why there's no
+    // MaterialRequestId linkage on this path.
+    [HttpPost("document")]
+    public async Task<IActionResult> CreateDocument(CreateMaterialDeliveryDocumentRequest request, CancellationToken cancellationToken)
+    {
+        var items = request.Items
+            .Select(i => new MaterialDeliveryDocumentLineInput(i.MaterialName, i.Unit, i.Qty, i.UnitCost))
+            .ToList();
+
+        var command = new CreateMaterialDeliveryDocumentCommand(request.ObjectId, request.SupplierName, items);
+        var result = await sender.Send(command, cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {

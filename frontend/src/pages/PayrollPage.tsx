@@ -1,562 +1,345 @@
-import { useMemo, useState } from "react";
-import { Download, Eye, Pencil, Plus, RefreshCw, TrendingDown, TrendingUp, Users, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, Loader2, Plus, Wallet } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Avatar } from "../components/ui/Avatar";
+import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
-import { Pagination } from "../components/ui/Pagination";
-import { EmptyState } from "../components/ui/EmptyState";
-import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { DonutChart } from "../components/charts/DonutChart";
-import { PayrollStatusBadge, PAYROLL_STATUSES, payrollStatusLabel } from "../components/payroll/PayrollStatusBadge";
-import { PayrollGenerateModal } from "../components/payroll/PayrollGenerateModal";
-import { PayrollFormModal } from "../components/payroll/PayrollFormModal";
-import { PayrollPaymentModal } from "../components/payroll/PayrollPaymentModal";
-import { PayrollDetailDrawer } from "../components/payroll/PayrollDetailDrawer";
-import { PayrollApprovalDialog } from "../components/payroll/PayrollApprovalDialog";
-import { PayrollReturnModal } from "../components/payroll/PayrollReturnModal";
 import { CustomSelect } from "../components/ui/CustomSelect";
-import { payrollRepository } from "../data/repositories";
-import { useRepositoryState } from "../hooks/useRepositoryState";
-import { usePersistentState } from "../hooks/usePersistentState";
-import { canEditPayroll, toPayrollRole } from "../utils/payrollPermissions";
-import { useAuth } from "../context/AuthContext";
-import { computePayrollKpis, computePayrollStatusBuckets, getUpcomingPayments } from "../utils/payrollAnalytics";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Modal } from "../components/ui/Modal";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { useToast } from "../hooks/useToast";
-import { formatCurrency, formatNumber } from "../utils/format";
-import { formatDateShort } from "../utils/date";
-import type { PayrollFilters, PayrollRecord, PayrollStatus } from "../types";
+import { useAuth } from "../context/AuthContext";
+import { ApiError, NetworkError } from "../api/apiClient";
+import {
+  adjustPayrollEntry,
+  approvePayrollEntry,
+  createPayrollAdvance,
+  createPayrollEntry,
+  listPayrollAdvances,
+  listPayrollEntries,
+  payPayrollEntry,
+  type PayrollAdvance,
+  type PayrollEntry,
+  type PayrollEntryStatus,
+} from "../api/payrollApi";
+import { listBrigades } from "../api/brigadesApi";
+import { listAllWorkers, type Worker } from "../api/workersApi";
+import { formatCurrency } from "../utils/format";
 
-const DEFAULT_FILTERS: PayrollFilters = {
-  status: "all",
-  brigadeName: "all",
-  position: "all",
-  dateFrom: "2026-07-01",
-  dateTo: "2026-07-31",
-};
-
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
-
-function overlaps(record: PayrollRecord, from: string, to: string): boolean {
-  if (from && record.periodEnd < from) return false;
-  if (to && record.periodStart > to) return false;
-  return true;
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Сессия истекла. Войдите в систему заново.";
+    if (error.status === 403) return "У вас нет прав для этого действия.";
+    return error.message || fallback;
+  }
+  return fallback;
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
+const STATUS_LABEL: Record<PayrollEntryStatus, string> = { Draft: "Черновик", Approved: "Утверждено", Paid: "Выплачено" };
+const STATUS_TONE: Record<PayrollEntryStatus, "blue" | "green" | "orange"> = { Draft: "orange", Approved: "blue", Paid: "green" };
 
-function withHistory(record: PayrollRecord, status: PayrollStatus, actor: string, comment: string): PayrollRecord {
-  const date = nowIso();
-  return {
-    ...record,
-    status,
-    updatedAt: date,
-    statusHistory: [...record.statusHistory, { id: `${record.id}-${record.statusHistory.length + 1}`, status, date, actor, comment }],
-  };
-}
+const CREATE_FORM_INITIAL = { workerId: "", periodStart: "", periodEnd: "" };
 
 export default function PayrollPage() {
-  const { showToast } = useToast();
   const { user } = useAuth();
-  const [records, setRecords] = useRepositoryState(payrollRepository);
-  const role = toPayrollRole(user!.role);
+  const { showToast } = useToast();
+  const canCreate = user?.role === "accountant";
+  const canApprovePay = user?.role === "owner" || user?.role === "accountant";
+  const canAdjust = user?.role === "accountant";
 
-  const [search, setSearch] = usePersistentState("filters.payroll.search", "");
-  const [filters, setFilters] = usePersistentState<PayrollFilters>("filters.payroll.filters", DEFAULT_FILTERS);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [tab, setTab] = useState<"entries" | "advances">("entries");
+  const [entries, setEntries] = useState<PayrollEntry[]>([]);
+  const [advances, setAdvances] = useState<PayrollAdvance[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [generateOpen, setGenerateOpen] = useState(false);
-  const [editRecord, setEditRecord] = useState<PayrollRecord | null>(null);
-  const [detailRecord, setDetailRecord] = useState<PayrollRecord | null>(null);
-  const [approvalRecord, setApprovalRecord] = useState<PayrollRecord | null>(null);
-  const [returnRecord, setReturnRecord] = useState<PayrollRecord | null>(null);
-  const [paymentRecord, setPaymentRecord] = useState<PayrollRecord | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<PayrollRecord | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(CREATE_FORM_INITIAL);
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const brigadeOptions = Array.from(
-    new Set(records.map((r) => r.brigadeName ?? r.department).filter((v): v is string => Boolean(v))),
-  ).sort((a, b) => a.localeCompare(b, "ru"));
-  const positionOptions = Array.from(new Set(records.map((r) => r.position))).sort((a, b) => a.localeCompare(b, "ru"));
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [advanceForm, setAdvanceForm] = useState({ workerId: "", amount: "", note: "" });
+  const [advanceError, setAdvanceError] = useState("");
+  const [creatingAdvance, setCreatingAdvance] = useState(false);
 
-  const filteredRecords = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return records.filter((r) => {
-      if (query) {
-        const haystack = `${r.employeeName} ${r.position} ${r.brigadeName ?? ""} ${r.department ?? ""} ${payrollStatusLabel(r.status)} ${r.periodLabel}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (filters.status !== "all" && r.status !== filters.status) return false;
-      if (filters.brigadeName !== "all" && (r.brigadeName ?? r.department) !== filters.brigadeName) return false;
-      if (filters.position !== "all" && r.position !== filters.position) return false;
-      if (!overlaps(r, filters.dateFrom, filters.dateTo)) return false;
-      return true;
-    });
-  }, [records, search, filters]);
+  const [adjustTarget, setAdjustTarget] = useState<PayrollEntry | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustError, setAdjustError] = useState("");
+  const [adjusting, setAdjusting] = useState(false);
 
-  const kpis = useMemo(() => computePayrollKpis(filteredRecords), [filteredRecords]);
-  const statusBuckets = useMemo(() => computePayrollStatusBuckets(filteredRecords), [filteredRecords]);
-  const upcoming = useMemo(() => getUpcomingPayments(records, 4), [records]);
+  const [payTarget, setPayTarget] = useState<PayrollEntry | null>(null);
 
-  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageRows = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function resetFilters() {
-    setFilters(DEFAULT_FILTERS);
-    setSearch("");
-    setPage(1);
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [entriesResult, advancesResult, brigadesResult] = await Promise.all([
+        listPayrollEntries(1, 100),
+        listPayrollAdvances(1, 100),
+        listBrigades(1, 100),
+      ]);
+      setEntries(entriesResult.items);
+      setAdvances(advancesResult.items);
+      setWorkers(await listAllWorkers(brigadesResult.items.map((b) => b.id)));
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить данные по зарплате"));
+      setLoadState("error");
+    }
   }
 
-  function updateRecord(id: string, patch: Partial<PayrollRecord> | ((r: PayrollRecord) => PayrollRecord)) {
-    setRecords((prev) =>
-      prev.map((r) => (r.id === id ? (typeof patch === "function" ? patch(r) : { ...r, ...patch }) : r)),
-    );
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const workerNameById = useMemo(() => new Map(workers.map((w) => [w.id, w.fullName])), [workers]);
+
+  const kpis = useMemo(() => ({
+    total: entries.length,
+    draft: entries.filter((e) => e.status === "Draft").length,
+    totalPaid: entries.filter((e) => e.status === "Paid").reduce((sum, e) => sum + (e.finalAmount ?? 0), 0),
+  }), [entries]);
+
+  function openCreate() {
+    setCreateForm({ ...CREATE_FORM_INITIAL, workerId: workers[0]?.id ?? "" });
+    setCreateError("");
+    setCreateOpen(true);
   }
 
-  function currentActorName(): string {
-    return user!.fullName;
+  async function submitCreate(event: FormEvent) {
+    event.preventDefault();
+    if (creating) return;
+    const { workerId, periodStart, periodEnd } = createForm;
+    if (!workerId || !periodStart || !periodEnd) {
+      setCreateError("Заполните работника и период");
+      return;
+    }
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createPayrollEntry(workerId, periodStart, periodEnd);
+      setEntries((current) => [created, ...current.filter((e) => e.id !== created.id)]);
+      setCreateOpen(false);
+      showToast("Начисление создано");
+    } catch (error) {
+      setCreateError(describeError(error, "Не удалось создать начисление"));
+    } finally {
+      setCreating(false);
+    }
   }
 
-  function handleGenerate(newRecords: PayrollRecord[]) {
-    setRecords((prev) => [...newRecords, ...prev]);
-    setGenerateOpen(false);
-    showToast(`Сформировано начислений: ${newRecords.length}`);
+  async function handleApprove(entry: PayrollEntry) {
+    if (busyId) return;
+    setBusyId(entry.id);
+    try {
+      const updated = await approvePayrollEntry(entry.id);
+      setEntries((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      showToast("Начисление утверждено");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось утвердить начисление"), "error");
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function handleSaveEdit(record: PayrollRecord) {
-    updateRecord(record.id, record);
-    setEditRecord(null);
-    setDetailRecord(null);
-    showToast("Начисление обновлено");
+  async function handlePay(entry: PayrollEntry) {
+    if (busyId) return;
+    setBusyId(entry.id);
+    try {
+      const updated = await payPayrollEntry(entry.id);
+      setEntries((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      showToast("Выплата проведена");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось провести выплату"), "error");
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function handleSubmit(record: PayrollRecord) {
-    updateRecord(record.id, (r) => ({ ...withHistory(r, "pending_approval", currentActorName(), "Отправлено на утверждение"), submittedAt: nowIso() }));
-    setDetailRecord(null);
-    showToast("Отправлено на утверждение");
+  function openAdjust(entry: PayrollEntry) {
+    setAdjustTarget(entry);
+    setAdjustAmount(String(entry.adjustmentAmount || ""));
+    setAdjustReason(entry.adjustmentReason ?? "");
+    setAdjustError("");
   }
 
-  function handleFlagReview(record: PayrollRecord) {
-    updateRecord(record.id, (r) => withHistory(r, "needs_review", currentActorName(), "Отмечено как требующее проверки"));
-    setDetailRecord(null);
-    showToast("Отмечено на проверку", "info");
+  async function submitAdjust(event: FormEvent) {
+    event.preventDefault();
+    if (!adjustTarget || adjusting) return;
+    const amount = Number(adjustAmount);
+    if (amount !== 0 && !adjustReason.trim()) {
+      setAdjustError("Причина обязательна при ненулевой корректировке");
+      return;
+    }
+    setAdjusting(true);
+    setAdjustError("");
+    try {
+      const updated = await adjustPayrollEntry(adjustTarget.id, amount, adjustReason.trim() || undefined);
+      setEntries((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      setAdjustTarget(null);
+      showToast("Корректировка сохранена");
+    } catch (error) {
+      setAdjustError(describeError(error, "Не удалось сохранить корректировку"));
+    } finally {
+      setAdjusting(false);
+    }
   }
 
-  function handleResolveReview(record: PayrollRecord) {
-    updateRecord(record.id, (r) => withHistory(r, "prepared", currentActorName(), "Проверка завершена"));
-    setDetailRecord(null);
-    showToast("Проверка завершена");
+  function openAdvance() {
+    setAdvanceForm({ workerId: workers[0]?.id ?? "", amount: "", note: "" });
+    setAdvanceError("");
+    setAdvanceOpen(true);
   }
 
-  function handleApprove(paymentDate: string) {
-    if (!approvalRecord) return;
-    const actor = currentActorName();
-    updateRecord(approvalRecord.id, (r) => ({
-      ...withHistory(r, "approved", actor, "Утверждено"),
-      approvedBy: actor,
-      approvedAt: nowIso(),
-      paymentDate,
-    }));
-    setApprovalRecord(null);
-    setDetailRecord(null);
-    showToast("Зарплата утверждена");
+  async function submitAdvance(event: FormEvent) {
+    event.preventDefault();
+    if (creatingAdvance) return;
+    if (!advanceForm.workerId || !advanceForm.amount || Number(advanceForm.amount) <= 0) {
+      setAdvanceError("Выберите работника и укажите сумму больше нуля");
+      return;
+    }
+    setCreatingAdvance(true);
+    setAdvanceError("");
+    try {
+      const created = await createPayrollAdvance(advanceForm.workerId, Number(advanceForm.amount), advanceForm.note.trim() || undefined);
+      setAdvances((current) => [created, ...current]);
+      setAdvanceOpen(false);
+      showToast("Аванс выдан");
+    } catch (error) {
+      setAdvanceError(describeError(error, "Не удалось выдать аванс"));
+    } finally {
+      setCreatingAdvance(false);
+    }
   }
 
-  function handleReturnFromApproval() {
-    if (!approvalRecord) return;
-    setReturnRecord(approvalRecord);
-    setApprovalRecord(null);
-  }
-
-  function handleConfirmReturn(comment: string) {
-    if (!returnRecord) return;
-    const actor = currentActorName();
-    updateRecord(returnRecord.id, (r) => ({
-      ...withHistory(r, "returned", actor, comment),
-      returnedBy: actor,
-      returnedAt: nowIso(),
-      returnReason: comment,
-    }));
-    setReturnRecord(null);
-    setDetailRecord(null);
-    showToast("Расчёт возвращён на доработку", "info");
-  }
-
-  function handleConfirmPayment(payment: { paymentDate: string; paymentMethod: string; paymentReference: string; note: string }) {
-    if (!paymentRecord) return;
-    const actor = currentActorName();
-    updateRecord(paymentRecord.id, (r) => ({
-      ...withHistory(r, "paid", actor, "Выплачено"),
-      paymentDate: payment.paymentDate,
-      paymentMethod: payment.paymentMethod,
-      paymentReference: payment.paymentReference,
-      paidAt: nowIso(),
-      note: payment.note || r.note,
-    }));
-    setPaymentRecord(null);
-    setDetailRecord(null);
-    showToast("Зарплата отмечена как выплаченная");
-  }
-
-  function handleConfirmCancel() {
-    if (!cancelTarget) return;
-    updateRecord(cancelTarget.id, (r) => withHistory(r, "cancelled", currentActorName(), "Расчёт отменён"));
-    setCancelTarget(null);
-    setDetailRecord(null);
-    showToast("Расчёт отменён", "info");
-  }
-
-  function handleExport() {
-    const header = ["№", "Сотрудник", "Должность", "Бригада/Отдел", "Период", "Начислено", "Удержания", "К выплате", "Статус", "Дата выплаты"];
-    const rows = filteredRecords.map((r) => [
-      r.number,
-      r.employeeName,
-      r.position,
-      r.brigadeName ?? r.department ?? "",
-      r.periodLabel,
-      r.totalAccrued.toFixed(2),
-      r.totalDeductions.toFixed(2),
-      r.netPayable.toFixed(2),
-      payrollStatusLabel(r.status),
-      r.paymentDate ? formatDateShort(r.paymentDate) : "",
-    ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "zarplaty.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast("Зарплаты экспортированы");
-  }
-
-  const columns: DataTableColumn<PayrollRecord>[] = [
-    { key: "number", header: "№", render: (row) => <span className="text-ink-muted">{row.number}</span> },
-    {
-      key: "employee",
-      header: "Сотрудник",
-      render: (row) => (
-        <div className="flex items-center gap-3">
-          <Avatar name={row.employeeName} size="sm" />
-          <span className="whitespace-nowrap font-semibold text-ink">{row.employeeName}</span>
-        </div>
-      ),
-    },
-    { key: "position", header: "Должность", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.position}</span> },
-    {
-      key: "brigade",
-      header: "Бригада / Отдел",
-      render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.brigadeName ?? row.department ?? "—"}</span>,
-    },
-    { key: "period", header: "Период", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.periodLabel}</span> },
-    {
-      key: "accrued",
-      header: "Начислено",
-      render: (row) => <span className="tabular whitespace-nowrap font-semibold text-ink">{formatNumber(row.totalAccrued)} сомони</span>,
-    },
-    {
-      key: "deductions",
-      header: "Удержания",
-      render: (row) => <span className="tabular whitespace-nowrap text-red">{formatNumber(row.totalDeductions)} сомони</span>,
-    },
-    {
-      key: "payable",
-      header: "К выплате",
-      render: (row) => <span className="tabular whitespace-nowrap font-bold text-ink">{formatNumber(row.netPayable)} сомони</span>,
-    },
-    { key: "status", header: "Статус", render: (row) => <PayrollStatusBadge status={row.status} /> },
+  const entryColumns: DataTableColumn<PayrollEntry>[] = [
+    { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
+    { key: "period", header: "Период", render: (row) => <span className="text-ink-secondary">{row.periodStart} — {row.periodEnd}</span> },
+    { key: "calculated", header: "Начислено", render: (row) => <span className="tabular text-ink-secondary">{formatCurrency(row.calculatedAmount)}</span> },
+    { key: "deductions", header: "Вычеты", render: (row) => <span className="tabular text-red">−{formatCurrency(row.latenessDeductionAmount + row.advanceDeductedAmount)}</span> },
+    { key: "final", header: "К выплате", render: (row) => <span className="tabular font-semibold text-ink">{row.finalAmount != null ? formatCurrency(row.finalAmount) : "—"}</span> },
+    { key: "status", header: "Статус", render: (row) => <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge> },
     {
       key: "actions",
       header: "Действия",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть начисление" onClick={() => setDetailRecord(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          {canEditPayroll(role, row.status) && (
-            <button type="button" aria-label="Редактировать начисление" onClick={() => setEditRecord(row)} className={iconButtonClass}>
-              <Pencil size={14} />
-            </button>
-          )}
+        <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {canAdjust && row.status === "Draft" && <Button size="sm" variant="secondary" onClick={() => openAdjust(row)}>Корректировка</Button>}
+          {canApprovePay && row.status === "Draft" && <Button size="sm" disabled={busyId === row.id} onClick={() => void handleApprove(row)}>Утвердить</Button>}
+          {canApprovePay && row.status === "Approved" && <Button size="sm" disabled={busyId === row.id} onClick={() => setPayTarget(row)}>Выплатить</Button>}
         </div>
       ),
     },
   ];
 
+  const advanceColumns: DataTableColumn<PayrollAdvance>[] = [
+    { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
+    { key: "amount", header: "Сумма", render: (row) => <span className="tabular text-ink">{formatCurrency(row.amount)}</span> },
+    { key: "issuedAt", header: "Дата выдачи", render: (row) => <span className="text-ink-secondary">{new Date(row.issuedAt).toLocaleDateString("ru-RU")}</span> },
+    { key: "settled", header: "Статус", render: (row) => <Badge tone={row.settledInPayrollEntryId ? "green" : "orange"}>{row.settledInPayrollEntryId ? "Зачтён" : "Не зачтён"}</Badge> },
+    { key: "note", header: "Примечание", render: (row) => <span className="text-ink-secondary">{row.note ?? "—"}</span> },
+  ];
+
   return (
     <AppLayout
-      title="Зарплаты"
-      subtitle="Управление начислениями, удержаниями и выплатами сотрудникам"
-      search={{
-        value: search,
-        onChange: (value) => {
-          setSearch(value);
-          setPage(1);
-        },
-        placeholder: "Поиск по сотрудникам...",
-      }}
+      title="Зарплата"
+      subtitle="Начисления, авансы и выплаты"
+      action={
+        tab === "entries"
+          ? canCreate ? <Button onClick={openCreate} disabled={workers.length === 0}><Plus size={15} /> Создать начисление</Button> : undefined
+          : (user?.role === "owner" || user?.role === "accountant") ? <Button onClick={openAdvance} disabled={workers.length === 0}><Plus size={15} /> Выдать аванс</Button> : undefined
+      }
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего к выплате" value={formatNumber(kpis.totalPayable)} icon={Wallet} tone="green" footer="сомони" />
-            <MetricCard label="Сотрудников" value={String(kpis.employeeCount)} icon={Users} tone="blue" footer="человек" />
-            <MetricCard label="Начислено" value={formatNumber(kpis.totalAccrued)} icon={TrendingUp} tone="orange" footer="сомони" />
-            <MetricCard label="Удержания" value={formatNumber(kpis.totalDeductions)} icon={TrendingDown} tone="purple" footer="сомони" />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-3 text-xs text-ink-secondary">
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }));
-                  setPage(1);
-                }}
-                className="w-27.5 bg-transparent text-ink focus:outline-none"
-              />
-              <span>–</span>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }));
-                  setPage(1);
-                }}
-                className="w-27.5 bg-transparent text-ink focus:outline-none"
-              />
-            </div>
-            <CustomSelect
-              size="sm"
-              aria-label="Статус"
-              value={filters.status}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, status: v as PayrollFilters["status"] }));
-                setPage(1);
-              }}
-              options={[
-                { value: "all", label: "Статус: Все" },
-                ...PAYROLL_STATUSES.map((s) => ({ value: s, label: payrollStatusLabel(s) })),
-              ]}
-            />
-            <CustomSelect
-              size="sm"
-              searchable
-              aria-label="Бригада"
-              value={filters.brigadeName}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, brigadeName: v }));
-                setPage(1);
-              }}
-              options={[{ value: "all", label: "Бригада: Все" }, ...brigadeOptions.map((b) => ({ value: b, label: b }))]}
-            />
-            <CustomSelect
-              size="sm"
-              searchable
-              aria-label="Должность"
-              value={filters.position}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, position: v }));
-                setPage(1);
-              }}
-              options={[{ value: "all", label: "Должность: Все" }, ...positionOptions.map((p) => ({ value: p, label: p }))]}
-            />
-            <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
-              <RefreshCw size={14} /> Сбросить фильтры
-            </Button>
-            <Button size="sm" className="h-9" onClick={() => setGenerateOpen(true)}>
-              <Plus size={14} /> Сформировать зарплату
-            </Button>
-            <Button variant="outline" size="sm" className="h-9" onClick={handleExport}>
-              <Download size={14} /> Экспорт
-            </Button>
-          </div>
-
-          <Card>
-            {pageRows.length > 0 ? (
-              <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} onRowClick={(row) => setDetailRecord(row)} />
-            ) : (
-              <EmptyState
-                icon={Wallet}
-                title="Начисления не найдены"
-                description="Измените параметры поиска или сформируйте зарплату за период"
-                action={
-                  <Button variant="outline" size="sm" onClick={resetFilters}>
-                    Сбросить фильтры
-                  </Button>
-                }
-              />
-            )}
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              total={filteredRecords.length}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              itemLabel="записей"
-            />
-          </Card>
-        </div>
-
-        <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Итоги за период</h2>
-            <dl className="mt-3.5 space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Сотрудников</dt>
-                <dd className="font-bold text-ink tabular">{kpis.employeeCount}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Начислено</dt>
-                <dd className="font-bold text-ink tabular">{formatCurrency(kpis.totalAccrued)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Удержания</dt>
-                <dd className="font-bold text-ink tabular">{formatCurrency(kpis.totalDeductions)}</dd>
-              </div>
-              <div className="flex items-center justify-between border-t border-border pt-2.5">
-                <dt className="font-semibold text-ink">К выплате</dt>
-                <dd className="font-bold text-green tabular">{formatCurrency(kpis.totalPayable)}</dd>
-              </div>
-            </dl>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Статусы выплат</h2>
-            {statusBuckets.length > 0 ? (
-              <>
-                <DonutChart
-                  data={statusBuckets}
-                  centerLabel="Всего"
-                  centerValue={String(filteredRecords.length)}
-                  size={176}
-                  valueFormatter={(value) => formatNumber(value)}
-                />
-                <ul className="mt-4 w-full space-y-2.5">
-                  {statusBuckets.map((bucket) => (
-                    <li key={bucket.category} className="flex items-center gap-2.5 text-sm">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: bucket.color }} />
-                      <span className="text-ink-secondary">{bucket.category}</span>
-                      <span className="ml-auto shrink-0 font-semibold text-ink tabular">
-                        {bucket.amount}{" "}
-                        <span className="text-ink-muted">
-                          ({filteredRecords.length > 0 ? Math.round((bucket.amount / filteredRecords.length) * 1000) / 10 : 0}%)
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="mt-4 text-sm text-ink-muted">Нет данных для отображения</p>
-            )}
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Ближайшие выплаты</h2>
-            <ul className="mt-3.5 space-y-3">
-              {upcoming.length > 0 ? (
-                upcoming.map((r) => (
-                  <li key={r.id} className="flex items-center gap-2.5">
-                    <Avatar name={r.employeeName} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink">{r.employeeName}</p>
-                      <p className="truncate text-xs text-ink-secondary">{r.position}</p>
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold text-ink-secondary">{formatDateShort(r.paymentDate!)}</span>
-                  </li>
-                ))
-              ) : (
-                <p className="text-sm text-ink-muted">Нет запланированных выплат</p>
-              )}
-            </ul>
-            <button
-              type="button"
-              onClick={() => {
-                setFilters((f) => ({ ...f, status: "approved" }));
-                setPage(1);
-              }}
-              className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
-            >
-              Все ближайшие выплаты →
-            </button>
-          </Card>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Всего начислений" value={String(kpis.total)} icon={Wallet} tone="orange" footer="За все периоды" />
+        <MetricCard label="Черновиков" value={String(kpis.draft)} icon={Wallet} tone="blue" footer="Ожидают утверждения" />
+        <MetricCard label="Выплачено" value={formatCurrency(kpis.totalPaid)} icon={Wallet} tone="green" footer="По оплаченным начислениям" />
       </div>
 
-      <PayrollGenerateModal open={generateOpen} existingRecords={records} onClose={() => setGenerateOpen(false)} onGenerate={handleGenerate} />
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
 
-      <PayrollFormModal open={Boolean(editRecord)} record={editRecord} onClose={() => setEditRecord(null)} onSave={handleSaveEdit} />
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-      <PayrollDetailDrawer
-        record={detailRecord}
-        role={role}
-        onClose={() => setDetailRecord(null)}
-        onEdit={(r) => {
-          setDetailRecord(null);
-          setEditRecord(r);
-        }}
-        onSubmit={handleSubmit}
-        onFlagReview={handleFlagReview}
-        onResolveReview={handleResolveReview}
-        onApprove={(r) => {
-          setDetailRecord(null);
-          setApprovalRecord(r);
-        }}
-        onReturn={(r) => {
-          setDetailRecord(null);
-          setReturnRecord(r);
-        }}
-        onMarkPaid={(r) => {
-          setDetailRecord(null);
-          setPaymentRecord(r);
-        }}
-        onCancel={(r) => {
-          setDetailRecord(null);
-          setCancelTarget(r);
-        }}
-      />
+      {loadState === "ready" && (
+        <Card className="mt-4">
+          <div className="flex flex-wrap items-center gap-2 px-5 pt-5 sm:px-6">
+            <button type="button" className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${tab === "entries" ? "bg-primary text-white" : "bg-[#F5F5F4] text-ink-secondary"}`} onClick={() => setTab("entries")}>Начисления</button>
+            <button type="button" className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${tab === "advances" ? "bg-primary text-white" : "bg-[#F5F5F4] text-ink-secondary"}`} onClick={() => setTab("advances")}>Авансы</button>
+          </div>
+          <div className="mt-4">
+            {tab === "entries" ? (
+              entries.length > 0 ? <DataTable columns={entryColumns} rows={entries} rowKey={(row) => row.id} /> : <EmptyState icon={Wallet} title="Начислений пока нет" description="Создайте первое начисление" />
+            ) : advances.length > 0 ? (
+              <DataTable columns={advanceColumns} rows={advances} rowKey={(row) => row.id} />
+            ) : (
+              <EmptyState icon={Wallet} title="Авансов пока нет" description="Здесь появятся выданные авансы" />
+            )}
+          </div>
+        </Card>
+      )}
 
-      <PayrollApprovalDialog
-        open={Boolean(approvalRecord)}
-        record={approvalRecord}
-        onClose={() => setApprovalRecord(null)}
-        onApprove={handleApprove}
-        onReturn={handleReturnFromApproval}
-      />
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Создать начисление" size="sm">
+        <form className="users-modal-form" onSubmit={submitCreate}>
+          <label><span>Работник</span><CustomSelect fullWidth value={createForm.workerId} onValueChange={(v) => setCreateForm((f) => ({ ...f, workerId: v }))} options={workers.map((w) => ({ value: w.id, label: w.fullName }))} /></label>
+          <label><span>Начало периода</span><input type="date" value={createForm.periodStart} onChange={(e) => setCreateForm((f) => ({ ...f, periodStart: e.target.value }))} /></label>
+          <label><span>Конец периода</span><input type="date" value={createForm.periodEnd} onChange={(e) => setCreateForm((f) => ({ ...f, periodEnd: e.target.value }))} /></label>
+          {createError && <p className="users-modal-error" role="alert">{createError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={creating}>{creating ? "Создание..." : "Создать"}</Button>
+          </div>
+        </form>
+      </Modal>
 
-      <PayrollReturnModal open={Boolean(returnRecord)} record={returnRecord} onClose={() => setReturnRecord(null)} onConfirm={handleConfirmReturn} />
-
-      <PayrollPaymentModal
-        open={Boolean(paymentRecord)}
-        record={paymentRecord}
-        onClose={() => setPaymentRecord(null)}
-        onConfirm={handleConfirmPayment}
-      />
+      <Modal open={advanceOpen} onClose={() => setAdvanceOpen(false)} title="Выдать аванс" size="sm">
+        <form className="users-modal-form" onSubmit={submitAdvance}>
+          <label><span>Работник</span><CustomSelect fullWidth value={advanceForm.workerId} onValueChange={(v) => setAdvanceForm((f) => ({ ...f, workerId: v }))} options={workers.map((w) => ({ value: w.id, label: w.fullName }))} /></label>
+          <label><span>Сумма</span><input type="number" min="0" step="0.01" value={advanceForm.amount} onChange={(e) => setAdvanceForm((f) => ({ ...f, amount: e.target.value }))} /></label>
+          <label><span>Примечание</span><input value={advanceForm.note} onChange={(e) => setAdvanceForm((f) => ({ ...f, note: e.target.value }))} /></label>
+          {advanceError && <p className="users-modal-error" role="alert">{advanceError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setAdvanceOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={creatingAdvance}>{creatingAdvance ? "Сохранение..." : "Выдать"}</Button>
+          </div>
+        </form>
+      </Modal>
 
       <ConfirmDialog
-        open={Boolean(cancelTarget)}
-        title="Отменить расчёт?"
-        description={cancelTarget ? `${cancelTarget.employeeName} · ${cancelTarget.periodLabel}` : undefined}
-        confirmLabel="Отменить расчёт"
-        danger
-        onConfirm={handleConfirmCancel}
-        onClose={() => setCancelTarget(null)}
+        open={payTarget !== null}
+        onClose={() => setPayTarget(null)}
+        title="Провести выплату?"
+        description={payTarget ? `${workerNameById.get(payTarget.workerId) ?? "Работник"} — ${payTarget.finalAmount != null ? formatCurrency(payTarget.finalAmount) : "сумма не рассчитана"}. Это действие нельзя отменить через интерфейс.` : undefined}
+        confirmLabel="Выплатить"
+        onConfirm={() => payTarget && void handlePay(payTarget)}
       />
+
+      <Modal open={adjustTarget !== null} onClose={() => setAdjustTarget(null)} title="Корректировка начисления" size="sm">
+        <form className="users-modal-form" onSubmit={submitAdjust}>
+          <label><span>Сумма корректировки</span><input type="number" step="0.01" value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} placeholder="Может быть отрицательной" /></label>
+          <label><span>Причина</span><input value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} /></label>
+          {adjustError && <p className="users-modal-error" role="alert">{adjustError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setAdjustTarget(null)}>Отмена</Button>
+            <Button type="submit" disabled={adjusting}>{adjusting ? "Сохранение..." : "Сохранить"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
   );
 }

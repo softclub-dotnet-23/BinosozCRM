@@ -517,6 +517,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("DeliveredAt")
                         .HasColumnType("timestamptz");
 
+                    b.Property<Guid?>("DocumentId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -552,6 +555,9 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("DocumentId")
+                        .HasFilter("\"DocumentId\" IS NOT NULL");
 
                     b.HasIndex("MaterialRequestId")
                         .HasFilter("\"MaterialRequestId\" IS NOT NULL");

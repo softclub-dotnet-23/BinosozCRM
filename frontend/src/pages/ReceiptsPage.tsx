@@ -1,454 +1,189 @@
-import { useMemo, useState } from "react";
-import { Banknote, Boxes, Download, Eye, FileInput, LayoutGrid, Pencil, Plus, RefreshCw, Trash2, UserCog } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, Boxes, Loader2, Plus, Trash2 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
-import { Pagination } from "../components/ui/Pagination";
 import { EmptyState } from "../components/ui/EmptyState";
-import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { DropdownMenu } from "../components/ui/DropdownMenu";
+import { Modal } from "../components/ui/Modal";
 import { CustomSelect } from "../components/ui/CustomSelect";
-import { ReceiptFormModal } from "../components/materials/ReceiptFormModal";
-import { ReceiptDetailDrawer } from "../components/materials/ReceiptDetailDrawer";
-import {
-  RECEIPT_SUPPLIERS,
-  RECEIPT_OBJECTS,
-  RECEIPT_BRIGADES,
-  receiptQuantity,
-  receiptTotal,
-  receiptUnit,
-} from "../data/mockMaterialReceipts";
-import { materialReceiptsRepository, employeesRepository } from "../data/repositories";
-import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
-import { usePersistentState } from "../hooks/usePersistentState";
-import { responsiblePersonName } from "../utils/responsiblePerson";
-import { computeReceiptKpis } from "../utils/receiptAnalytics";
-import { adjustMaterialStock } from "../utils/materialStockEffects";
 import { useToast } from "../hooks/useToast";
-import { formatCurrency, formatNumber } from "../utils/format";
-import { formatDateShort } from "../utils/date";
-import type { MaterialReceipt, ReceiptFilters } from "../types";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { createMaterialDeliveryDocument, groupByDocument, listMaterialDeliveries, type MaterialDeliveryDocument, type MaterialDeliveryDocumentLine } from "../api/materialDeliveriesApi";
+import { listObjects, type ConstructionObject } from "../api/objectsApi";
+import { formatCurrency } from "../utils/format";
 
-const DEFAULT_FILTERS: ReceiptFilters = {
-  supplier: "all",
-  objectName: "all",
-  brigadeName: "all",
-  dateFrom: "2026-07-01",
-  dateTo: "2026-07-30",
-};
-
-const selectClass =
-  "w-full h-9 rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
-const iconButtonClass =
-  "flex h-7 w-7 items-center justify-center rounded-lg border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4] hover:text-ink";
-
-function formatCompactAmount(value: number): string {
-  if (value < 100000) return formatNumber(Math.round(value * 10) / 10);
-  return `${formatNumber(Math.round(value / 1000))} тыс.`;
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) return error.message || fallback;
+  return fallback;
 }
 
-/** sign = 1 applies a receipt (stock increases at its warehouse); sign = -1 reverses it. */
-function applyReceiptStockEffect(receipt: MaterialReceipt, sign: 1 | -1) {
-  receipt.lines.forEach((line) => {
-    adjustMaterialStock(line.materialName, receipt.warehouse, sign * line.quantity);
-  });
-}
+const EMPTY_LINE: MaterialDeliveryDocumentLine = { materialName: "", unit: "", qty: 0, unitCost: 0 };
 
 export default function ReceiptsPage() {
   const { showToast } = useToast();
 
-  const [receipts, setReceipts] = useRepositoryState(materialReceiptsRepository);
-  const employees = useRepositorySnapshot(employeesRepository);
-  const [search, setSearch] = usePersistentState("filters.receipts.search", "");
-  const [filters, setFilters] = usePersistentState<ReceiptFilters>("filters.receipts.filters", DEFAULT_FILTERS);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [documents, setDocuments] = useState<MaterialDeliveryDocument[]>([]);
+  const [objects, setObjects] = useState<ConstructionObject[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
 
-  const [formReceipt, setFormReceipt] = useState<MaterialReceipt | null | undefined>(undefined);
-  const [viewReceipt, setViewReceipt] = useState<MaterialReceipt | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<MaterialReceipt | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [objectId, setObjectId] = useState("");
+  const [supplierName, setSupplierName] = useState("");
+  const [lines, setLines] = useState<MaterialDeliveryDocumentLine[]>([{ ...EMPTY_LINE }]);
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const filteredReceipts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return receipts.filter((r) => {
-      if (query) {
-        const haystack = `${r.documentNumber} ${r.supplier} ${r.objectName} ${r.invoiceNumber} ${responsiblePersonName(
-          r.responsible,
-          employees,
-        )} ${r.lines.map((l) => l.materialName).join(" ")}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (filters.supplier !== "all" && r.supplier !== filters.supplier) return false;
-      if (filters.objectName !== "all" && r.objectName !== filters.objectName) return false;
-      if (filters.brigadeName !== "all" && r.brigadeName !== filters.brigadeName) return false;
-      if (filters.dateFrom && r.date < filters.dateFrom) return false;
-      if (filters.dateTo && r.date > filters.dateTo) return false;
-      return true;
-    });
-  }, [receipts, search, filters, employees]);
-
-  const kpis = useMemo(() => computeReceiptKpis(filteredReceipts), [filteredReceipts]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredReceipts.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageRows = filteredReceipts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function resetFilters() {
-    setFilters(DEFAULT_FILTERS);
-    setSearch("");
-    setPage(1);
-  }
-
-  function handleSaveReceipt(receipt: MaterialReceipt) {
-    const isEdit = receipts.some((r) => r.id === receipt.id);
-    if (isEdit) {
-      const previous = receipts.find((r) => r.id === receipt.id);
-      if (previous) applyReceiptStockEffect(previous, -1); // reverse old effect first
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [deliveriesResult, objectsResult] = await Promise.all([listMaterialDeliveries(1, 100), listObjects(1, 100)]);
+      setDocuments(groupByDocument(deliveriesResult.items));
+      setObjects(objectsResult.items);
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить поступления"));
+      setLoadState("error");
     }
-    applyReceiptStockEffect(receipt, 1); // apply new effect
-
-    setReceipts((prev) => {
-      if (isEdit) return prev.map((r) => (r.id === receipt.id ? receipt : r));
-      const nextNumber = prev.length > 0 ? Math.max(...prev.map((r) => r.number)) + 1 : 1;
-      const documentNumber = receipt.documentNumber.startsWith("ПР-НОВ") ? `ПР-${nextNumber}` : receipt.documentNumber;
-      return [{ ...receipt, number: nextNumber, documentNumber }, ...prev];
-    });
-    setFormReceipt(undefined);
-    setViewReceipt(null);
-    showToast(isEdit ? "Поступление обновлено, остатки пересчитаны" : "Поступление добавлено, остатки склада обновлены");
   }
 
-  function handleDuplicate(receipt: MaterialReceipt) {
-    setViewReceipt(null);
-    setFormReceipt({ ...receipt, id: "", documentNumber: "ПР-НОВ", date: "" });
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const objectNameById = useMemo(() => new Map(objects.map((o) => [o.id, o.name])), [objects]);
+
+  const kpis = useMemo(() => {
+    const totalValue = documents.reduce((sum, doc) => sum + doc.lines.reduce((s, l) => s + l.qty * l.unitCost, 0), 0);
+    return { documents: documents.length, lines: documents.reduce((sum, d) => sum + d.lines.length, 0), totalValue };
+  }, [documents]);
+
+  function openCreate() {
+    setObjectId(objects[0]?.id ?? "");
+    setSupplierName("");
+    setLines([{ ...EMPTY_LINE }]);
+    setCreateError("");
+    setCreateOpen(true);
   }
 
-  function handleDeleteConfirmed() {
-    if (!deleteTarget) return;
-    applyReceiptStockEffect(deleteTarget, -1); // reverse its stock effect
-    setReceipts((prev) => prev.filter((r) => r.id !== deleteTarget.id));
-    setViewReceipt(null);
-    showToast("Поступление удалено, остатки склада скорректированы", "info");
-    setDeleteTarget(null);
+  function updateLine(index: number, patch: Partial<MaterialDeliveryDocumentLine>) {
+    setLines((current) => current.map((line, i) => (i === index ? { ...line, ...patch } : line)));
   }
 
-  function handleExport() {
-    const header = ["Дата", "Номер", "Поставщик", "Объект", "Бригада", "Материалов", "Кол-во", "Сумма"];
-    const rows = filteredReceipts.map((r) => [
-      formatDateShort(r.date),
-      r.documentNumber,
-      r.supplier,
-      r.objectName,
-      r.brigadeName ?? "",
-      r.lines.length,
-      receiptQuantity(r).toFixed(2),
-      receiptTotal(r).toFixed(2),
-    ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "postupleniya.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast("Поступления экспортированы");
+  async function submitCreate(event: FormEvent) {
+    event.preventDefault();
+    if (creating) return;
+    if (!objectId) {
+      setCreateError("Выберите объект");
+      return;
+    }
+    const validLines = lines.filter((l) => l.materialName.trim() && l.unit.trim() && l.qty > 0);
+    if (validLines.length === 0) {
+      setCreateError("Добавьте хотя бы одну позицию с материалом, единицей и количеством > 0");
+      return;
+    }
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createMaterialDeliveryDocument(objectId, supplierName.trim() || undefined, validLines);
+      setDocuments((current) => [{ documentId: created.documentId, objectId: created.objectId, supplierName: created.supplierName, deliveredAt: created.deliveredAt, lines: created.lines }, ...current]);
+      setCreateOpen(false);
+      showToast("Поступление добавлено");
+    } catch (error) {
+      setCreateError(describeError(error, "Не удалось сохранить поступление"));
+    } finally {
+      setCreating(false);
+    }
   }
-
-  const columns: DataTableColumn<MaterialReceipt>[] = [
-    { key: "number", header: "№", render: (row) => <span className="text-ink-muted">{row.number}</span> },
-    { key: "date", header: "Дата", render: (row) => <span className="whitespace-nowrap text-ink">{formatDateShort(row.date)}</span> },
-    { key: "doc", header: "Номер", render: (row) => <span className="whitespace-nowrap font-semibold text-ink">{row.documentNumber}</span> },
-    { key: "supplier", header: "Поставщик", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.supplier}</span> },
-    { key: "object", header: "Объект", render: (row) => <span className="whitespace-nowrap text-ink-secondary">{row.objectName}</span> },
-    { key: "materials", header: "Материалов", render: (row) => <span className="tabular text-ink-secondary">{row.lines.length}</span> },
-    {
-      key: "quantity",
-      header: "Кол-во (ед.)",
-      render: (row) => {
-        const unit = receiptUnit(row);
-        return (
-          <span className="tabular whitespace-nowrap font-semibold text-ink">
-            {formatNumber(receiptQuantity(row))}
-            {unit ? ` ${unit}` : ""}
-          </span>
-        );
-      },
-    },
-    {
-      key: "total",
-      header: "Сумма (сомони)",
-      render: (row) => <span className="tabular whitespace-nowrap font-semibold text-ink">{formatNumber(receiptTotal(row))}</span>,
-    },
-    {
-      key: "actions",
-      header: "Действия",
-      headerClassName: "text-right",
-      className: "text-right",
-      render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" aria-label="Просмотреть поступление" onClick={() => setViewReceipt(row)} className={iconButtonClass}>
-            <Eye size={14} />
-          </button>
-          <button type="button" aria-label="Редактировать поступление" onClick={() => setFormReceipt(row)} className={iconButtonClass}>
-            <Pencil size={14} />
-          </button>
-          <DropdownMenu
-            trigger={<span className={iconButtonClass}>⋯</span>}
-            items={[
-              { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setViewReceipt(row) },
-              { label: "Дублировать", icon: <FileInput size={14} />, onClick: () => handleDuplicate(row) },
-              { label: "Скачать накладную", icon: <Download size={14} />, onClick: () => showToast("Накладная скачана", "info") },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
-            ]}
-          />
-        </div>
-      ),
-    },
-  ];
 
   return (
     <AppLayout
-      title="Поступления"
-      subtitle="Учет поступлений материалов на склад"
-      search={{
-        value: search,
-        onChange: (value) => {
-          setSearch(value);
-          setPage(1);
-        },
-        placeholder: "Поиск по поступлениям...",
-      }}
+      title="Поступления материалов"
+      subtitle="Документы поступления материалов на объекты"
+      action={<Button onClick={openCreate} disabled={objects.length === 0}><Plus size={15} /> Добавить поступление</Button>}
     >
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <MetricCard label="Всего поступлений" value={String(kpis.count)} icon={Boxes} tone="green" footer="Документа" />
-            <MetricCard label="Поступило материалов" value={formatCompactAmount(kpis.totalQuantity)} icon={LayoutGrid} tone="blue" footer="Ед. измерения" />
-            <MetricCard label="Общая стоимость" value={formatCompactAmount(kpis.totalCost)} icon={Banknote} tone="orange" footer="сомони" />
-            <MetricCard label="Средняя стоимость" value={formatCompactAmount(kpis.averageCost)} icon={UserCog} tone="purple" footer="сомони" />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-2.5">
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }));
-                  setPage(1);
-                }}
-                className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
-              />
-              <span className="text-ink-muted">–</span>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) => {
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }));
-                  setPage(1);
-                }}
-                className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
-              />
-            </div>
-            <CustomSelect
-              size="sm"
-              searchable
-              aria-label="Поставщик"
-              value={filters.supplier}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, supplier: v }));
-                setPage(1);
-              }}
-              options={[{ value: "all", label: "Поставщик: Все" }, ...RECEIPT_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
-            />
-            <CustomSelect
-              size="sm"
-              aria-label="Объект"
-              value={filters.objectName}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, objectName: v }));
-                setPage(1);
-              }}
-              options={[{ value: "all", label: "Объект: Все" }, ...RECEIPT_OBJECTS.map((o) => ({ value: o, label: o }))]}
-            />
-            <CustomSelect
-              size="sm"
-              aria-label="Бригада"
-              value={filters.brigadeName}
-              onValueChange={(v) => {
-                setFilters((f) => ({ ...f, brigadeName: v }));
-                setPage(1);
-              }}
-              options={[{ value: "all", label: "Бригада: Все" }, ...RECEIPT_BRIGADES.map((b) => ({ value: b, label: b }))]}
-            />
-            <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
-              <RefreshCw size={14} /> Сбросить фильтры
-            </Button>
-          </div>
-
-          <Card>
-            {pageRows.length > 0 ? (
-              <DataTable columns={columns} rows={pageRows} rowKey={(row) => row.id} onRowClick={(row) => setViewReceipt(row)} />
-            ) : (
-              <EmptyState
-                icon={Boxes}
-                title="Поступления не найдены"
-                description="Измените параметры поиска или сбросьте фильтры"
-                action={
-                  <Button variant="outline" size="sm" onClick={resetFilters}>
-                    Сбросить фильтры
-                  </Button>
-                }
-              />
-            )}
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              pageSize={pageSize}
-              total={filteredReceipts.length}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-              itemLabel="записей"
-            />
-          </Card>
-        </div>
-
-        <div className="flex w-full flex-col gap-4 xl:w-70 xl:shrink-0">
-          <div className="flex flex-col gap-2">
-            <Button className="w-full" onClick={() => setFormReceipt(null)}>
-              <Plus size={16} /> Новое поступление
-            </Button>
-            <Button variant="outline" className="w-full" onClick={handleExport}>
-              <Download size={16} /> Экспорт
-            </Button>
-          </div>
-
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
-            <div className="mt-4 space-y-3.5">
-              <div>
-                <p className="text-xs font-medium text-ink-secondary">Период</p>
-                <div className="mt-1.5 flex flex-col gap-2">
-                  <input
-                    type="date"
-                    value={filters.dateFrom}
-                    onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
-                    className={selectClass}
-                  />
-                  <input
-                    type="date"
-                    value={filters.dateTo}
-                    onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
-                    className={selectClass}
-                  />
-                </div>
-              </div>
-
-              <FilterField label="Поставщик">
-                <CustomSelect
-                  searchable
-                  value={filters.supplier}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, supplier: v }))}
-                  options={[{ value: "all", label: "Все поставщики" }, ...RECEIPT_SUPPLIERS.map((s) => ({ value: s, label: s }))]}
-                />
-              </FilterField>
-
-              <FilterField label="Объект">
-                <CustomSelect
-                  value={filters.objectName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, objectName: v }))}
-                  options={[{ value: "all", label: "Все объекты" }, ...RECEIPT_OBJECTS.map((o) => ({ value: o, label: o }))]}
-                />
-              </FilterField>
-
-              <FilterField label="Бригада">
-                <CustomSelect
-                  value={filters.brigadeName}
-                  onValueChange={(v) => setFilters((f) => ({ ...f, brigadeName: v }))}
-                  options={[{ value: "all", label: "Все бригады" }, ...RECEIPT_BRIGADES.map((b) => ({ value: b, label: b }))]}
-                />
-              </FilterField>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button className="flex-1" onClick={() => setPage(1)}>
-                Применить
-              </Button>
-              <Button variant="outline" className="flex-1" onClick={resetFilters}>
-                Сбросить
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="text-[15px] font-bold text-ink">Итоги за период</h2>
-            <dl className="mt-3.5 space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Документов</dt>
-                <dd className="font-bold text-ink tabular">{kpis.count}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Кол-во (ед.)</dt>
-                <dd className="font-bold text-ink tabular">{formatNumber(Math.round(kpis.totalQuantity * 10) / 10)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-ink-secondary">Сумма (сомони)</dt>
-                <dd className="font-bold text-ink tabular">{formatCurrency(Math.round(kpis.totalCost))}</dd>
-              </div>
-            </dl>
-          </Card>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Документов" value={String(kpis.documents)} icon={Boxes} tone="orange" footer="Всего поступлений" />
+        <MetricCard label="Позиций" value={String(kpis.lines)} icon={Boxes} tone="blue" footer="Строк материалов" />
+        <MetricCard label="Сумма" value={formatCurrency(kpis.totalValue)} icon={Boxes} tone="green" footer="Общая стоимость" />
       </div>
 
-      <ReceiptFormModal
-        open={formReceipt !== undefined}
-        receipt={formReceipt ?? null}
-        existingInvoiceNumbers={receipts.map((r) => r.invoiceNumber)}
-        onClose={() => setFormReceipt(undefined)}
-        onSave={handleSaveReceipt}
-      />
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
 
-      <ReceiptDetailDrawer
-        receipt={viewReceipt}
-        onClose={() => setViewReceipt(null)}
-        onEdit={(r) => {
-          setViewReceipt(null);
-          setFormReceipt(r);
-        }}
-        onDuplicate={handleDuplicate}
-        onDelete={(r) => {
-          setViewReceipt(null);
-          setDeleteTarget(r);
-        }}
-      />
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        title="Удалить поступление?"
-        description={
-          deleteTarget
-            ? `Поступление «${deleteTarget.documentNumber}» будет удалено. Остатки склада, увеличенные этим поступлением, будут скорректированы.`
-            : undefined
-        }
-        confirmLabel="Удалить"
-        danger
-        onConfirm={handleDeleteConfirmed}
-      />
+      {loadState === "ready" && (
+        documents.length === 0 ? (
+          <Card className="mt-4"><EmptyState icon={Boxes} title="Поступлений пока нет" description="Добавьте первое поступление материалов" /></Card>
+        ) : (
+          <div className="mt-4 flex flex-col gap-3">
+            {documents.map((doc) => (
+              <Card key={doc.documentId} className="p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-semibold text-ink">{objectNameById.get(doc.objectId) ?? "—"}</span>
+                    {doc.supplierName && <span className="ml-2 text-sm text-ink-muted">от {doc.supplierName}</span>}
+                  </div>
+                  <span className="text-xs text-ink-muted">{new Date(doc.deliveredAt).toLocaleString("ru-RU")}</span>
+                </div>
+                <table className="mt-3 w-full text-sm">
+                  <thead><tr className="text-left text-xs text-ink-muted"><th className="pb-1">Материал</th><th className="pb-1">Кол-во</th><th className="pb-1">Цена</th><th className="pb-1 text-right">Сумма</th></tr></thead>
+                  <tbody>
+                    {doc.lines.map((line) => (
+                      <tr key={line.id}>
+                        <td className="py-1 text-ink">{line.materialName}</td>
+                        <td className="py-1 text-ink-secondary">{line.qty} {line.unit}</td>
+                        <td className="py-1 text-ink-secondary">{formatCurrency(line.unitCost)}</td>
+                        <td className="py-1 text-right tabular text-ink">{formatCurrency(line.qty * line.unitCost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Добавить поступление" size="lg">
+        <form className="users-modal-form" onSubmit={submitCreate}>
+          <label><span>Объект</span><CustomSelect fullWidth value={objectId} onValueChange={setObjectId} options={objects.map((o) => ({ value: o.id, label: o.name }))} /></label>
+          <label><span>Поставщик</span><input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="ООО «Стройматериалы»" /></label>
+
+          <div>
+            <span className="text-sm font-medium text-ink">Позиции</span>
+            <div className="mt-2 flex flex-col gap-2">
+              {lines.map((line, index) => (
+                <div key={index} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2">
+                  <input placeholder="Материал" value={line.materialName} onChange={(e) => updateLine(index, { materialName: e.target.value })} />
+                  <input placeholder="Ед." value={line.unit} onChange={(e) => updateLine(index, { unit: e.target.value })} />
+                  <input type="number" min="0" step="0.001" placeholder="Кол-во" value={line.qty || ""} onChange={(e) => updateLine(index, { qty: Number(e.target.value) })} />
+                  <input type="number" min="0" step="0.01" placeholder="Цена" value={line.unitCost || ""} onChange={(e) => updateLine(index, { unitCost: Number(e.target.value) })} />
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setLines((current) => current.filter((_, i) => i !== index))} disabled={lines.length === 1}><Trash2 size={13} /></Button>
+                </div>
+              ))}
+            </div>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setLines((current) => [...current, { ...EMPTY_LINE }])} style={{ marginTop: 8 }}>
+              <Plus size={13} /> Добавить строку
+            </Button>
+          </div>
+
+          {createError && <p className="users-modal-error" role="alert">{createError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={creating}>{creating ? "Сохранение..." : "Сохранить"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
-  );
-}
-
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-ink-secondary">{label}</p>
-      <div className="mt-1.5">{children}</div>
-    </div>
   );
 }

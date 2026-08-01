@@ -1,4 +1,5 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup>  <UserSecretsId>9c5c73f5-ca0a-4ca6-8275-f85514a7b66d</UserSecretsId>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Application\Application.csproj" />
