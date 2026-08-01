@@ -6,6 +6,12 @@ public sealed class SeedOptions
 
     public SeedCompanyOptions Company { get; init; } = new();
     public List<SeedOwnerOptions> Owners { get; init; } = [];
+
+    // Gates DemoSeedDataService (Development-only demo dataset). Defaults to
+    // off — must be explicitly opted into via Seed:DemoDataEnabled /
+    // Seed__DemoDataEnabled=true. Program.cs additionally never calls it
+    // outside Development, regardless of this flag.
+    public bool DemoDataEnabled { get; init; }
 }
 
 public sealed class SeedCompanyOptions

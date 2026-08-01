@@ -60,6 +60,7 @@ public static class DependencyInjection
 
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<SeedDataService>();
+        services.AddScoped<DemoSeedDataService>();
 
         services.AddOptions<FileStorageOptions>()
             .Bind(configuration.GetSection(FileStorageOptions.SectionName))

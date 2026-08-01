@@ -270,6 +270,16 @@ using (var scope = app.Services.CreateScope())
 
     var seedDataService = scope.ServiceProvider.GetRequiredService<SeedDataService>();
     await seedDataService.SeedAsync(CancellationToken.None);
+
+    // DemoSeedDataService itself gates on Seed:DemoDataEnabled (default off);
+    // this is the second, independent guard — demo data never runs in
+    // Production regardless of how that flag is set, same dev-only spirit
+    // as the Swagger UI gate below.
+    if (!app.Environment.IsProduction())
+    {
+        var demoSeedDataService = scope.ServiceProvider.GetRequiredService<DemoSeedDataService>();
+        await demoSeedDataService.SeedAsync(CancellationToken.None);
+    }
 }
 
 // Must be first: everything downstream can throw, and this is the only
