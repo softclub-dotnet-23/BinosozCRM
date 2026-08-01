@@ -17,28 +17,29 @@ namespace Api.BackgroundServices;
 // query filter, exceptions caught and logged per-company rather than
 // crashing the host.
 //
-// Checks once every 24h for items whose due date/time falls on
-// *yesterday* specifically — DueDate/DueAt is a point in time, so "just
-// became overdue" only happens once, on the day after it passes. Without
+// Runs at each Asia/Dushanbe business-day boundary for items whose due
+// date/time falls on *yesterday* specifically — DueDate/DueAt is a point in
+// time, so "just became overdue" only happens once, on the day after it
+// passes. Without
 // persisting "already notified" state per item (a real field this
 // codebase doesn't have), checking exactly yesterday is what keeps this
 // from re-firing the same notification every single day an item stays
 // overdue.
 public sealed class OverdueCheckBackgroundService(
     IServiceScopeFactory scopeFactory,
-    ILogger<OverdueCheckBackgroundService> logger) : BackgroundService
+    ILogger<OverdueCheckBackgroundService> logger,
+    IBusinessTimeProvider businessTime) : BackgroundService
 {
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(CheckInterval);
-
-        do
+        while (!stoppingToken.IsCancellationRequested)
         {
             await RunOnceAsync(stoppingToken);
+
+            var now = businessTime.UtcNow;
+            var delay = businessTime.GetNextBusinessDayStartUtc(now) - now;
+            await Task.Delay(delay, stoppingToken);
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
     private async Task RunOnceAsync(CancellationToken cancellationToken)
@@ -54,7 +55,7 @@ public sealed class OverdueCheckBackgroundService(
         var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<ApplicationDbContext>>();
         var notifier = scope.ServiceProvider.GetRequiredService<IOverdueNotifier>();
 
-        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+        var yesterday = businessTime.Today.AddDays(-1);
 
         List<Company> companies;
         await using (var lookupContext = new ApplicationDbContext(dbOptions, new SystemCompanyCurrentUserService(Guid.Empty)))
@@ -67,7 +68,7 @@ public sealed class OverdueCheckBackgroundService(
             try
             {
                 await using var context = new ApplicationDbContext(dbOptions, new SystemCompanyCurrentUserService(company.Id));
-                await CheckCompanyAsync(context, notifier, company.Id, yesterday, cancellationToken);
+                await CheckCompanyAsync(context, notifier, company.Id, yesterday, businessTime, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -86,6 +87,7 @@ public sealed class OverdueCheckBackgroundService(
         IOverdueNotifier notifier,
         Guid companyId,
         DateOnly yesterday,
+        IBusinessTimeProvider businessTime,
         CancellationToken cancellationToken)
     {
         var overdueWorkOrders = await context.WorkOrders
@@ -102,7 +104,7 @@ public sealed class OverdueCheckBackgroundService(
             .Where(t => t.DueAt != null && t.Status != IndividualTaskStatus.Done)
             .ToListAsync(cancellationToken);
 
-        foreach (var task in overdueIndividualTasks.Where(t => DateOnly.FromDateTime(t.DueAt!.Value.UtcDateTime) == yesterday))
+        foreach (var task in overdueIndividualTasks.Where(t => businessTime.GetBusinessDate(t.DueAt!.Value) == yesterday))
         {
             await notifier.NotifyIndividualTaskOverdueAsync(
                 companyId, task.Id, task.BrigadeId, task.DueAt!.Value, cancellationToken);

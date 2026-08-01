@@ -14,16 +14,17 @@ namespace Api.BackgroundJobs;
 // PROGRESS.md Phase 5 Step 8. A thin timer loop only — all the actual
 // logic (period math, which workers, alerting) lives in
 // PayrollDraftGenerator (Application layer), directly unit-testable
-// without waiting on this loop or the hosting lifecycle.
-public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFactory, ILogger<PayrollDraftBackgroundService> logger) : BackgroundService
+// without waiting on this loop or the hosting lifecycle. After its startup
+// run, this service waits for the next Asia/Dushanbe business-day boundary,
+// never the host machine's local midnight.
+public sealed class PayrollDraftBackgroundService(
+    IServiceScopeFactory scopeFactory,
+    ILogger<PayrollDraftBackgroundService> logger,
+    IBusinessTimeProvider businessTime) : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(24);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(Interval);
-
-        do
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
@@ -37,8 +38,11 @@ public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFact
                 // per-worker failures itself.
                 logger.LogError(ex, "Payroll draft background job run failed.");
             }
+
+            var now = businessTime.UtcNow;
+            var delay = businessTime.GetNextBusinessDayStartUtc(now) - now;
+            await Task.Delay(delay, stoppingToken);
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
     private async Task RunOnceAsync(CancellationToken cancellationToken)
@@ -52,7 +56,7 @@ public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFact
             return;
         }
         var dbOptions = scope.ServiceProvider.GetRequiredService<DbContextOptions<ApplicationDbContext>>();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = businessTime.Today;
 
         List<Company> companies;
         await using (var lookupContext = new ApplicationDbContext(dbOptions, new SystemCompanyCurrentUserService(Guid.Empty)))
@@ -65,7 +69,8 @@ public sealed class PayrollDraftBackgroundService(IServiceScopeFactory scopeFact
             try
             {
                 await using var context = new ApplicationDbContext(dbOptions, new SystemCompanyCurrentUserService(company.Id));
-                await PayrollDraftGenerator.GenerateForCompanyAsync(context, company, today, logger, cancellationToken);
+                await PayrollDraftGenerator.GenerateForCompanyAsync(
+                    context, company, today, businessTime, logger, cancellationToken);
             }
             catch (Exception ex)
             {

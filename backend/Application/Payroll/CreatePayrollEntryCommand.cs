@@ -27,7 +27,9 @@ public sealed class CreatePayrollEntryCommandValidator : AbstractValidator<Creat
     }
 }
 
-public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext context)
+public sealed class CreatePayrollEntryCommandHandler(
+    IApplicationDbContext context,
+    IBusinessTimeProvider businessTime)
     : IRequestHandler<CreatePayrollEntryCommand, Result<PayrollEntryDto>>
 {
     public async Task<Result<PayrollEntryDto>> Handle(CreatePayrollEntryCommand request, CancellationToken cancellationToken)
@@ -53,7 +55,8 @@ public sealed class CreatePayrollEntryCommandHandler(IApplicationDbContext conte
 
         var calculatedAmount = await CalculatedAmountCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
         var latenessDeductionAmount = await LatenessDeductionCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
-        var bonusAmount = await BonusAmountCalculator.ComputeAsync(context, worker, request.PeriodStart, request.PeriodEnd, cancellationToken);
+        var bonusAmount = await BonusAmountCalculator.ComputeAsync(
+            context, worker, request.PeriodStart, request.PeriodEnd, businessTime, cancellationToken);
         var advanceDeductedAmount = await AdvanceDeductedAmountCalculator.ComputeAsync(context, worker, request.PeriodEnd, cancellationToken);
 
         var entry = PayrollEntry.Create(worker.CompanyId, worker.Id, request.PeriodStart, request.PeriodEnd);

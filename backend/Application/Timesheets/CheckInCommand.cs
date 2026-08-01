@@ -25,7 +25,10 @@ public sealed class CheckInCommandValidator : AbstractValidator<CheckInCommand>
     }
 }
 
-public sealed class CheckInCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class CheckInCommandHandler(
+    IApplicationDbContext context,
+    ICurrentUserService currentUser,
+    IBusinessTimeProvider businessTime)
     : IRequestHandler<CheckInCommand, Result<TimesheetDto>>
 {
     public async Task<Result<TimesheetDto>> Handle(CheckInCommand request, CancellationToken cancellationToken)
@@ -45,8 +48,8 @@ public sealed class CheckInCommandHandler(IApplicationDbContext context, ICurren
         if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
             return Result.Failure<TimesheetDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
 
-        var checkInAt = DateTimeOffset.UtcNow;
-        var date = DateOnly.FromDateTime(checkInAt.UtcDateTime);
+        var checkInAt = businessTime.UtcNow;
+        var date = businessTime.GetBusinessDate(checkInAt);
 
         // §8.9: a day covered by AbsenceRecord is a "уважительное
         // отсутствие" — a real check-in landing on that same day is the
@@ -72,7 +75,10 @@ public sealed class CheckInCommandHandler(IApplicationDbContext context, ICurren
             context.Timesheets.Add(timesheet);
         }
 
-        timesheet.CheckIn(checkInAt, company.LatenessGraceMinutes);
+        DateTimeOffset? plannedStartAt = worker.ShiftStartTime is null
+            ? null
+            : businessTime.GetBusinessDateTimeUtc(date, worker.ShiftStartTime.Value);
+        timesheet.CheckIn(checkInAt, company.LatenessGraceMinutes, plannedStartAt);
 
         await context.SaveChangesAsync(cancellationToken);
 

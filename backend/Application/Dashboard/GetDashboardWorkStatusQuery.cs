@@ -23,7 +23,10 @@ namespace Application.Dashboard;
 // optional BrigadeId filter applying to both entities directly.
 public sealed record GetDashboardWorkStatusQuery(Guid? ObjectId, Guid? BrigadeId) : IRequest<Result<DashboardWorkStatusDto>>;
 
-public sealed class GetDashboardWorkStatusQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
+public sealed class GetDashboardWorkStatusQueryHandler(
+    IApplicationDbContext context,
+    ICurrentUserService currentUser,
+    IBusinessTimeProvider businessTime)
     : IRequestHandler<GetDashboardWorkStatusQuery, Result<DashboardWorkStatusDto>>
 {
     public async Task<Result<DashboardWorkStatusDto>> Handle(GetDashboardWorkStatusQuery request, CancellationToken cancellationToken)
@@ -57,8 +60,8 @@ public sealed class GetDashboardWorkStatusQueryHandler(IApplicationDbContext con
             .Select(g => new StatusCountDto(g.Key.ToString(), g.Count()))
             .ToListAsync(cancellationToken);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var now = DateTimeOffset.UtcNow;
+        var now = businessTime.UtcNow;
+        var today = businessTime.GetBusinessDate(now);
 
         var overdueWorkOrders = await workOrders.CountAsync(
             w => w.DueDate != null && w.DueDate < today && w.Status != WorkOrderStatus.Accepted && w.Status != WorkOrderStatus.Closed,

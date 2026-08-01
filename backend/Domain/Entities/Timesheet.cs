@@ -41,7 +41,7 @@ public sealed class Timesheet : AuditableEntity, ICompanyOwned, ISoftDelete
         };
     }
 
-    public void CheckIn(DateTimeOffset checkInAt, int latenessGraceMinutes)
+    public void CheckIn(DateTimeOffset checkInAt, int latenessGraceMinutes, DateTimeOffset? plannedStartAt = null)
     {
         CheckInAt = checkInAt;
 
@@ -51,7 +51,10 @@ public sealed class Timesheet : AuditableEntity, ICompanyOwned, ISoftDelete
             return;
         }
 
-        var plannedStart = new DateTimeOffset(Date, PlannedStartTime.Value, checkInAt.Offset);
+        // The optional instant lets the application supply the approved
+        // business-zone shift start. The fallback preserves the domain-only
+        // API used by legacy callers that already provide matching offsets.
+        var plannedStart = plannedStartAt ?? new DateTimeOffset(Date, PlannedStartTime.Value, checkInAt.Offset);
         var lateMinutes = (int)Math.Max(0, (checkInAt - plannedStart).TotalMinutes) - latenessGraceMinutes;
         LateMinutes = Math.Max(0, lateMinutes);
     }

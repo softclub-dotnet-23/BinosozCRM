@@ -12,6 +12,8 @@ namespace Api.IntegrationTests;
 [Collection(PostgresCollection.Name)]
 public sealed class PayrollBackendAuditTests(PostgresFixture fixture)
 {
+    private static readonly FixedBusinessTimeProvider BusinessTime = new(DateTimeOffset.UtcNow);
+
     [Fact]
     public async Task Payroll_queries_and_creation_hide_another_companys_worker_and_entry()
     {
@@ -37,7 +39,7 @@ public sealed class PayrollBackendAuditTests(PostgresFixture fixture)
         var actorA = new FixedCurrentUserService(companyA.Id, Guid.NewGuid(), Role.Accountant);
         await using var context = fixture.CreateDbContext(actorA);
 
-        var create = await new CreatePayrollEntryCommandHandler(context).Handle(
+        var create = await new CreatePayrollEntryCommandHandler(context, BusinessTime).Handle(
             new CreatePayrollEntryCommand(workerB.Id, periodStart, periodEnd), CancellationToken.None);
         var get = await new GetPayrollEntryQueryHandler(context, actorA).Handle(
             new GetPayrollEntryQuery(entryB.Id), CancellationToken.None);
@@ -70,7 +72,7 @@ public sealed class PayrollBackendAuditTests(PostgresFixture fixture)
         await using (var context = fixture.CreateDbContext(new FixedCurrentUserService(company.Id)))
         {
             await PayrollDraftGenerator.GenerateForCompanyAsync(
-                context, company, today, NullLogger.Instance, CancellationToken.None);
+                context, company, today, BusinessTime, NullLogger.Instance, CancellationToken.None);
         }
 
         await using var verify = fixture.CreateDbContext(new FixedCurrentUserService(company.Id));
