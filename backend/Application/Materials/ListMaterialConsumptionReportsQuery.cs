@@ -23,20 +23,32 @@ public sealed class ListMaterialConsumptionReportsQueryHandler(IApplicationDbCon
     {
         var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
 
-        var query = context.MaterialConsumptionReports.AsQueryable();
+        var query = context.MaterialConsumptionReports.AsNoTracking().AsQueryable();
         if (allowedObjectIds is not null)
             query = query.Where(r => allowedObjectIds.Contains(r.ObjectId));
 
-        query = query.OrderByDescending(r => r.Date);
-
         var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query
+        var items = await (
+                from report in query
+                join constructionObject in context.ConstructionObjects.AsNoTracking()
+                    on report.ObjectId equals constructionObject.Id
+                orderby report.Date descending
+                select new MaterialConsumptionReportDto(
+                    report.Id,
+                    report.ObjectId,
+                    constructionObject.Name,
+                    report.BrigadeId,
+                    report.ReportedByUserId,
+                    report.Date,
+                    report.MaterialName,
+                    report.Unit,
+                    report.QtyUsed,
+                    report.QtyShortage,
+                    report.Comment))
             .Skip((request.Page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = items.Select(MaterialConsumptionReportDto.FromEntity).ToList();
-
-        return Result.Success(new PagedResult<MaterialConsumptionReportDto>(dtos, request.Page, request.PageSize, totalCount));
+        return Result.Success(new PagedResult<MaterialConsumptionReportDto>(items, request.Page, request.PageSize, totalCount));
     }
 }
