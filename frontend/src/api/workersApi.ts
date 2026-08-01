@@ -52,3 +52,13 @@ export function createWorker(brigadeId: string, input: CreateWorkerInput): Promi
 export function terminateWorker(workerId: string, terminationDate: string): Promise<Worker> {
   return request<Worker>(`/api/v1/workers/${workerId}/terminate`, { method: "PUT", body: { terminationDate } });
 }
+
+export interface ChangeWorkerPayRateInput {
+  payRateType: PayRateType;
+  payRate: number;
+  effectiveFrom: string;
+}
+
+export function changeWorkerPayRate(workerId: string, input: ChangeWorkerPayRateInput): Promise<Worker> {
+  return request<Worker>(`/api/v1/workers/${workerId}/pay-rate`, { method: "PUT", body: input });
+}

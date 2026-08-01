@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertCircle, Loader2, Plus, UserMinus, Users } from "lucide-react";
+import { AlertCircle, Loader2, Plus, UserMinus, Users, Wallet } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -9,17 +9,30 @@ import { DataTable, type DataTableColumn } from "../components/tables/DataTable"
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Modal } from "../components/ui/Modal";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../hooks/useToast";
 import { ApiError, NetworkError } from "../api/apiClient";
 import { listBrigades, type Brigade } from "../api/brigadesApi";
-import { createWorker, listAllWorkers, terminateWorker, type PayRateType, type Worker } from "../api/workersApi";
+import { changeWorkerPayRate, createWorker, listAllWorkers, terminateWorker, type PayRateType, type Worker } from "../api/workersApi";
 import { formatCurrency } from "../utils/format";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
-  if (error instanceof ApiError) return error.message || fallback;
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case "WORKER_NOT_FOUND":
+        return "Сотрудник не найден";
+      case "PAY_RATE_EFFECTIVE_DATE_CONFLICT":
+        return "Дата вступления в силу должна быть позже даты последнего изменения ставки";
+      default:
+        return error.message || fallback;
+    }
+  }
   return fallback;
 }
+
+const RATE_FORM_INITIAL = { payRateType: "Hourly" as PayRateType, payRate: "", effectiveFrom: "" };
 
 const PAY_RATE_LABEL: Record<PayRateType, string> = { Hourly: "Почасовая", Piecework: "Сдельная" };
 
@@ -35,6 +48,7 @@ const CREATE_FORM_INITIAL = {
 };
 
 export default function EmployeesPage() {
+  const { user: currentUser } = useAuth();
   const { showToast } = useToast();
 
   const [brigades, setBrigades] = useState<Brigade[]>([]);
@@ -54,6 +68,13 @@ export default function EmployeesPage() {
   const [terminateDate, setTerminateDate] = useState("");
   const [terminateError, setTerminateError] = useState("");
   const [terminating, setTerminating] = useState(false);
+
+  const isOwner = currentUser?.role === "owner";
+  const [rateTarget, setRateTarget] = useState<Worker | null>(null);
+  const [rateForm, setRateForm] = useState(RATE_FORM_INITIAL);
+  const [rateError, setRateError] = useState("");
+  const [rateConfirmOpen, setRateConfirmOpen] = useState(false);
+  const [savingRate, setSavingRate] = useState(false);
 
   async function loadAll() {
     setLoadState("loading");
@@ -150,6 +171,51 @@ export default function EmployeesPage() {
     }
   }
 
+  function openRateChange(worker: Worker) {
+    setRateTarget(worker);
+    setRateForm(RATE_FORM_INITIAL);
+    setRateError("");
+    setRateConfirmOpen(false);
+  }
+
+  function submitRateForm(event: FormEvent) {
+    event.preventDefault();
+    const rate = Number(rateForm.payRate);
+    if (!rateForm.payRate.trim() || Number.isNaN(rate) || (rateForm.payRateType === "Hourly" ? rate <= 0 : rate < 0)) {
+      setRateError(
+        rateForm.payRateType === "Hourly"
+          ? "Почасовая ставка должна быть больше нуля"
+          : "Сдельная ставка не может быть отрицательной",
+      );
+      return;
+    }
+    if (!rateForm.effectiveFrom) {
+      setRateError("Укажите дату вступления в силу");
+      return;
+    }
+    setRateError("");
+    setRateConfirmOpen(true);
+  }
+
+  async function confirmRateChange() {
+    if (!rateTarget || savingRate) return;
+    setSavingRate(true);
+    try {
+      const updated = await changeWorkerPayRate(rateTarget.id, {
+        payRateType: rateForm.payRateType,
+        payRate: Number(rateForm.payRate),
+        effectiveFrom: rateForm.effectiveFrom,
+      });
+      setWorkers((current) => current.map((w) => (w.id === updated.id ? updated : w)));
+      setRateTarget(null);
+      showToast("Ставка обновлена");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось изменить ставку"), "error");
+    } finally {
+      setSavingRate(false);
+    }
+  }
+
   const columns: DataTableColumn<Worker>[] = [
     { key: "fullName", header: "Сотрудник", render: (row) => <span className="font-semibold text-ink">{row.fullName}</span> },
     { key: "brigade", header: "Бригада", render: (row) => <span className="text-ink-secondary">{brigadeNameById.get(row.brigadeId) ?? "—"}</span> },
@@ -173,7 +239,10 @@ export default function EmployeesPage() {
       className: "text-right",
       render: (row) =>
         row.isActive ? (
-          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            {isOwner && (
+              <Button size="sm" variant="secondary" onClick={() => openRateChange(row)}><Wallet size={13} /> Ставка</Button>
+            )}
             <Button size="sm" variant="secondary" onClick={() => openTerminate(row)}><UserMinus size={13} /> Уволить</Button>
           </div>
         ) : null,
@@ -253,6 +322,67 @@ export default function EmployeesPage() {
           </div>
         </form>
       </Modal>
+
+      <Modal open={rateTarget !== null && !rateConfirmOpen && !savingRate} onClose={() => setRateTarget(null)} title="Изменить ставку" description={rateTarget?.fullName} size="sm">
+        <form className="users-modal-form" onSubmit={submitRateForm}>
+          <p className="col-span-2 text-sm text-ink-secondary">
+            Текущая ставка:{" "}
+            {rateTarget?.payRateType && rateTarget.payRate != null
+              ? `${formatCurrency(rateTarget.payRate)} · ${PAY_RATE_LABEL[rateTarget.payRateType]}`
+              : "не указана"}
+          </p>
+          <label>
+            <span>Тип оплаты</span>
+            <CustomSelect
+              fullWidth
+              value={rateForm.payRateType}
+              onValueChange={(v) => setRateForm((f) => ({ ...f, payRateType: v as PayRateType }))}
+              options={[{ value: "Hourly", label: "Почасовая" }, { value: "Piecework", label: "Сдельная" }]}
+            />
+          </label>
+          <label>
+            <span>Новая ставка</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={rateForm.payRate}
+              aria-invalid={rateError ? true : undefined}
+              onChange={(e) => setRateForm((f) => ({ ...f, payRate: e.target.value }))}
+            />
+          </label>
+          <label>
+            <span>Действует с</span>
+            <input
+              type="date"
+              value={rateForm.effectiveFrom}
+              aria-invalid={rateError ? true : undefined}
+              onChange={(e) => setRateForm((f) => ({ ...f, effectiveFrom: e.target.value }))}
+            />
+          </label>
+          {rateError && <p className="users-modal-error" role="alert">{rateError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setRateTarget(null)}>Отмена</Button>
+            <Button type="submit">Далее</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={rateTarget !== null && rateConfirmOpen}
+        onClose={() => setRateConfirmOpen(false)}
+        title="Подтвердите изменение ставки"
+        description={rateTarget?.fullName}
+        note={
+          <>
+            Новая ставка: {rateForm.payRate ? formatCurrency(Number(rateForm.payRate)) : "—"} · {PAY_RATE_LABEL[rateForm.payRateType]}
+            <br />
+            Действует с: {rateForm.effectiveFrom || "—"}
+          </>
+        }
+        confirmLabel={savingRate ? "Сохранение..." : "Сохранить"}
+        onConfirm={() => void confirmRateChange()}
+      />
     </AppLayout>
   );
 }
