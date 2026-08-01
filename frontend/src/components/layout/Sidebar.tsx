@@ -87,7 +87,6 @@ const BRIGADIR_NAV_ITEMS: NavEntry[] = [
   { to: "/works", label: "Назначенные работы", icon: ClipboardCheck },
   { to: "/attendance", label: "Посещаемость", icon: Calendar },
   { to: "/inventory/materials", label: "Материалы", icon: Package },
-  { to: "/reports", label: "Отчёты", icon: BarChart3 },
 ];
 
 interface SidebarProps {
