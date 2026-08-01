@@ -53,7 +53,11 @@ public sealed class CreateWorkOrderCommandHandler(IApplicationDbContext context,
         if (request.EstimateItemId is not null && !await context.EstimateItems.AnyAsync(e => e.Id == request.EstimateItemId, cancellationToken))
             return Result.Failure<WorkOrderDto>(new Error("ESTIMATE_ITEM_NOT_FOUND", "Estimate item not found."));
 
-        var company = await context.Companies.FirstAsync(cancellationToken);
+        // Company itself is not company-owned, so it is not covered by the
+        // CompanyId query filter. Select the caller's company explicitly;
+        // FirstAsync() can otherwise reserve a code from another tenant.
+        var company = await context.Companies
+            .SingleAsync(company => company.Id == currentUser.CompanyId!.Value, cancellationToken);
         var code = company.ReserveNextCode();
 
         var workOrder = WorkOrder.Create(

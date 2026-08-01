@@ -88,14 +88,14 @@ function CompanyDashboardPage() {
             <MetricCard label="Нарядов" value={String(workOrderCount)} icon={ClipboardList} tone="green" footer="Всего создано" />
             <MetricCard
               label="Просрочено"
-              value={String(workStatus.overdueWorkOrderCount + workStatus.overdueIndividualTaskCount)}
+              value={String(workStatus.overdueWorkOrderCount)}
               icon={AlertTriangle}
               tone="red"
-              footer={`${workStatus.overdueWorkOrderCount} нарядов, ${workStatus.overdueIndividualTaskCount} задач`}
+              footer={`${workStatus.overdueWorkOrderCount} нарядов`}
             />
           </StaggeredGrid>
 
-          <MotionSection delayMs={80} className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <MotionSection delayMs={80} className="mt-4 grid grid-cols-1 gap-4">
             <Card className="p-5 sm:p-6">
               <h2 className="text-[17px] font-bold text-ink">Наряды по статусам</h2>
               <div className="mt-4 flex flex-col gap-2">
@@ -107,7 +107,7 @@ function CompanyDashboardPage() {
                       <span className="w-32 shrink-0 text-sm text-ink-secondary">{entry.status}</span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#F5F5F4]">
                         <div
-                          className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+                        className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
                           style={{ width: `${workOrderStatusTotal ? (entry.count / workOrderStatusTotal) * 100 : 0}%` }}
                         />
                       </div>
@@ -118,21 +118,6 @@ function CompanyDashboardPage() {
               </div>
             </Card>
 
-            <Card className="p-5 sm:p-6">
-              <h2 className="text-[17px] font-bold text-ink">Личные задачи по статусам</h2>
-              <div className="mt-4 flex flex-col gap-2">
-                {workStatus.individualTaskStatusCounts.length === 0 ? (
-                  <p className="text-sm text-ink-muted">Задач пока нет</p>
-                ) : (
-                  workStatus.individualTaskStatusCounts.map((entry) => (
-                    <div key={entry.status} className="flex items-center justify-between text-sm">
-                      <span className="text-ink-secondary">{entry.status}</span>
-                      <span className="font-semibold text-ink">{entry.count}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
           </MotionSection>
 
           <MotionSection delayMs={140}>
