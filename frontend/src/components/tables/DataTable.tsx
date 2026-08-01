@@ -73,7 +73,7 @@ export function DataTable<T>({ columns, rows, rowKey, selectedRowKey, onRowClick
                 className={cn(
                   "border-b border-border transition-colors last:border-0",
                   onRowClick && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset",
-                  selected ? "bg-primary-soft/60" : "hover:bg-[#FAFAF9]",
+                  selected ? "bg-primary-soft/60" : "hover:bg-app-bg",
                 )}
               >
                 {columns.map((col) => (

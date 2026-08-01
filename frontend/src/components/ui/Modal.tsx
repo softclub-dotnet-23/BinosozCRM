@@ -30,7 +30,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div
-        className="absolute inset-0 bg-[#171717]/45 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-ink/45 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />

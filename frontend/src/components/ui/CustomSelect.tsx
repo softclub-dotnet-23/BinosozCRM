@@ -328,7 +328,7 @@ export function CustomSelect({
             : open
               ? "border-primary ring-2 ring-primary/15"
               : "border-border-strong hover:border-[#d4d4d2]",
-          disabled && "cursor-not-allowed bg-[#FAFAF9] text-ink-muted",
+          disabled && "cursor-not-allowed bg-app-bg text-ink-muted",
           loading && "cursor-wait",
         )}
       >

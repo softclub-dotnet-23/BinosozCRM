@@ -19,7 +19,7 @@ export function Drawer({ open, onClose, title, children, footer }: DrawerProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-[#171717]/40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-ink/40" onClick={onClose} aria-hidden="true" />
       <div
         ref={containerRef}
         role="dialog"

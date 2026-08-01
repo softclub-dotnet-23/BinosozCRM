@@ -20,7 +20,7 @@ export function ObjectStateTable({ rows }: { rows: ObjectSummaryRow[] }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-border last:border-0 hover:bg-[#FAFAF9]">
+            <tr key={row.id} className="border-b border-border last:border-0 hover:bg-app-bg">
               <td className="px-5 py-4 font-semibold text-ink sm:px-6">{row.name}</td>
               <td className="px-3 py-4 text-ink-secondary">
                 <div className="flex items-center gap-2">
