@@ -1,30 +1,16 @@
-import { LayoutDashboard } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ClipboardList, Loader2 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Card } from "../components/ui/Card";
-import { EmptyState } from "../components/ui/EmptyState";
+import { MetricCard } from "../components/ui/MetricCard";
+import { Button } from "../components/ui/Button";
+import { getDashboardWorkStatus, type DashboardWorkStatus } from "../api/dashboardApi";
+import { ApiError, NetworkError } from "../api/apiClient";
 
-/**
- * This dashboard's widgets (crew roster, brigade identity/efficiency,
- * attendance-with-names, critical materials) all depend on backend contracts
- * that don't exist for a Brigadir caller — see BrigadirTeamPage.tsx and
- * BrigadirAttendancePage.tsx for the specific gaps, and note materials has no
- * real API in this codebase at all yet (MaterialsPage.tsx is still
- * mock-only). "Мои работы" (/works) is the one Brigadir data source with a
- * real, usable contract (GET /work-orders/mine) — it's a real page in its
- * own right rather than a card here, so this landing dashboard is left
- * unavailable rather than showing one real card next to three fabricated
- * ones. See the frontend audit (2026-07-31) and its remediation report.
- */
 export default function BrigadirDashboardPage() {
-  return (
-    <AppLayout title="Панель бригадира" subtitle="Раздел пока недоступен">
-      <Card>
-        <EmptyState
-          icon={LayoutDashboard}
-          title="Раздел пока недоступен"
-          description="Backend ещё не даёт бригадиру данные для большинства виджетов этой панели. Актуальные данные по вашим работам доступны в разделе «Мои работы»."
-        />
-      </Card>
-    </AppLayout>
-  );
+  const [data, setData] = useState<DashboardWorkStatus | null>(null); const [error, setError] = useState("");
+  async function load() { setError(""); try { setData(await getDashboardWorkStatus()); } catch (cause) { setError(cause instanceof NetworkError ? "Нет подключения к серверу" : cause instanceof ApiError ? cause.message : "Не удалось загрузить сводку"); } }
+  useEffect(() => { void load(); }, []);
+  const total = useMemo(() => data?.workOrderStatusCounts.reduce((sum, item) => sum + item.count, 0) ?? 0, [data]);
+  return <AppLayout title="Панель бригадира" subtitle="Сводка только по вашей бригаде">{error ? <Card><p className="text-red">{error}</p><Button className="mt-3" size="sm" onClick={() => void load()}>Повторить</Button></Card> : !data ? <Card><Loader2 className="animate-spin" /></Card> : <><div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><MetricCard label="Мои наряды" value={String(total)} icon={ClipboardList} tone="orange" footer="По статусам" /><MetricCard label="Просрочено" value={String(data.overdueWorkOrderCount)} icon={AlertTriangle} tone="red" footer="Требуют внимания" /></div><Card className="mt-4 p-5"><h2 className="font-bold text-ink">Наряды по статусам</h2><div className="mt-3 space-y-2">{data.workOrderStatusCounts.length ? data.workOrderStatusCounts.map((item) => <div key={item.status} className="flex justify-between text-sm"><span>{item.status}</span><strong>{item.count}</strong></div>) : <p className="text-ink-muted">Назначенных нарядов пока нет</p>}</div></Card></>}</AppLayout>;
 }
