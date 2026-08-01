@@ -41,4 +41,20 @@ public sealed class BrigadesController(ISender sender) : ControllerBase
         var result = await sender.Send(new AssignBrigadirCommand(brigadeId, request.UserId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpPost("{brigadeId:guid}/activate")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> Activate(Guid brigadeId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ActivateBrigadeCommand(brigadeId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpPost("{brigadeId:guid}/deactivate")]
+    [Authorize(Roles = "Owner,Prorab")]
+    public async Task<IActionResult> Deactivate(Guid brigadeId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new DeactivateBrigadeCommand(brigadeId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

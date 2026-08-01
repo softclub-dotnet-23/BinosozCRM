@@ -73,9 +73,26 @@ public sealed class PostgresFixture : IAsyncLifetime
     public ApplicationDbContext CreateDbContext() => CreateDbContext(new NullCurrentUserService());
 
     public ApplicationDbContext CreateDbContext(ICurrentUserService currentUser)
+        => CreateDbContext(_container.GetConnectionString(), currentUser);
+
+    public async Task<string> CreateIsolatedDatabaseConnectionStringAsync(CancellationToken cancellationToken = default)
+    {
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+        {
+            Database = $"integration_{Guid.NewGuid():N}"
+        };
+
+        var connectionString = builder.ConnectionString;
+        await using var context = CreateDbContext(connectionString, new NullCurrentUserService());
+        await context.Database.MigrateAsync(cancellationToken);
+        return connectionString;
+    }
+
+    public ApplicationDbContext CreateDbContext(string connectionString, ICurrentUserService currentUser)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
+            .UseNpgsql(connectionString)
+            .AddInterceptors(new TestCurrentUserSaveChangesInterceptor(currentUser))
             .Options;
 
         return new ApplicationDbContext(options, currentUser);

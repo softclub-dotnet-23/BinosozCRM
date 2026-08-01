@@ -18,7 +18,7 @@ public sealed class ListPayrollAdvancesQueryHandler(IApplicationDbContext contex
 {
     public async Task<Result<PagedResult<PayrollAdvanceDto>>> Handle(ListPayrollAdvancesQuery request, CancellationToken cancellationToken)
     {
-        var query = context.PayrollAdvances.AsQueryable();
+        var query = context.PayrollAdvances.AsNoTracking().AsQueryable();
 
         if (currentUser.Role == Role.Brigadir)
         {

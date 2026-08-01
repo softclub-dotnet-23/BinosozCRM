@@ -1,5 +1,16 @@
 import type { UserRole } from "../../types";
 
+/**
+ * `administrator` and `storekeeper` are UI-only placeholders: the backend's
+ * Role enum (Domain/Enums/Role.cs) only has Owner/Prorab/Brigadir/Accountant,
+ * and mapBackendRole() (api/authApi.ts) can never produce either of them from
+ * a real login. They stay in this type/map for pages that already reference
+ * them, but no authenticated session will ever carry one until/unless the
+ * backend adds a matching role — a decision this frontend integration
+ * explicitly did not make on its own (see 2026-07-31 frontend-integration
+ * checkpoint notes in docs/PROGRESS.md).
+ */
+
 /** Landing route right after login, and where a role gets bounced back to if it opens a route it can't use. */
 export const ROLE_HOME: Record<UserRole, string> = {
   owner: "/dashboard",

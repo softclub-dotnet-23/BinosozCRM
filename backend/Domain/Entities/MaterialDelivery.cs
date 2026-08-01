@@ -7,6 +7,12 @@ public sealed class MaterialDelivery : AuditableEntity, ICompanyOwned, ISoftDele
     public Guid CompanyId { get; private set; }
     public Guid ObjectId { get; private set; }
     public Guid? MaterialRequestId { get; private set; }
+    // Groups several MaterialDelivery rows created together as one bulk
+    // "receipt document" (frontend-integration gap: the UI models one
+    // document with several material lines, this entity is one line per
+    // row). Null for every delivery created through the pre-existing
+    // single-item path — this is purely additive.
+    public Guid? DocumentId { get; private set; }
     public string MaterialName { get; private set; } = null!;
     public string Unit { get; private set; } = null!;
     public decimal Qty { get; private set; }
@@ -26,7 +32,8 @@ public sealed class MaterialDelivery : AuditableEntity, ICompanyOwned, ISoftDele
         decimal unitCost,
         DateTimeOffset deliveredAt,
         Guid? materialRequestId = null,
-        string? supplierName = null)
+        string? supplierName = null,
+        Guid? documentId = null)
     {
         return new MaterialDelivery
         {
@@ -34,6 +41,7 @@ public sealed class MaterialDelivery : AuditableEntity, ICompanyOwned, ISoftDele
             CompanyId = companyId,
             ObjectId = objectId,
             MaterialRequestId = materialRequestId,
+            DocumentId = documentId,
             MaterialName = materialName,
             Unit = unit,
             Qty = qty,

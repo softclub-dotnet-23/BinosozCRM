@@ -21,6 +21,7 @@ public sealed class MaterialDeliveryConfiguration : IEntityTypeConfiguration<Mat
         builder.Property(x => x.ModifiedAt).HasColumnType("timestamptz");
 
         builder.HasIndex(x => x.MaterialRequestId).HasFilter("\"MaterialRequestId\" IS NOT NULL");
+        builder.HasIndex(x => x.DocumentId).HasFilter("\"DocumentId\" IS NOT NULL");
 
         builder.HasOne<Company>().WithMany().HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ConstructionObject>().WithMany().HasForeignKey(x => x.ObjectId).OnDelete(DeleteBehavior.Restrict);

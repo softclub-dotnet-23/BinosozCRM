@@ -82,4 +82,12 @@ public sealed class AuthController(ISender sender, ILogger<AuthController> logge
         var result = await sender.Send(new ResetPasswordCommand(request.Token, request.NewPassword), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetCurrentUserQuery(), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }
