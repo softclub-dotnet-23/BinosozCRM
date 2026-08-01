@@ -45,6 +45,11 @@ const STATUS_TONE: Record<PayrollEntryStatus, "blue" | "green" | "orange"> = { D
 
 const CREATE_FORM_INITIAL = { workerId: "", periodStart: "", periodEnd: "" };
 
+/** Approve/Pay/Adjust/Create responses never carry WorkerName (only List/Get join it) — keep the name already known locally instead of overwriting it with null. */
+function mergeEntry(updated: PayrollEntry, previous?: PayrollEntry): PayrollEntry {
+  return { ...updated, workerName: updated.workerName ?? previous?.workerName ?? null };
+}
+
 export default function PayrollPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -126,7 +131,8 @@ export default function PayrollPage() {
     setCreateError("");
     try {
       const created = await createPayrollEntry(workerId, periodStart, periodEnd);
-      setEntries((current) => [created, ...current.filter((e) => e.id !== created.id)]);
+      const createdWithName: PayrollEntry = { ...created, workerName: created.workerName ?? workerNameById.get(workerId) ?? null };
+      setEntries((current) => [createdWithName, ...current.filter((e) => e.id !== created.id)]);
       setCreateOpen(false);
       showToast("Начисление создано");
     } catch (error) {
@@ -141,7 +147,7 @@ export default function PayrollPage() {
     setBusyId(entry.id);
     try {
       const updated = await approvePayrollEntry(entry.id);
-      setEntries((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      setEntries((current) => current.map((e) => (e.id === updated.id ? mergeEntry(updated, e) : e)));
       showToast("Начисление утверждено");
     } catch (error) {
       showToast(describeError(error, "Не удалось утвердить начисление"), "error");
@@ -155,7 +161,7 @@ export default function PayrollPage() {
     setBusyId(entry.id);
     try {
       const updated = await payPayrollEntry(entry.id);
-      setEntries((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      setEntries((current) => current.map((e) => (e.id === updated.id ? mergeEntry(updated, e) : e)));
       showToast("Выплата проведена");
     } catch (error) {
       showToast(describeError(error, "Не удалось провести выплату"), "error");
@@ -183,7 +189,7 @@ export default function PayrollPage() {
     setAdjustError("");
     try {
       const updated = await adjustPayrollEntry(adjustTarget.id, amount, adjustReason.trim() || undefined);
-      setEntries((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+      setEntries((current) => current.map((e) => (e.id === updated.id ? mergeEntry(updated, e) : e)));
       setAdjustTarget(null);
       showToast("Корректировка сохранена");
     } catch (error) {
@@ -221,7 +227,7 @@ export default function PayrollPage() {
   }
 
   const entryColumns: DataTableColumn<PayrollEntry>[] = [
-    { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
+    { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{row.workerName ?? workerNameById.get(row.workerId) ?? "—"}</span> },
     { key: "period", header: "Период", render: (row) => <span className="text-ink-secondary">{row.periodStart} — {row.periodEnd}</span> },
     { key: "calculated", header: "Начислено", render: (row) => <span className="tabular text-ink-secondary">{formatCurrency(row.calculatedAmount)}</span> },
     { key: "deductions", header: "Вычеты", render: (row) => <span className="tabular text-red">−{formatCurrency(row.latenessDeductionAmount + row.advanceDeductedAmount)}</span> },
@@ -325,7 +331,7 @@ export default function PayrollPage() {
         open={payTarget !== null}
         onClose={() => setPayTarget(null)}
         title="Провести выплату?"
-        description={payTarget ? `${workerNameById.get(payTarget.workerId) ?? "Работник"} — ${payTarget.finalAmount != null ? formatCurrency(payTarget.finalAmount) : "сумма не рассчитана"}. Это действие нельзя отменить через интерфейс.` : undefined}
+        description={payTarget ? `${payTarget.workerName ?? workerNameById.get(payTarget.workerId) ?? "Работник"} — ${payTarget.finalAmount != null ? formatCurrency(payTarget.finalAmount) : "сумма не рассчитана"}. Это действие нельзя отменить через интерфейс.` : undefined}
         confirmLabel="Выплатить"
         onConfirm={() => payTarget && void handlePay(payTarget)}
       />

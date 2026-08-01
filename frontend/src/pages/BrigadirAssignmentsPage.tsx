@@ -21,6 +21,7 @@ import {
   type WorkOrder,
   type WorkOrderStatus,
 } from "../api/workOrdersApi";
+import { listObjectLookups, toNameMap, uniqueIds } from "../api/lookupsApi";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
@@ -44,6 +45,7 @@ export default function BrigadirAssignmentsPage() {
   const { showToast } = useToast();
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [objectNameById, setObjectNameById] = useState<Map<string, string>>(new Map());
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "unavailable">("loading");
   const [loadError, setLoadError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | WorkOrderStatus>("all");
@@ -58,9 +60,11 @@ export default function BrigadirAssignmentsPage() {
 
   async function loadAll() {
     setLoadState("loading");
+    let items: WorkOrder[];
     try {
       const result = await listMyWorkOrders(1, 100);
-      setWorkOrders(result.items);
+      items = result.items;
+      setWorkOrders(items);
       setLoadState("ready");
     } catch (error) {
       if (error instanceof ApiError && error.code === "WORKER_NOT_FOUND") {
@@ -69,6 +73,19 @@ export default function BrigadirAssignmentsPage() {
       }
       setLoadError(describeError(error, "Не удалось загрузить наряды"));
       setLoadState("error");
+      return;
+    }
+
+    // A failed name lookup should not take down the whole page — the table
+    // still renders with objectId-keyed "—" fallbacks if this rejects.
+    try {
+      const ids = uniqueIds(items.map((order) => order.objectId));
+      if (ids.length > 0) {
+        const objects = await listObjectLookups({ ids, limit: ids.length });
+        setObjectNameById(toNameMap(objects));
+      }
+    } catch {
+      // leave objectNameById as-is; column falls back to "—"
     }
   }
 
@@ -174,6 +191,7 @@ export default function BrigadirAssignmentsPage() {
         </div>
       ),
     },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
     { key: "volume", header: "Объём", render: (row) => <span className="text-ink-secondary">{row.plannedQty} {row.unit}</span> },
     { key: "dueDate", header: "Срок", render: (row) => <span className="text-ink-secondary">{row.dueDate ?? "—"}</span> },
     { key: "status", header: "Статус", render: (row) => <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge> },

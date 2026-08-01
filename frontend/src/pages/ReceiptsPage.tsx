@@ -88,7 +88,11 @@ export default function ReceiptsPage() {
     setCreateError("");
     try {
       const created = await createMaterialDeliveryDocument(objectId, supplierName.trim() || undefined, validLines);
-      setDocuments((current) => [{ documentId: created.documentId, objectId: created.objectId, supplierName: created.supplierName, deliveredAt: created.deliveredAt, lines: created.lines }, ...current]);
+      const createdObjectName = created.lines[0]?.objectName ?? objectNameById.get(created.objectId) ?? "—";
+      setDocuments((current) => [
+        { documentId: created.documentId, objectId: created.objectId, objectName: createdObjectName, supplierName: created.supplierName, deliveredAt: created.deliveredAt, lines: created.lines },
+        ...current,
+      ]);
       setCreateOpen(false);
       showToast("Поступление добавлено");
     } catch (error) {
@@ -130,7 +134,7 @@ export default function ReceiptsPage() {
               <Card key={doc.documentId} className="p-5 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <span className="font-semibold text-ink">{objectNameById.get(doc.objectId) ?? "—"}</span>
+                    <span className="font-semibold text-ink">{doc.objectName}</span>
                     {doc.supplierName && <span className="ml-2 text-sm text-ink-muted">от {doc.supplierName}</span>}
                   </div>
                   <span className="text-xs text-ink-muted">{new Date(doc.deliveredAt).toLocaleString("ru-RU")}</span>
