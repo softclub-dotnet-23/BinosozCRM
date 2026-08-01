@@ -26,3 +26,17 @@ export function formatMillionsCompact(value: number): string {
   const str = Number.isInteger(millions) ? String(millions) : millions.toFixed(1);
   return `${str}M`;
 }
+
+/** Rounded, Russian-suffixed magnitude for donut-center labels — e.g. "186 тыс.", "2.4 млн". Falls back to the full currency string below 1000. */
+export function formatCompactCurrency(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) {
+    const millions = Math.round((value / 1_000_000) * 10) / 10;
+    const str = Number.isInteger(millions) ? String(millions) : millions.toFixed(1);
+    return `${str} млн`;
+  }
+  if (abs >= 1000) {
+    return `${numberFormatter.format(Math.round(value / 1000))} тыс.`;
+  }
+  return formatCurrency(value);
+}
