@@ -25,8 +25,8 @@ public sealed class IndividualTaskIsolationTests(PostgresFixture fixture)
         var brigade = Brigade.Create(companyId, "Brigade A");
         var otherBrigade = Brigade.Create(companyId, "Brigade B");
 
-        var brigadirUser = User.Create("Brigadir A", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
-        var otherBrigadirUser = User.Create("Brigadir B", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var brigadirUser = User.Create(companyId, "Brigadir A", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var otherBrigadirUser = User.Create(companyId, "Brigadir B", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
 
         var adult = new DateOnly(1990, 1, 1);
         var hireDate = new DateOnly(2020, 1, 1);
@@ -158,8 +158,8 @@ public sealed class IndividualTaskIsolationTests(PostgresFixture fixture)
             var customer = Customer.Create(companyId, "Acme");
             var constructionObject = ConstructionObject.Create(companyId, "Object A", customer.Id);
             var brigade = Brigade.Create(companyId, "Brigade A");
-            var brigadirUser = User.Create("Brigadir A", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
-            var prorabUser = User.Create("Prorab Elsewhere", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+            var brigadirUser = User.Create(companyId, "Brigadir A", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+            var prorabUser = User.Create(companyId, "Prorab Elsewhere", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
             var adult = new DateOnly(1990, 1, 1);
             var hireDate = new DateOnly(2020, 1, 1);
             var brigadirWorker = Worker.Create(companyId, brigade.Id, "Brigadir A Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", adult, PayRateType.Hourly, 50m, hireDate, userId: brigadirUser.Id);

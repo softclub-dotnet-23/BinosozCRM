@@ -32,7 +32,7 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
 
     private void EnsureActor(DbContext? context)
     {
-        if (context is null || currentUser.UserId is not { } userId || HasTrackedActor(context, userId))
+        if (context is null || currentUser.UserId is not { } userId || currentUser.CompanyId is not { } || HasTrackedActor(context, userId))
             return;
 
         if (!context.Set<User>().IgnoreQueryFilters().Any(u => u.Id == userId))
@@ -41,7 +41,7 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
 
     private async Task EnsureActorAsync(DbContext? context, CancellationToken cancellationToken)
     {
-        if (context is null || currentUser.UserId is not { } userId || HasTrackedActor(context, userId))
+        if (context is null || currentUser.UserId is not { } userId || currentUser.CompanyId is not { } || HasTrackedActor(context, userId))
             return;
 
         if (!await context.Set<User>().IgnoreQueryFilters().AnyAsync(u => u.Id == userId, cancellationToken))
@@ -54,6 +54,7 @@ public sealed class TestCurrentUserSaveChangesInterceptor(ICurrentUserService cu
     private void AddActor(DbContext context, Guid userId)
     {
         var actor = User.Create(
+            currentUser.CompanyId!.Value,
             "Test actor",
             $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             "test-hash",

@@ -52,7 +52,7 @@ public sealed class ConcurrencyConflictTests(PostgresFixture fixture)
     private async Task<(FixedCurrentUserService Owner, Guid WorkOrderId)> SeedWorkOrderAsync()
     {
         var companyId = Guid.NewGuid();
-        var ownerUser = User.Create("Owner", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Owner);
+        var ownerUser = User.Create(companyId, "Owner", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Domain.Enums.Role.Owner);
         var company = Company.Create(companyId, $"Concurrency Co {companyId}");
         var customer = Customer.Create(companyId, "Customer");
         var constructionObject = ConstructionObject.Create(companyId, "Object", customer.Id);

@@ -14,6 +14,9 @@ namespace Api.IntegrationTests;
 [Collection(PostgresCollection.Name)]
 public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
 {
+    private static readonly FixedBusinessTimeProvider BusinessTime = new(
+        new DateTimeOffset(2026, 8, 1, 7, 0, 0, TimeSpan.Zero));
+
     private async Task<(FixedCurrentUserService Owner, Guid ProrabUserId, Guid BrigadirUserId, Guid WorkerId, Guid ObjectId)> SeedAsync()
     {
         var companyId = Guid.NewGuid();
@@ -24,8 +27,8 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         var customer = Customer.Create(companyId, "Acme");
         var constructionObject = ConstructionObject.Create(companyId, "Object A", customer.Id);
         var brigade = Brigade.Create(companyId, "Brigade A");
-        var prorabUser = User.Create("Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
-        var brigadirUser = User.Create("Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var prorabUser = User.Create(companyId, "Prorab", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Prorab);
+        var brigadirUser = User.Create(companyId, "Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
         var worker = Worker.Create(
             companyId, brigade.Id, "Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             new DateOnly(1990, 1, 1), PayRateType.Hourly, 40m, new DateOnly(2020, 1, 1),
@@ -49,10 +52,10 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
         var prorab = new FixedCurrentUserService(owner.CompanyId!.Value, prorabUserId, Role.Prorab);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = BusinessTime.Today;
         await using (var checkInContext = fixture.CreateDbContext(brigadir))
         {
-            var checkIn = await new CheckInCommandHandler(checkInContext, brigadir)
+            var checkIn = await new CheckInCommandHandler(checkInContext, brigadir, BusinessTime)
                 .Handle(new CheckInCommand(workerId, objectId), CancellationToken.None);
             checkIn.IsSuccess.Should().BeTrue();
         }
@@ -72,7 +75,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         var (owner, prorabUserId, brigadirUserId, workerId, objectId) = await SeedAsync();
         var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
         var prorab = new FixedCurrentUserService(owner.CompanyId!.Value, prorabUserId, Role.Prorab);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = BusinessTime.Today;
 
         await using (var absenceContext = fixture.CreateDbContext(prorab))
         {
@@ -83,7 +86,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         }
 
         await using var context = fixture.CreateDbContext(brigadir);
-        var result = await new CheckInCommandHandler(context, brigadir)
+        var result = await new CheckInCommandHandler(context, brigadir, BusinessTime)
             .Handle(new CheckInCommand(workerId, objectId), CancellationToken.None);
 
         result.IsFailure.Should().BeTrue();
@@ -97,7 +100,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
         var prorab = new FixedCurrentUserService(owner.CompanyId!.Value, prorabUserId, Role.Prorab);
 
-        var future = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
+        var future = BusinessTime.Today.AddDays(10);
         await using (var absenceContext = fixture.CreateDbContext(prorab))
         {
             var absence = await new CreateAbsenceRecordCommandHandler(absenceContext, prorab, new NotUsedFileStorageService()).Handle(
@@ -108,7 +111,7 @@ public sealed class AbsenceTimesheetConflictTests(PostgresFixture fixture)
         }
 
         await using var context = fixture.CreateDbContext(brigadir);
-        var checkIn = await new CheckInCommandHandler(context, brigadir)
+        var checkIn = await new CheckInCommandHandler(context, brigadir, BusinessTime)
             .Handle(new CheckInCommand(workerId, objectId), CancellationToken.None);
 
         checkIn.IsSuccess.Should().BeTrue();

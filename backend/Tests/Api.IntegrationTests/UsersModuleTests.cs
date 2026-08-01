@@ -27,12 +27,14 @@ public sealed class UsersModuleTests(PostgresFixture fixture)
         // Owner needs an actual persisted row, not just a fabricated id —
         // same pattern PayrollCalculationTests.cs uses for its actor users.
         var ownerUser = User.Create(
+            companyId,
             "Test Owner",
             $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             _passwordHasher.Hash("owner-password"),
             Role.Owner);
 
         var targetUser = User.Create(
+            companyId,
             "Target Prorab",
             $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
             _passwordHasher.Hash("initial-password"),
@@ -218,6 +220,124 @@ public sealed class UsersModuleTests(PostgresFixture fixture)
 
         var newPasswordResult = await loginHandler.Handle(new LoginCommand(targetUser.Phone, result.Value.TemporaryPassword, "127.0.0.1"), CancellationToken.None);
         newPasswordResult.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Owner_reset_replaces_the_password_revokes_sessions_and_writes_a_secret_free_audit_entry()
+    {
+        var (owner, targetUser) = await SeedCompanyOwnerAndUserAsync();
+
+        await using (var seedTokenContext = fixture.CreateDbContext())
+        {
+            seedTokenContext.RefreshTokens.Add(RefreshToken.Create(
+                owner.CompanyId!.Value,
+                targetUser.Id,
+                RefreshTokenGenerator.Hash("password-reset-stale-token"),
+                DateTimeOffset.UtcNow.AddDays(30),
+                "127.0.0.1"));
+            await seedTokenContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        const string newPassword = "owner-selected-password";
+        await using (var resetContext = fixture.CreateDbContext(owner))
+        {
+            var result = await new ResetUserPasswordCommandHandler(resetContext, _passwordHasher, owner)
+                .Handle(new ResetUserPasswordCommand(targetUser.Id, newPassword), CancellationToken.None);
+
+            result.IsSuccess.Should().BeTrue();
+        }
+
+        await using (var verifyContext = fixture.CreateDbContext())
+        {
+            var target = await verifyContext.Users.IgnoreQueryFilters().SingleAsync(u => u.Id == targetUser.Id);
+            target.ForcePasswordChange.Should().BeFalse();
+
+            var token = await verifyContext.RefreshTokens.IgnoreQueryFilters().SingleAsync(rt => rt.UserId == targetUser.Id);
+            token.RevokedAt.Should().NotBeNull();
+
+            var auditEntry = await verifyContext.AdminAuditLogs.IgnoreQueryFilters().SingleAsync(a =>
+                a.TargetEntityId == targetUser.Id && a.Action == AdminAuditAction.OwnerPasswordReset);
+            auditEntry.ActorUserId.Should().Be(owner.UserId!.Value);
+            auditEntry.CompanyId.Should().Be(owner.CompanyId!.Value);
+            auditEntry.OldValueJson.Should().BeNull();
+            auditEntry.NewValueJson.Should().BeNull();
+        }
+
+        await using var loginContext = fixture.CreateDbContext();
+        var loginHandler = new LoginCommandHandler(loginContext, _passwordHasher, new JwtTokenService(AuthTestOptions.Jwt), AuthTestOptions.Jwt);
+        var oldPassword = await loginHandler.Handle(
+            new LoginCommand(targetUser.Phone, "initial-password", "127.0.0.1"), CancellationToken.None);
+        var replacementPassword = await loginHandler.Handle(
+            new LoginCommand(targetUser.Phone, newPassword, "127.0.0.1"), CancellationToken.None);
+
+        oldPassword.IsFailure.Should().BeTrue();
+        oldPassword.Error.Code.Should().Be("AUTH_INVALID_CREDENTIALS");
+        replacementPassword.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Owner_reset_does_not_expose_or_modify_a_cross_company_user()
+    {
+        var (owner, _) = await SeedCompanyOwnerAndUserAsync();
+        var otherCompanyId = Guid.NewGuid();
+        var initialPassword = "other-company-initial";
+        var otherUser = User.Create(
+            otherCompanyId,
+            "Other Company User",
+            $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
+            _passwordHasher.Hash(initialPassword),
+            Role.Prorab);
+
+        await using (var seedContext = fixture.CreateDbContext())
+        {
+            seedContext.Companies.Add(Company.Create(otherCompanyId, $"Other Co {otherCompanyId}"));
+            seedContext.Users.Add(otherUser);
+            await seedContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        await using (var resetContext = fixture.CreateDbContext(owner))
+        {
+            var result = await new ResetUserPasswordCommandHandler(resetContext, _passwordHasher, owner)
+                .Handle(new ResetUserPasswordCommand(otherUser.Id, "never-applied-password"), CancellationToken.None);
+
+            result.IsFailure.Should().BeTrue();
+            result.Error.Code.Should().Be("USER_NOT_FOUND");
+        }
+
+        await using var loginContext = fixture.CreateDbContext();
+        var loginHandler = new LoginCommandHandler(loginContext, _passwordHasher, new JwtTokenService(AuthTestOptions.Jwt), AuthTestOptions.Jwt);
+        var originalPassword = await loginHandler.Handle(
+            new LoginCommand(otherUser.Phone, initialPassword, "127.0.0.1"), CancellationToken.None);
+        var attemptedPassword = await loginHandler.Handle(
+            new LoginCommand(otherUser.Phone, "never-applied-password", "127.0.0.1"), CancellationToken.None);
+
+        originalPassword.IsSuccess.Should().BeTrue();
+        attemptedPassword.IsFailure.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("short")]
+    public void Owner_reset_password_uses_the_existing_password_policy(string password)
+    {
+        var result = new ResetUserPasswordCommandValidator()
+            .Validate(new ResetUserPasswordCommand(Guid.NewGuid(), password));
+
+        result.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Non_owner_cannot_reset_a_password_even_when_the_handler_is_called_directly()
+    {
+        var (owner, targetUser) = await SeedCompanyOwnerAndUserAsync();
+        var prorab = new FixedCurrentUserService(owner.CompanyId!.Value, Guid.NewGuid(), Role.Prorab);
+
+        await using var context = fixture.CreateDbContext(prorab);
+        var result = await new ResetUserPasswordCommandHandler(context, _passwordHasher, prorab)
+            .Handle(new ResetUserPasswordCommand(targetUser.Id, "not-authorized-password"), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("AUTH_FORBIDDEN");
     }
 
     [Fact]

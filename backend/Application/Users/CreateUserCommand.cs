@@ -38,11 +38,19 @@ public sealed class CreateUserCommandHandler(
 {
     public async Task<Result<CreateUserResult>> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
-        if (await context.Users.AnyAsync(u => u.Phone == request.Phone, cancellationToken))
+        if (await context.Users
+                .IgnoreQueryFilters()
+                .AnyAsync(u => u.Phone == request.Phone, cancellationToken))
             return Result.Failure<CreateUserResult>(new Error("PHONE_ALREADY_IN_USE", "A user with this phone number already exists."));
 
         var temporaryPassword = TemporaryPasswordGenerator.Generate();
-        var user = User.Create(request.FullName, request.Phone, passwordHasher.Hash(temporaryPassword), request.Role, forcePasswordChange: true);
+        var user = User.Create(
+            currentUser.CompanyId!.Value,
+            request.FullName,
+            request.Phone,
+            passwordHasher.Hash(temporaryPassword),
+            request.Role,
+            forcePasswordChange: true);
         context.Users.Add(user);
 
         var auditEntry = AdminAuditLog.Create(

@@ -3,8 +3,9 @@ using Domain.Enums;
 
 namespace Domain.Entities;
 
-public sealed class User : AuditableEntity, ISoftDelete
+public sealed class User : AuditableEntity, ICompanyOwned, ISoftDelete
 {
+    public Guid CompanyId { get; private set; }
     public string FullName { get; private set; } = null!;
     public string Phone { get; private set; } = null!;
     public string PasswordHash { get; private set; } = null!;
@@ -15,11 +16,20 @@ public sealed class User : AuditableEntity, ISoftDelete
 
     private User() { }
 
-    public static User Create(string fullName, string phone, string passwordHash, Role role, bool forcePasswordChange = false)
+    public static User Create(
+        Guid companyId,
+        string fullName,
+        string phone,
+        string passwordHash,
+        Role role,
+        bool forcePasswordChange = false)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(companyId, Guid.Empty);
+
         return new User
         {
             Id = Guid.CreateVersion7(),
+            CompanyId = companyId,
             FullName = fullName,
             Phone = phone,
             PasswordHash = passwordHash,

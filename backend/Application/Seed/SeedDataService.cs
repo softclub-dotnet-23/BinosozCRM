@@ -23,7 +23,12 @@ public sealed class SeedDataService(IApplicationDbContext context, IPasswordHash
             await context.SaveChangesAsync(cancellationToken);
         }
 
-        var anyOwnerExists = await context.Users.AnyAsync(u => u.Role == Role.Owner, cancellationToken);
+        // Startup has no request identity, so the User CompanyId global
+        // filter intentionally fails closed. Seed checks must inspect the
+        // persisted users explicitly to remain idempotent.
+        var anyOwnerExists = await context.Users
+            .IgnoreQueryFilters()
+            .AnyAsync(u => !u.IsDeleted && u.Role == Role.Owner, cancellationToken);
         if (anyOwnerExists)
             return;
 
@@ -37,6 +42,7 @@ public sealed class SeedDataService(IApplicationDbContext context, IPasswordHash
                 throw new InvalidOperationException($"{envVarName} is not set — cannot seed Owner accounts.");
 
             var owner = User.Create(
+                options.Company.Id,
                 ownerOptions.FullName,
                 ownerOptions.Phone,
                 passwordHasher.Hash(password),

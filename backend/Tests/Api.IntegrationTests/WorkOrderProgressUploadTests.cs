@@ -23,7 +23,7 @@ public sealed class WorkOrderProgressUploadTests(PostgresFixture fixture)
     {
         var companyId = Guid.NewGuid();
         var owner = new FixedCurrentUserService(companyId, Guid.NewGuid(), Role.Owner);
-        var brigadirUser = User.Create("Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+        var brigadirUser = User.Create(companyId, "Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
         var company = Company.Create(companyId, $"Upload Test Co {companyId}");
         var customer = Customer.Create(companyId, "Customer");
         var constructionObject = ConstructionObject.Create(companyId, "Object", customer.Id);
