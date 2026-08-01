@@ -23,6 +23,14 @@ public sealed class BrigadesController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    [HttpGet("mine")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMyBrigadeQuery(), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpGet]
     [Authorize(Roles = "Owner,Prorab,Accountant")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)

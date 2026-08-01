@@ -7,6 +7,11 @@ export interface Brigade {
   isActive: boolean;
 }
 
+/** Brigadir-only: the brigade linked to the authenticated user. */
+export function getMyBrigade(): Promise<Brigade> {
+  return request<Brigade>("/api/v1/brigades/mine");
+}
+
 export function listBrigades(page: number, pageSize: number): Promise<PagedResult<Brigade>> {
   return request<PagedResult<Brigade>>(`/api/v1/brigades?page=${page}&pageSize=${pageSize}`);
 }
