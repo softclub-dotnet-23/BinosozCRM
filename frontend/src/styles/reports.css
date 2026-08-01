@@ -1,0 +1,355 @@
+/* Reports-only density and proportions, matched to the 1280 × 853 reference. */
+.reports-page {
+  width: 100%;
+}
+
+.reports-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reports-summary-card {
+  min-height: 108px;
+  padding: 15px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  border-radius: 12px;
+}
+
+.reports-summary-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.reports-summary-title {
+  color: #697386;
+  font-size:13px;
+  line-height: 1.25;
+}
+
+.reports-summary-value {
+  margin-top: 5px;
+  color: #17191c;
+  font-size:22px;
+  font-weight: 750;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.reports-summary-value span {
+  display: block;
+  margin-top: 5px;
+  color: #98a2b3;
+  font-size:13px;
+  font-weight: 500;
+}
+
+.reports-open-button {
+  margin-top: 7px;
+  color: #697386;
+  font-size:13px;
+  font-weight: 650;
+  transition: color 150ms ease;
+}
+
+.reports-open-button:hover {
+  color: #ff5a00;
+}
+
+.reports-content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 218px;
+  align-items: start;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/* Financial tab has no aside content ("Топ объектов по прибыли" was the only card there) —
+   drop the 218px track entirely so the main column's charts/tables use the full width
+   instead of leaving an empty grid track. */
+.reports-content-grid--full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.reports-main-column,
+.reports-financial-tab,
+.reports-aside {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reports-aside > div {
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.reports-aside > div h2 {
+  font-size:15px;
+}
+
+.reports-aside > div p,
+.reports-aside > div li,
+.reports-aside > div span {
+  font-size:13px;
+  line-height: 1.35;
+}
+
+.reports-aside > div ul {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.reports-aside > div ul > * {
+  margin-block: 0 !important;
+}
+
+.reports-filter-period {
+  height: 40px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: #344054;
+  font-size:13px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* Full-width horizontal Filters bar (replaces the old cramped 218px aside card). */
+.reports-filters-bar {
+  padding: 16px 18px;
+  border-radius: 14px;
+}
+
+.reports-filters-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.reports-filters-field {
+  min-width: 0;
+}
+
+.reports-filters-field label,
+.reports-filters-field p {
+  display: block;
+  margin-bottom: 6px;
+  font-size:13px;
+  font-weight: 500;
+  color: #697386;
+}
+
+.reports-filters-field [role="button"][aria-haspopup="listbox"] {
+  height: 42px;
+}
+
+.reports-filters-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.reports-filters-actions button {
+  height: 42px;
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  .reports-filters-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-filters-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 639px) {
+  .reports-filters-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reports-filters-actions {
+    flex-direction: column;
+  }
+
+  .reports-filters-actions button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+.reports-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reports-kpi-card {
+  height: 120px;
+  padding: 14px 16px;
+  overflow: hidden;
+  border-radius: 11px;
+}
+
+.reports-kpi-grid > :nth-child(1) {
+  background: #f3fbf7;
+}
+
+.reports-kpi-grid > :nth-child(2) {
+  background: #fff7f2;
+}
+
+.reports-kpi-grid > :nth-child(3) {
+  background: #f3f7ff;
+}
+
+.reports-kpi-grid > :nth-child(4) {
+  background: #faf5ff;
+}
+
+.reports-kpi-card > p:last-child {
+  white-space: nowrap;
+}
+
+.reports-kpi-card > p:last-child span {
+  font-size:13px;
+}
+
+.reports-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+  gap: 12px;
+}
+
+.reports-chart-card {
+  height: 194px;
+  padding: 14px 16px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.reports-section-title {
+  color: #17191c;
+  font-size:16px;
+  font-weight: 700;
+}
+
+.reports-chart-wrap {
+  margin-top: 7px;
+}
+
+.reports-chart-wrap > div > div:first-child {
+  margin-bottom: 2px;
+}
+
+.reports-expense-content {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reports-expense-legend {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.reports-expense-legend li {
+  gap: 7px;
+  font-size:13px;
+}
+
+.reports-table-card {
+  height: 190px;
+  border-radius: 12px;
+}
+
+.reports-table-card th,
+.reports-table-card td {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+.reports-table-card td:first-child {
+  max-width: 250px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+
+
+@media (max-width: 1199px) {
+  .reports-content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .reports-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reports-chart-card {
+    height: auto;
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 640px) {
+  .reports-summary-grid,
+  .reports-kpi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Dark theme: same issue as users.css — hardcoded light-mode text/surface colors with no dark
+   counterpart, so text stayed near-black and stayed unreadable after switching to dark mode. */
+html[data-app-theme=dark] .reports-page { color: #f2f2f0; }
+html[data-app-theme=dark] .reports-summary-title,
+html[data-app-theme=dark] .reports-open-button,
+html[data-app-theme=dark] .reports-expense-legend li,
+html[data-app-theme=dark] .reports-filters-field label,
+html[data-app-theme=dark] .reports-filters-field p {
+  color: #b8bcc4;
+}
+html[data-app-theme=dark] .reports-summary-value,
+html[data-app-theme=dark] .reports-section-title {
+  color: #f2f2f0;
+}
+html[data-app-theme=dark] .reports-summary-value span,
+html[data-app-theme=dark] .reports-kpi-card > p:last-child span {
+  color: #7d828c;
+}
+html[data-app-theme=dark] .reports-filter-period {
+  color: #d7dce3;
+  background: #1d2027;
+  border-color: #383d48;
+}
+html[data-app-theme=dark] .reports-kpi-grid > :nth-child(1) { background: #10261a; }
+html[data-app-theme=dark] .reports-kpi-grid > :nth-child(2) { background: #3a2313; }
+html[data-app-theme=dark] .reports-kpi-grid > :nth-child(3) { background: #10233d; }
+html[data-app-theme=dark] .reports-kpi-grid > :nth-child(4) { background: #2a1740; }
