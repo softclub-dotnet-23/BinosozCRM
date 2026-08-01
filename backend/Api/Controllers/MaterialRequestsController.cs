@@ -34,7 +34,7 @@ public sealed class MaterialRequestsController(ISender sender) : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Owner,Prorab")]
+    [Authorize(Roles = "Owner,Prorab,Accountant")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -69,7 +69,7 @@ public sealed class MaterialRequestsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{materialRequestId:guid}")]
-    [Authorize(Roles = "Owner,Prorab")]
+    [Authorize(Roles = "Owner,Prorab,Accountant")]
     public async Task<IActionResult> Get(Guid materialRequestId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetMaterialRequestQuery(materialRequestId), cancellationToken);

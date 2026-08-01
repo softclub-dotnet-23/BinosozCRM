@@ -8,7 +8,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/v1/reports")]
-[Authorize(Roles = "Owner,Prorab")]
+[Authorize(Roles = "Owner,Prorab,Accountant")]
 public sealed class ReportsController(ISender sender) : ControllerBase
 {
     [HttpGet("actual-cost")]

@@ -42,7 +42,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     }
 
     [HttpGet]
-    [Authorize(Roles = "Owner,Prorab")]
+    [Authorize(Roles = "Owner,Prorab,Accountant")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -64,7 +64,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     }
 
     [HttpGet("{workOrderId:guid}")]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Accountant")]
     public async Task<IActionResult> Get(Guid workOrderId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetWorkOrderQuery(workOrderId), cancellationToken);
@@ -130,7 +130,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     }
 
     [HttpGet("{workOrderId:guid}/log")]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Accountant")]
     public async Task<IActionResult> GetLog(Guid workOrderId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetWorkOrderLogQuery(workOrderId), cancellationToken);

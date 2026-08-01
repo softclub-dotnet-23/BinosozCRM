@@ -243,7 +243,7 @@ public sealed class WorkOrdersHttpTests : IDisposable
         (await anonymous.GetAsync($"/api/v1/work-orders/{workOrderId}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await brigadir.GetAsync("/api/v1/work-orders")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await brigadir.PostAsync("/api/v1/work-orders", WorkOrderJson(seed, "Brigadir cannot create"))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await accountant.GetAsync($"/api/v1/work-orders/{workOrderId}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await accountant.GetAsync($"/api/v1/work-orders/{workOrderId}")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await accountant.PostAsync($"/api/v1/work-orders/{workOrderId}/assign", ApiHttpTestSupport.Json(new { assignedDate = new DateOnly(2026, 7, 1) }))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         using (var mine = await brigadir.GetAsync("/api/v1/work-orders/mine?page=1&pageSize=20"))
@@ -311,7 +311,7 @@ public sealed class WorkOrdersHttpTests : IDisposable
         }
 
         (await brigadir.PostAsync("/api/v1/brigades", ApiHttpTestSupport.Json(new { name = "Brigadir denied" }))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await accountant.GetAsync("/api/v1/brigades?page=1&pageSize=20")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await accountant.GetAsync("/api/v1/brigades?page=1&pageSize=20")).StatusCode.Should().Be(HttpStatusCode.OK);
 
         using (var ownList = await owner.GetAsync("/api/v1/brigades?page=1&pageSize=50"))
         {

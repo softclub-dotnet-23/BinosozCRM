@@ -18,7 +18,7 @@ namespace Api.Controllers;
 public sealed class TimesheetsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Accountant")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -43,7 +43,7 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{timesheetId:guid}")]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Accountant")]
     public async Task<IActionResult> Get(Guid timesheetId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetTimesheetQuery(timesheetId), cancellationToken);

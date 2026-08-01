@@ -16,7 +16,7 @@ namespace Api.Controllers;
 public sealed class PayrollAdvancesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = "Owner,Accountant,Brigadir")]
+    [Authorize(Roles = "Owner,Accountant")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);

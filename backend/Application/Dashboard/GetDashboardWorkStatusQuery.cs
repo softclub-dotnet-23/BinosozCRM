@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.IndividualTasks;
 using Application.Objects;
 using Domain.Common;
 using Domain.Enums;
@@ -31,20 +32,40 @@ public sealed class GetDashboardWorkStatusQueryHandler(
 {
     public async Task<Result<DashboardWorkStatusDto>> Handle(GetDashboardWorkStatusQuery request, CancellationToken cancellationToken)
     {
-        if (request.ObjectId is not null)
+        List<Guid>? allowedObjectIds = null;
+        Guid? callerBrigadeId = null;
+
+        if (currentUser.Role == Role.Brigadir)
         {
-            var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
-            if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId.Value))
+            callerBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
+            if (callerBrigadeId is null)
+                return Result.Failure<DashboardWorkStatusDto>(new Error("WORKER_NOT_FOUND", "No worker record linked to this account."));
+
+            if (request.BrigadeId is not null && request.BrigadeId != callerBrigadeId)
+                return Result.Failure<DashboardWorkStatusDto>(new Error("BRIGADE_NOT_FOUND", "Brigade not found."));
+        }
+        else
+        {
+            allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+            if (request.ObjectId is not null && allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId.Value))
                 return Result.Failure<DashboardWorkStatusDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
         }
 
         var workOrders = context.WorkOrders.AsQueryable();
+        if (allowedObjectIds is not null)
+            workOrders = workOrders.Where(w => allowedObjectIds.Contains(w.ObjectId));
+        if (callerBrigadeId is not null)
+            workOrders = workOrders.Where(w => w.BrigadeId == callerBrigadeId.Value);
         if (request.ObjectId is not null)
             workOrders = workOrders.Where(w => w.ObjectId == request.ObjectId.Value);
         if (request.BrigadeId is not null)
             workOrders = workOrders.Where(w => w.BrigadeId == request.BrigadeId.Value);
 
         var individualTasks = context.IndividualTasks.AsQueryable();
+        if (allowedObjectIds is not null)
+            individualTasks = individualTasks.Where(t => t.WorkOrderId != null && context.WorkOrders.Any(w => w.Id == t.WorkOrderId && allowedObjectIds.Contains(w.ObjectId)));
+        if (callerBrigadeId is not null)
+            individualTasks = individualTasks.Where(t => t.BrigadeId == callerBrigadeId.Value);
         if (request.ObjectId is not null)
             individualTasks = individualTasks.Where(t => t.WorkOrderId != null && context.WorkOrders.Any(w => w.Id == t.WorkOrderId && w.ObjectId == request.ObjectId.Value));
         if (request.BrigadeId is not null)

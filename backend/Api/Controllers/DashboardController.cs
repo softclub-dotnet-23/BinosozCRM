@@ -9,7 +9,7 @@ namespace Api.Controllers;
 // MASTER §9.4/§8.6: GET /dashboard/work-status — Prorab+.
 [ApiController]
 [Route("api/v1/dashboard")]
-[Authorize(Roles = "Owner,Prorab")]
+[Authorize(Roles = "Owner,Prorab,Brigadir,Accountant")]
 public sealed class DashboardController(ISender sender) : ControllerBase
 {
     [HttpGet("work-status")]
