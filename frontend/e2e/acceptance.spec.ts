@@ -79,7 +79,11 @@ test("Accountant has read-only operational navigation and payroll", async ({ pag
   await payroll.click();
   await expect(page.getByText(/зарплат/i).first()).toBeVisible();
   await openNavigation(page);
-  await expect(navigationLink(page, "Объекты")).toHaveCount(1);
-  await page.goto("/objects");
+  const objects = navigationLink(page, "Объекты");
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    await page.locator("aside nav").evaluate((navigation) => { navigation.scrollTop = 0; });
+    await objects.scrollIntoViewIfNeeded();
+  }
+  await objects.click();
   await expect(page.getByRole("button", { name: /создать объект/i })).toHaveCount(0);
 });

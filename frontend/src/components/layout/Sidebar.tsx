@@ -156,13 +156,13 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         // silently stop matching if that arbitrary value ever changes.
         data-sidebar-state={collapsed ? "collapsed" : "expanded"}
         className={cn(
-          "flex h-screen flex-col border-r border-border bg-card transition-[width,transform] duration-200",
+          "flex h-screen flex-col overflow-hidden border-r border-border bg-card transition-[width,transform] duration-200",
           collapsed ? "w-[84px]" : "w-[236px]",
           "fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:z-auto",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        <div className="flex items-center justify-between gap-2 px-5 py-6">
+        <div className="shrink-0 flex items-center justify-between gap-2 px-5 py-6">
           <div className="flex min-w-0 flex-1 items-center overflow-hidden">
             {collapsed ? (
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft">
@@ -311,7 +311,7 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         {/* Mobile-only equivalent of the footer above — the desktop footer hides itself below
             the lg breakpoint instead, so logout lives in exactly one visible place per breakpoint. */}
         {user && (
-          <div className="p-4 lg:hidden">
+          <div className="shrink-0 p-4 lg:hidden">
             <MobileProfileCard onBeforeLogout={onCloseMobile} />
           </div>
         )}
