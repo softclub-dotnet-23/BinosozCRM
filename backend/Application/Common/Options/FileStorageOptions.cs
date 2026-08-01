@@ -8,5 +8,7 @@ public sealed class FileStorageOptions
     public string SignedUrlSecret { get; init; } = string.Empty;
     public int SignedUrlExpiryMinutes { get; init; } = 15;
     public long MaxFileSizeBytes { get; init; } = 5 * 1024 * 1024;
+    public int MaxPhotosPerProgress { get; init; } = 5;
+    public long MaxTotalUploadSizeBytes { get; init; } = 25 * 1024 * 1024;
     public string[] AllowedContentTypes { get; init; } = ["image/jpeg", "image/png", "image/webp"];
 }

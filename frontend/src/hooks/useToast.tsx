@@ -43,7 +43,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             role="status"
-            className="pointer-events-auto flex min-w-[280px] max-w-sm items-start gap-3 rounded-xl border border-border-strong bg-card px-4 py-3 shadow-[var(--shadow-popover)]"
+            className="pointer-events-auto flex min-w-[280px] max-w-sm items-start gap-3 rounded-xl border border-border-strong bg-card px-4 py-3 shadow-(--shadow-popover)"
           >
             {toast.variant === "success" && <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-green" />}
             {toast.variant === "error" && <XCircle size={18} className="mt-0.5 shrink-0 text-red" />}

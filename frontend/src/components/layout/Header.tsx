@@ -1,14 +1,10 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CalendarDays, ChevronDown, LogOut, Menu, Settings, User as UserIcon } from "lucide-react";
 import { SearchInput } from "../ui/SearchInput";
 import { SessionAvatar } from "./SessionAvatar";
 import { ProfileModal } from "./ProfileModal";
 import { useOnClickOutside } from "../../hooks/useOnClickOutside";
-import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
-import { materialsRepository } from "../../data/repositories";
-import { getMaterialStatus } from "../../utils/materialAnalytics";
-import { pluralizeRu } from "../../utils/pluralize";
 import { cn } from "../../utils/cn";
 import { useAuth } from "../../context/AuthContext";
 import { ROLE_LABEL } from "../../lib/auth/roleAccess";
@@ -24,11 +20,6 @@ interface HeaderProps {
   };
   action?: ReactNode;
 }
-
-const STATIC_NOTIFICATIONS = [
-  { id: 1, title: "Заливка фундамента просрочена", time: "10 мин назад" },
-  { id: 3, title: "Зарплата за июль готова к утверждению", time: "3 ч назад" },
-];
 
 const DATE_RANGES = ["1 – 30 июль 2026", "1 – 30 июнь 2026", "1 – 31 май 2026", "Текущий квартал"];
 
@@ -50,23 +41,6 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
     logout();
     navigate("/login", { replace: true });
   }
-
-  const materials = useRepositorySnapshot(materialsRepository);
-  const criticalCount = useMemo(() => materials.filter((m) => getMaterialStatus(m) === "critical").length, [materials]);
-
-  const notifications = useMemo(() => {
-    const list = [...STATIC_NOTIFICATIONS];
-    if (criticalCount > 0) {
-      const materialWord = pluralizeRu(criticalCount, "материал", "материала", "материалов");
-      const verbWord = criticalCount === 1 ? "имеет" : "имеют";
-      list.splice(1, 0, {
-        id: 2,
-        title: `${criticalCount} ${materialWord} ${verbWord} критический остаток на складе`,
-        time: "Только что",
-      });
-    }
-    return list;
-  }, [criticalCount]);
 
   useOnClickOutside(notifRef, () => setNotifOpen(false));
   useOnClickOutside(dateRef, () => setDateOpen(false));
@@ -106,23 +80,11 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
             className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border-strong text-ink-secondary transition-colors hover:bg-[#F5F5F4]"
           >
             <Bell size={18} />
-            {notifications.length > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red text-[10px] font-bold text-white">
-                {notifications.length}
-              </span>
-            )}
           </button>
           {notifOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-border bg-card p-2 shadow-[var(--shadow-popover)]">
+            <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-border bg-card p-2 shadow-(--shadow-popover)">
               <p className="px-3 py-2 text-sm font-bold text-ink">Уведомления</p>
-              <div className="space-y-1">
-                {notifications.map((n) => (
-                  <div key={n.id} className="rounded-lg px-3 py-2 hover:bg-[#F7F7F6]">
-                    <p className="text-sm text-ink">{n.title}</p>
-                    <p className="mt-0.5 text-xs text-ink-muted">{n.time}</p>
-                  </div>
-                ))}
-              </div>
+              <p className="px-3 py-2 text-sm text-ink-muted">Уведомления пока не подключены к backend.</p>
             </div>
           )}
         </div>
@@ -138,7 +100,7 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
             <ChevronDown size={14} className="text-ink-muted" />
           </button>
           {dateOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]">
+            <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)">
               {DATE_RANGES.map((range) => (
                 <button
                   key={range}
@@ -170,7 +132,7 @@ export function Header({ title, subtitle, onOpenMobileSidebar, search, action }:
               <ChevronDown size={14} className="text-ink-muted" />
             </button>
             {profileOpen && (
-              <div className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-border bg-card p-1.5 shadow-[var(--shadow-popover)]">
+              <div className="absolute right-0 z-20 mt-2 w-52 rounded-xl border border-border bg-card p-1.5 shadow-(--shadow-popover)">
                 <div className="px-3 py-2">
                   <p className="text-sm font-semibold text-ink">{user.fullName}</p>
                   <p className="text-xs text-ink-muted">{ROLE_LABEL[user.role]}</p>

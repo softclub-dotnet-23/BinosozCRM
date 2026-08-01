@@ -18,6 +18,7 @@ using Infrastructure;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -51,6 +52,16 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // (Api/Contracts/Users/CreateUserRequest.cs's Role field).
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+
+var fileStorageOptions = builder.Configuration.GetSection(FileStorageOptions.SectionName).Get<FileStorageOptions>()
+    ?? new FileStorageOptions();
+builder.Services.Configure<FormOptions>(options =>
+{
+    // Reject an oversized multipart request while ASP.NET Core is parsing it,
+    // before the action opens any uploaded stream. Per-file and actual-stream
+    // checks remain in AddWorkOrderProgressCommand as a second boundary.
+    options.MultipartBodyLengthLimit = fileStorageOptions.MaxTotalUploadSizeBytes;
+});
 
 // Swagger/OpenAPI — dev-only interactive API explorer. Lets anyone on the
 // team browse every controller's endpoints (Shahrom's Zone B + Ahmad's

@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Objects;
 using Domain.Common;
 using Domain.Entities;
 using FluentValidation;
@@ -45,6 +46,10 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
         if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
             return Result.Failure<MaterialDeliveryDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
 
+        var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+        if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId))
+            return Result.Failure<MaterialDeliveryDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
+
         MaterialRequest? materialRequest = null;
         if (request.MaterialRequestId is not null)
         {
@@ -53,6 +58,8 @@ public sealed class CreateMaterialDeliveryCommandHandler(IApplicationDbContext c
                 return Result.Failure<MaterialDeliveryDto>(accessResult.Error);
 
             materialRequest = accessResult.Value;
+            if (materialRequest.ObjectId != request.ObjectId)
+                return Result.Failure<MaterialDeliveryDto>(new Error("MATERIAL_REQUEST_NOT_FOUND", "Material request not found."));
         }
 
         var deliveredAt = DateTimeOffset.UtcNow;

@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Objects;
 using Domain.Common;
 using Domain.Entities;
 using FluentValidation;
@@ -52,6 +53,10 @@ public sealed class CreateMaterialDeliveryDocumentCommandHandler(IApplicationDbC
     {
         if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
             return Result.Failure<MaterialDeliveryDocumentDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
+
+        var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+        if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId))
+            return Result.Failure<MaterialDeliveryDocumentDto>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
 
         var documentId = Guid.NewGuid();
         var deliveredAt = DateTimeOffset.UtcNow;

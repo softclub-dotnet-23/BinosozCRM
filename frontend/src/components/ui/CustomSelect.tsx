@@ -340,7 +340,7 @@ export function CustomSelect({
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </span>
-        <span className="flex flex-shrink-0 items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
           {clearable && value && isInteractive && (
             <button
               type="button"
@@ -374,7 +374,7 @@ export function CustomSelect({
             role="listbox"
             id={listboxId}
             aria-label={ariaProps["aria-label"] ?? placeholder}
-            className="fixed z-[1000] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-popover)]"
+            className="fixed z-[1000] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-(--shadow-popover)"
             style={{
               left: rect.left,
               minWidth: rect.width,
@@ -384,7 +384,7 @@ export function CustomSelect({
           >
             {searchable && (
               <div className="flex items-center gap-2 border-b border-border px-2.5 py-2">
-                <Search size={14} className="flex-shrink-0 text-ink-muted" />
+                <Search size={14} className="shrink-0 text-ink-muted" />
                 <input
                   ref={searchRef}
                   value={query}
@@ -451,7 +451,7 @@ export function CustomSelect({
                               <span className="block truncate text-xs text-ink-secondary">{option.description}</span>
                             )}
                           </span>
-                          {isSelected && <Check size={14} className="flex-shrink-0 text-primary" />}
+                          {isSelected && <Check size={14} className="shrink-0 text-primary" />}
                         </div>
                       );
                     })}
