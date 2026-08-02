@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Workers;
 using Domain.Common;
 using Domain.Enums;
 using MediatR;
@@ -14,6 +15,7 @@ namespace Application.Payroll;
 // their own PayrollEntry rows (they're a Worker too, via Worker.UserId),
 // not their whole brigade's — a different isolation axis than the
 // BrigadeId-based one BrigadirAccess.GetOwnBrigadeIdAsync covers elsewhere.
+// Worker (post-MASTER addition) uses the identical "own row" scoping.
 public sealed record ListPayrollEntriesQuery(int Page, int PageSize) : IRequest<Result<PagedResult<PayrollEntryDto>>>;
 
 public sealed class ListPayrollEntriesQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
@@ -23,12 +25,9 @@ public sealed class ListPayrollEntriesQueryHandler(IApplicationDbContext context
     {
         var query = context.PayrollEntries.AsNoTracking().AsQueryable();
 
-        if (currentUser.Role == Role.Brigadir)
+        if (currentUser.Role is Role.Brigadir or Role.Worker)
         {
-            var ownWorkerId = await context.Workers
-                .Where(w => w.UserId == currentUser.UserId)
-                .Select(w => (Guid?)w.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
 
             query = query.Where(e => e.WorkerId == ownWorkerId);
         }

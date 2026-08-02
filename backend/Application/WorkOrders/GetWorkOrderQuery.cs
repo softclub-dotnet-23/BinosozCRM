@@ -19,7 +19,7 @@ public sealed class GetWorkOrderQueryHandler(IApplicationDbContext context, ICur
         if (workOrder is null)
             return Result.Failure<WorkOrderDto>(new Error("WORK_ORDER_NOT_FOUND", "Work order not found."));
 
-        if (currentUser.Role == Role.Brigadir)
+        if (currentUser.Role is Role.Brigadir or Role.Worker)
         {
             var ownBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
             if (ownBrigadeId != workOrder.BrigadeId)

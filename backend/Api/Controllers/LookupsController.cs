@@ -10,7 +10,7 @@ namespace Api.Controllers;
 // only LookupItemDto values: { id, name }, never a Worker/Object entity.
 [ApiController]
 [Route("api/v1/lookups")]
-[Authorize(Roles = "Owner,Prorab,Brigadir")]
+[Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
 public sealed class LookupsController(ISender sender) : ControllerBase
 {
     [HttpGet("workers")]

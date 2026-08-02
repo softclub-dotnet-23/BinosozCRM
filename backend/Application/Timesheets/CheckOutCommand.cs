@@ -1,11 +1,13 @@
 using Application.Common.Interfaces;
 using Domain.Common;
+using Domain.Enums;
 using FluentValidation;
 using MediatR;
 
 namespace Application.Timesheets;
 
 // MASTER §9.4/§8.4: POST /timesheets/{id}/check-out — Brigadir, own brigade.
+// Worker (post-MASTER addition): own timesheet only.
 // HoursWorked = CheckOutAt - CheckInAt (Timesheet.CheckOut already tolerates
 // a missing CheckInAt by leaving HoursWorked null — no separate error code
 // for "checked out without checking in" exists in §9.2's catalogue, and
@@ -29,7 +31,9 @@ public sealed class CheckOutCommandHandler(
 {
     public async Task<Result<TimesheetDto>> Handle(CheckOutCommand request, CancellationToken cancellationToken)
     {
-        var accessResult = await TimesheetAccess.GetForBrigadirAsync(context, currentUser, request.TimesheetId, cancellationToken);
+        var accessResult = currentUser.Role == Role.Worker
+            ? await TimesheetAccess.GetForWorkerAsync(context, currentUser, request.TimesheetId, cancellationToken)
+            : await TimesheetAccess.GetForBrigadirAsync(context, currentUser, request.TimesheetId, cancellationToken);
         if (accessResult.IsFailure)
             return Result.Failure<TimesheetDto>(accessResult.Error);
 

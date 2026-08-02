@@ -35,6 +35,7 @@ public sealed class ListWorkerLookupsQueryHandler(IApplicationDbContext context,
                 break;
 
             case Role.Brigadir:
+            case Role.Worker:
             {
                 var brigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
                 if (brigadeId is null)

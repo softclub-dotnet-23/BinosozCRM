@@ -71,6 +71,23 @@ public sealed class Worker : AuditableEntity, ICompanyOwned, ISoftDelete
         IsActive = false;
     }
 
+    // Worker-role checkpoint (docs/PROGRESS.md, post-MASTER addition): links
+    // an *existing* Worker record to a login-capable User created afterward
+    // — the realistic onboarding path, since Worker.Create's own UserId
+    // parameter only covers linking at creation time (e.g. a Brigadir hired
+    // with a login from day one). Re-linking an already-linked Worker is
+    // rejected rather than silently overwritten — a second login taking
+    // over someone else's attendance/payroll history is not a "change",
+    // it's a distinct mistake that needs a human decision, not code.
+    public Result LinkUser(Guid userId)
+    {
+        if (UserId is not null)
+            return Result.Failure(new Error("WORKER_ALREADY_LINKED", "Worker is already linked to a user account."));
+
+        UserId = userId;
+        return Result.Success();
+    }
+
     public void ChangePayRate(PayRateType payRateType, decimal payRate)
     {
         ValidatePayRate(payRateType, payRate);

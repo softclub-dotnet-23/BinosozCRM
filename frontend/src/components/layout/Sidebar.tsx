@@ -4,6 +4,7 @@ import {
   Building2,
   Calculator,
   Calendar,
+  Camera,
   ChevronDown,
   ClipboardCheck,
   HardHat,
@@ -86,6 +87,21 @@ const BRIGADIR_NAV_ITEMS: NavEntry[] = [
   { to: '/attendance', label: 'Посещаемость', icon: Calendar },
 ];
 
+const WORKER_NAV_ITEMS: NavEntry[] = [
+  { to: '/dashboard', label: 'Обзор', icon: Home },
+  { to: '/tasks', label: 'Задачи', icon: ClipboardCheck },
+  { to: '/attendance', label: 'Табель', icon: Calendar },
+  { to: '/inventory/materials', label: 'Материалы', icon: Package },
+  { to: '/photo-reports', label: 'Фотоотчёты', icon: Camera },
+  { to: '/profile', label: 'Профиль', icon: User },
+];
+
+function navItemsForRole(role: string): NavEntry[] {
+  if (role === 'brigadir') return BRIGADIR_NAV_ITEMS;
+  if (role === 'worker') return WORKER_NAV_ITEMS;
+  return NAV_ITEMS;
+}
+
 interface SidebarProps {
   collapsed?: boolean;
   mobileOpen?: boolean;
@@ -107,7 +123,7 @@ export function Sidebar({
   const visibleNavItems = useMemo(
     () =>
       user
-        ? (user.role === 'brigadir' ? BRIGADIR_NAV_ITEMS : NAV_ITEMS)
+        ? navItemsForRole(user.role)
             .map((entry) =>
               isNavGroup(entry)
                 ? {

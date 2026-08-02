@@ -20,9 +20,21 @@ export interface MaterialRequest {
   isOverDelivered: boolean;
 }
 
-/** Create is Brigadir-only (Telegram bot) — this page only reads and acts on existing requests. */
+/** Owner/Prorab: every request in their scope. Brigadir/Worker: only their own (RequestedByUserId == self). */
 export function listMaterialRequests(page: number, pageSize: number): Promise<PagedResult<MaterialRequest>> {
   return request<PagedResult<MaterialRequest>>(`/api/v1/material-requests?page=${page}&pageSize=${pageSize}`);
+}
+
+export interface CreateMaterialRequestInput {
+  objectId: string;
+  materialName: string;
+  unit: string;
+  qty: number;
+}
+
+/** Brigadir/Worker: own brigade, resolved server-side from the caller's linked Worker row. */
+export function createMaterialRequest(input: CreateMaterialRequestInput): Promise<MaterialRequest> {
+  return request<MaterialRequest>("/api/v1/material-requests", { method: "POST", body: input });
 }
 
 export function approveMaterialRequest(id: string): Promise<MaterialRequest> {

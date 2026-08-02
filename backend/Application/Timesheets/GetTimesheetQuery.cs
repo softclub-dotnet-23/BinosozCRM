@@ -12,9 +12,12 @@ public sealed class GetTimesheetQueryHandler(IApplicationDbContext context, ICur
 {
     public async Task<Result<TimesheetDto>> Handle(GetTimesheetQuery request, CancellationToken cancellationToken)
     {
-        var result = currentUser.Role == Role.Brigadir
-            ? await TimesheetAccess.GetForBrigadirAsync(context, currentUser, request.Id, cancellationToken)
-            : await TimesheetAccess.GetForProrabAsync(context, currentUser, request.Id, cancellationToken);
+        var result = currentUser.Role switch
+        {
+            Role.Brigadir => await TimesheetAccess.GetForBrigadirAsync(context, currentUser, request.Id, cancellationToken),
+            Role.Worker => await TimesheetAccess.GetForWorkerAsync(context, currentUser, request.Id, cancellationToken),
+            _ => await TimesheetAccess.GetForProrabAsync(context, currentUser, request.Id, cancellationToken),
+        };
 
         return result.IsFailure
             ? Result.Failure<TimesheetDto>(result.Error)

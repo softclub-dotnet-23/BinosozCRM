@@ -12,6 +12,7 @@ import { listBrigades } from "../api/brigadesApi";
 import { listWorkOrders } from "../api/workOrdersApi";
 import { formatCurrency } from "../utils/format";
 import BrigadirDashboardPage from "./BrigadirDashboardPage";
+import WorkerDashboardPage from "./WorkerDashboardPage";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
@@ -22,6 +23,7 @@ function describeError(error: unknown, fallback: string): string {
 export default function DashboardPage() {
   const { user } = useAuth();
   if (user?.role === "brigadir") return <BrigadirDashboardPage />;
+  if (user?.role === "worker") return <WorkerDashboardPage />;
   return <CompanyDashboardPage />;
 }
 

@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Workers;
 using Domain.Common;
 using Domain.Enums;
 using MediatR;
@@ -20,12 +21,9 @@ public sealed class ListPayrollAdvancesQueryHandler(IApplicationDbContext contex
     {
         var query = context.PayrollAdvances.AsNoTracking().AsQueryable();
 
-        if (currentUser.Role == Role.Brigadir)
+        if (currentUser.Role is Role.Brigadir or Role.Worker)
         {
-            var ownWorkerId = await context.Workers
-                .Where(w => w.UserId == currentUser.UserId)
-                .Select(w => (Guid?)w.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
 
             query = query.Where(a => a.WorkerId == ownWorkerId);
         }

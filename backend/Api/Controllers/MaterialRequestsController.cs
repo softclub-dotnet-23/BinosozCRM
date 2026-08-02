@@ -25,7 +25,7 @@ namespace Api.Controllers;
 public sealed class MaterialRequestsController(ISender sender) : ControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> Create(CreateMaterialRequestRequest request, CancellationToken cancellationToken)
     {
         var command = new CreateMaterialRequestCommand(request.ObjectId, request.MaterialName, request.Unit, request.Qty);
@@ -34,7 +34,7 @@ public sealed class MaterialRequestsController(ISender sender) : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Owner,Prorab")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);

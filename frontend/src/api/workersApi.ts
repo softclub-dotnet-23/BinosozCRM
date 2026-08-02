@@ -62,3 +62,8 @@ export interface ChangeWorkerPayRateInput {
 export function changeWorkerPayRate(workerId: string, input: ChangeWorkerPayRateInput): Promise<Worker> {
   return request<Worker>(`/api/v1/workers/${workerId}/pay-rate`, { method: "PUT", body: input });
 }
+
+/** Brigadir/Worker: their own linked Worker record, full details (own PayRate/Document*, unlike the masked view another role sees of someone else's). */
+export function getMyWorkerProfile(): Promise<Worker> {
+  return request<Worker>("/api/v1/workers/me");
+}

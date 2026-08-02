@@ -18,6 +18,7 @@ import { listBrigades } from "../api/brigadesApi";
 import { listAllWorkers, type Worker } from "../api/workersApi";
 import { formatDushanbeTime } from "../utils/dushanbeTime";
 import BrigadirAttendancePage from "./BrigadirAttendancePage";
+import WorkerAttendancePage from "./WorkerAttendancePage";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
@@ -30,6 +31,7 @@ const CREATE_FORM_INITIAL = { workerId: "", objectId: "", date: "", checkInAt: "
 export default function AttendancePage() {
   const { user } = useAuth();
   if (user?.role === "brigadir") return <BrigadirAttendancePage />;
+  if (user?.role === "worker") return <WorkerAttendancePage />;
   return <CompanyAttendancePage />;
 }
 
