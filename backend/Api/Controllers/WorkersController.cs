@@ -12,10 +12,11 @@ namespace Api.Controllers;
 // endpoint for it is enumerated in §9.4 yet.
 [ApiController]
 [Route("api/v1")]
-[Authorize(Roles = "Owner,Prorab")]
+[Authorize]
 public sealed class WorkersController(ISender sender) : ControllerBase
 {
     [HttpPost("brigades/{brigadeId:guid}/workers")]
+    [Authorize(Roles = "Owner,Prorab")]
     public async Task<IActionResult> Create(Guid brigadeId, CreateWorkerRequest request, CancellationToken cancellationToken)
     {
         var command = new CreateWorkerCommand(
@@ -37,6 +38,7 @@ public sealed class WorkersController(ISender sender) : ControllerBase
     }
 
     [HttpGet("brigades/{brigadeId:guid}/workers")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir")]
     public async Task<IActionResult> List(Guid brigadeId, [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] bool includeInactive, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -47,6 +49,7 @@ public sealed class WorkersController(ISender sender) : ControllerBase
     }
 
     [HttpPut("workers/{workerId:guid}/terminate")]
+    [Authorize(Roles = "Owner,Prorab")]
     public async Task<IActionResult> Terminate(Guid workerId, TerminateWorkerRequest request, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new TerminateWorkerCommand(workerId, request.TerminationDate), cancellationToken);
