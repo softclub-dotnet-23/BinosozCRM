@@ -34,6 +34,14 @@ public sealed class BrigadesController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    [HttpGet("mine")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetMyBrigadeQuery(), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpPut("{brigadeId:guid}/brigadir")]
     [Authorize(Roles = "Owner")]
     public async Task<IActionResult> AssignBrigadir(Guid brigadeId, AssignBrigadirRequest request, CancellationToken cancellationToken)

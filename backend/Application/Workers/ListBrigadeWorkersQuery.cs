@@ -1,6 +1,8 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.IndividualTasks;
 using Domain.Common;
+using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +23,16 @@ public sealed class ListBrigadeWorkersQueryHandler(IApplicationDbContext context
         var brigadeExists = await context.Brigades.AnyAsync(b => b.Id == request.BrigadeId, cancellationToken);
         if (!brigadeExists)
             return Result.Failure<PagedResult<WorkerDto>>(new Error("BRIGADE_NOT_FOUND", "Brigade not found."));
+
+        if (currentUser.Role == Role.Brigadir)
+        {
+            var callerBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
+            if (callerBrigadeId is null)
+                return Result.Success(new PagedResult<WorkerDto>([], request.Page, request.PageSize, 0));
+
+            if (request.BrigadeId != callerBrigadeId.Value)
+                return Result.Failure<PagedResult<WorkerDto>>(new Error("BRIGADE_NOT_FOUND", "Brigade not found."));
+        }
 
         var query = context.Workers
             .Where(w => w.BrigadeId == request.BrigadeId);
