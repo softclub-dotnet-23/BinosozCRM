@@ -1,4 +1,4 @@
-import type { UserRole } from "../../types";
+import type { UserRole } from '../../types';
 
 /**
  * `administrator` and `storekeeper` are UI-only placeholders: the backend's
@@ -13,15 +13,15 @@ import type { UserRole } from "../../types";
 
 /** Landing route right after login, and where a role gets bounced back to if it opens a route it can't use. */
 export const ROLE_HOME: Record<UserRole, string> = {
-  owner: "/dashboard",
-  administrator: "/dashboard",
-  accountant: "/payroll",
-  prorab: "/works",
-  brigadir: "/brigades",
-  storekeeper: "/inventory/materials",
+  owner: '/dashboard',
+  administrator: '/dashboard',
+  accountant: '/payroll',
+  prorab: '/works',
+  brigadir: '/brigades',
+  storekeeper: '/inventory/materials',
 };
 
-const FULL_ACCESS = "*" as const;
+const FULL_ACCESS = '*' as const;
 
 /**
  * Routes each role may open. An entry ending in "/*" allows that path and every
@@ -42,26 +42,34 @@ const FULL_ACCESS = "*" as const;
 const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   owner: FULL_ACCESS,
   administrator: FULL_ACCESS,
-  accountant: ["/dashboard", "/payroll", "/budgets", "/estimates", "/objects"],
-  prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/attendance", "/inventory/*", "/reports"],
-  brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials"],
-  storekeeper: ["/dashboard", "/inventory/*", "/reports"],
+  accountant: ['/dashboard', '/payroll', '/budgets', '/estimates', '/objects'],
+  prorab: [
+    '/dashboard',
+    '/objects',
+    '/works',
+    '/brigades/*',
+    '/attendance',
+    '/inventory/*',
+    '/reports',
+  ],
+  brigadir: ['/dashboard', '/works', '/brigades', '/attendance'],
+  storekeeper: ['/dashboard', '/inventory/*', '/reports'],
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  owner: "Владелец",
-  administrator: "Администратор",
-  accountant: "Бухгалтер",
-  prorab: "Прораб",
-  brigadir: "Бригадир",
-  storekeeper: "Снабженец",
+  owner: 'Владелец',
+  administrator: 'Администратор',
+  accountant: 'Бухгалтер',
+  prorab: 'Прораб',
+  brigadir: 'Бригадир',
+  storekeeper: 'Снабженец',
 };
 
 export function isRouteAllowed(role: UserRole, pathname: string): boolean {
   const rule = ROLE_ALLOWED_PREFIXES[role];
   if (rule === FULL_ACCESS) return true;
   return rule.some((entry) => {
-    if (entry.endsWith("/*")) {
+    if (entry.endsWith('/*')) {
       const base = entry.slice(0, -2);
       return pathname === base || pathname.startsWith(`${base}/`);
     }
