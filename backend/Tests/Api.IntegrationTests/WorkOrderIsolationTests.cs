@@ -317,6 +317,115 @@ public sealed class WorkOrderIsolationTests(PostgresFixture fixture)
         log.ToStatus.Should().Be("InProgress");
     }
 
+    // GetWorkOrderQuery (GET /work-orders/{id}) had zero test coverage before
+    // this — every other transition handler in this file is covered, but the
+    // plain read-by-id path (Application/WorkOrders/GetWorkOrderQuery.cs) was
+    // not. Same isolation rules as everywhere else (Brigadir via own
+    // BrigadeId, Prorab via ProrabObjectAssignment), verified directly here.
+    [Fact]
+    public async Task GetById_returns_the_order_for_the_owning_brigadir()
+    {
+        var (owner, _, brigadirUserId, _, _, _, workOrderId) = await SeedAsync();
+        var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
+
+        await using var context = fixture.CreateDbContext(brigadir);
+        var result = await new GetWorkOrderQueryHandler(context, brigadir)
+            .Handle(new GetWorkOrderQuery(workOrderId), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Id.Should().Be(workOrderId);
+    }
+
+    [Fact]
+    public async Task GetById_hides_another_brigades_order_from_a_brigadir_as_not_found()
+    {
+        var (owner, _, brigadirUserId, objectId, brigadeId, otherBrigadeId, workOrderId) = await SeedAsync();
+        _ = brigadeId;
+
+        Guid otherOrderId;
+        await using (var setupContext = fixture.CreateDbContext(owner))
+        {
+            var otherOrder = await new CreateWorkOrderCommandHandler(setupContext, owner).Handle(
+                new CreateWorkOrderCommand(objectId, otherBrigadeId, "Other brigade's order", "m2", 5, 100, null, null),
+                CancellationToken.None);
+            otherOrderId = otherOrder.Value.Id;
+        }
+
+        var otherBrigadirUserId = Guid.NewGuid();
+        await using (var setupContext = fixture.CreateDbContext(owner))
+        {
+            var otherBrigadirUser = User.Create(owner.CompanyId!.Value, "Yet Another Brigadir", $"+992{Random.Shared.NextInt64(100000000, 999999999)}", "hash", Role.Brigadir);
+            otherBrigadirUserId = otherBrigadirUser.Id;
+            var otherWorker = Worker.Create(
+                owner.CompanyId!.Value, otherBrigadeId, "Yet Another Brigadir Worker", $"+992{Random.Shared.NextInt64(100000000, 999999999)}",
+                new DateOnly(1990, 1, 1), PayRateType.Hourly, 50m, new DateOnly(2020, 1, 1), userId: otherBrigadirUser.Id);
+            setupContext.Users.Add(otherBrigadirUser);
+            setupContext.Workers.Add(otherWorker);
+            await setupContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        // The other brigadir CAN read their own brigade's order (sanity: this
+        // isn't "every brigadir is denied", it's "the caller's own brigade only").
+        var otherBrigadir = new FixedCurrentUserService(owner.CompanyId!.Value, otherBrigadirUserId, Role.Brigadir);
+        await using var ownContext = fixture.CreateDbContext(otherBrigadir);
+        var ownResult = await new GetWorkOrderQueryHandler(ownContext, otherBrigadir)
+            .Handle(new GetWorkOrderQuery(otherOrderId), CancellationToken.None);
+        ownResult.IsSuccess.Should().BeTrue();
+
+        // ...but the ORIGINAL brigadir (own brigade = the seeded `brigadeId`)
+        // cannot reach the second brigade's order.
+        var brigadir = new FixedCurrentUserService(owner.CompanyId!.Value, brigadirUserId, Role.Brigadir);
+        await using var crossContext = fixture.CreateDbContext(brigadir);
+        var crossResult = await new GetWorkOrderQueryHandler(crossContext, brigadir)
+            .Handle(new GetWorkOrderQuery(otherOrderId), CancellationToken.None);
+
+        crossResult.IsFailure.Should().BeTrue();
+        crossResult.Error.Code.Should().Be("WORK_ORDER_NOT_FOUND");
+        workOrderId.Should().NotBe(otherOrderId);
+    }
+
+    [Fact]
+    public async Task GetById_for_a_brigadir_with_no_linked_worker_row_is_not_found_not_forbidden()
+    {
+        var (owner, _, _, _, _, _, workOrderId) = await SeedAsync();
+        var unlinkedBrigadir = new FixedCurrentUserService(owner.CompanyId!.Value, Guid.NewGuid(), Role.Brigadir);
+
+        await using var context = fixture.CreateDbContext(unlinkedBrigadir);
+        var result = await new GetWorkOrderQueryHandler(context, unlinkedBrigadir)
+            .Handle(new GetWorkOrderQuery(workOrderId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("WORK_ORDER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task GetById_rejects_a_prorab_not_assigned_to_the_orders_object()
+    {
+        var (owner, prorabUserId, _, _, _, _, workOrderId) = await SeedAsync();
+
+        // A second, unrelated object the Prorab IS assigned to — same
+        // strict-allow-list proof as the other Prorab isolation tests above.
+        await using (var setupContext = fixture.CreateDbContext(owner))
+        {
+            var customer = Customer.Create(owner.CompanyId!.Value, "Other Customer");
+            var otherObject = ConstructionObject.Create(owner.CompanyId!.Value, "Object Elsewhere", customer.Id);
+            setupContext.Customers.Add(customer);
+            setupContext.ConstructionObjects.Add(otherObject);
+            await setupContext.SaveChangesAsync(CancellationToken.None);
+
+            await new AssignProrabCommandHandler(setupContext, owner)
+                .Handle(new AssignProrabCommand(otherObject.Id, prorabUserId), CancellationToken.None);
+        }
+
+        var prorab = new FixedCurrentUserService(owner.CompanyId!.Value, prorabUserId, Role.Prorab);
+        await using var context = fixture.CreateDbContext(prorab);
+        var result = await new GetWorkOrderQueryHandler(context, prorab)
+            .Handle(new GetWorkOrderQuery(workOrderId), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("PRORAB_NOT_ASSIGNED_TO_OBJECT");
+    }
+
     // MASTER §7.1: Accepted --close--> Closed, "вручную Prorab" — the
     // manual half. Punch-list closeout for WorkOrder.Close().
     [Fact]
