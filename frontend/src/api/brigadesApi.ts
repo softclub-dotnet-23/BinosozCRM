@@ -1,4 +1,5 @@
 import { request, type PagedResult } from "./apiClient";
+import type { WorkOrderStatus } from "./workOrdersApi";
 
 export interface Brigade {
   id: string;
@@ -25,4 +26,21 @@ export function activateBrigade(brigadeId: string): Promise<Brigade> {
 
 export function deactivateBrigade(brigadeId: string): Promise<Brigade> {
   return request<Brigade>(`/api/v1/brigades/${brigadeId}/deactivate`, { method: "POST" });
+}
+
+/** Matches Application/Brigades/BrigadeAssignmentDto.cs — WorkOrder as the assignment, Amount = PlannedQty*UnitPrice. */
+export interface BrigadeAssignment {
+  brigadeId: string;
+  brigadeName: string;
+  objectId: string;
+  objectName: string;
+  title: string;
+  amount: number;
+  assignedDate: string | null;
+  dueDate: string | null;
+  status: WorkOrderStatus;
+}
+
+export function listBrigadeAssignments(brigadeId?: string): Promise<BrigadeAssignment[]> {
+  return request<BrigadeAssignment[]>(`/api/v1/brigades/assignments${brigadeId ? `?brigadeId=${brigadeId}` : ""}`);
 }

@@ -58,7 +58,6 @@ const NAV_ITEMS: NavEntry[] = [
     children: [
       { to: "/brigades", label: "Список бригад" },
       { to: "/brigades/composition", label: "Состав бригад" },
-      { to: "/brigades/assignments", label: "Назначения" },
     ],
   },
   { to: "/employees", label: "Сотрудники", icon: User },
@@ -71,7 +70,6 @@ const NAV_ITEMS: NavEntry[] = [
       { to: "/inventory/material-requests", label: "Заявки на материалы" },
       { to: "/inventory/receipts", label: "Поступления" },
       { to: "/inventory/write-offs", label: "Списания" },
-      { to: "/inventory/transfers", label: "Перемещения" },
       { to: "/inventory/stock", label: "Остатки" },
     ],
   },

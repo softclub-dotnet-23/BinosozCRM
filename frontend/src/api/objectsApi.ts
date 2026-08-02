@@ -62,3 +62,56 @@ export function updateObject(objectId: string, input: UpdateObjectInput): Promis
 export function getObjectCostBreakdown(objectId: string): Promise<ObjectCostBreakdown> {
   return request<ObjectCostBreakdown>(`/api/v1/objects/${objectId}/cost-breakdown`);
 }
+
+/** Matches Application/Objects/EstimateItemDto.cs — a per-object estimate line item (not a company-wide "Estimate" entity). */
+export interface EstimateItem {
+  id: string;
+  objectId: string;
+  workType: string;
+  unit: string;
+  plannedQty: number;
+  plannedUnitPrice: number;
+  stage: string | null;
+}
+
+export function getEstimateItems(objectId: string, page: number, pageSize: number): Promise<PagedResult<EstimateItem>> {
+  return request<PagedResult<EstimateItem>>(`/api/v1/objects/${objectId}/estimate-items?page=${page}&pageSize=${pageSize}`);
+}
+
+export interface CreateEstimateItemInput {
+  workType: string;
+  unit: string;
+  plannedQty: number;
+  plannedUnitPrice: number;
+  stage?: string;
+}
+
+export function createEstimateItem(objectId: string, input: CreateEstimateItemInput): Promise<EstimateItem> {
+  return request<EstimateItem>(`/api/v1/objects/${objectId}/estimate-items`, { method: "POST", body: input });
+}
+
+/** Matches Application/Materials/StockBalanceDto.cs — computed on the fly from MaterialDelivery/MaterialConsumptionReport, not a stored entity. */
+export interface StockBalanceItem {
+  materialName: string;
+  unit: string;
+  totalDelivered: number;
+  totalConsumed: number;
+  balance: number;
+}
+
+export function getObjectStockBalance(objectId: string): Promise<StockBalanceItem[]> {
+  return request<StockBalanceItem[]>(`/api/v1/objects/${objectId}/stock`);
+}
+
+/** Matches Application/Objects/ObjectBudgetSummaryDto.cs — ActualCost reuses the same MASTER §8.10 calculator as ObjectCostBreakdown, computed for every object in one call. */
+export interface ObjectBudgetSummary {
+  objectId: string;
+  objectName: string;
+  budget: number | null;
+  actualCost: number;
+  remaining: number | null;
+}
+
+export function getObjectBudgets(): Promise<ObjectBudgetSummary[]> {
+  return request<ObjectBudgetSummary[]>("/api/v1/objects/budgets");
+}

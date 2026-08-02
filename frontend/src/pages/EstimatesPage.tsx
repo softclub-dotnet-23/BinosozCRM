@@ -1,28 +1,29 @@
 import { Calculator } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
+import { Button } from "../components/ui/Button";
 
 /**
- * No backend entity matches this page's "Estimate" concept (its own id,
- * status workflow, and total amount across a whole object). The closest real
- * concept is EstimateItem — POST/GET /api/v1/objects/{objectId}/estimate-items
- * — but that's a per-object line item (WorkType/Unit/PlannedQty/
- * PlannedUnitPrice/Stage), a different shape and workflow, the same class of
- * mismatch the project already decided not to paper over for Assignments
- * (see AssignmentsPage.tsx). Collapsing the two without a confirmed business
- * contract would misrepresent the numbers, so this section is left
- * unavailable rather than reusing EstimateItem under a different name. See
- * the frontend audit (2026-07-31) and its remediation report.
+ * Backend only exposes EstimateItem per-object (POST/GET
+ * /objects/{objectId}/estimate-items) — there's no company-wide "all
+ * estimates" endpoint to back a standalone list here. The actual estimate
+ * table lives in the object's own view (ObjectsPage → ObjectEstimateItems),
+ * so this page just routes people there instead of inventing a company-wide
+ * aggregate the backend doesn't have.
  */
 export default function EstimatesPage() {
+  const navigate = useNavigate();
+
   return (
-    <AppLayout title="Сметы" subtitle="Раздел пока недоступен">
+    <AppLayout title="Сметы" subtitle="Смета ведётся в разрезе объекта">
       <Card>
         <EmptyState
           icon={Calculator}
-          title="Раздел пока недоступен"
-          description="Для смет в текущем виде нет соответствующей модели данных на backend. Раздел будет включён после того, как появится согласованный бизнес-контракт для этой сущности."
+          title="Выберите объект, чтобы увидеть его смету"
+          description="Общего списка смет по всем объектам нет — откройте объект и посмотрите его смету там."
+          action={<Button onClick={() => navigate("/objects")}>К списку объектов</Button>}
         />
       </Card>
     </AppLayout>

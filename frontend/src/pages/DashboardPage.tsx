@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, AlertTriangle, Building2, ClipboardList, Info, Loader2, UsersRound } from "lucide-react";
+import { AlertCircle, AlertTriangle, Building2, ClipboardList, Landmark, Loader2, Scale, UsersRound, Wallet } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
@@ -7,9 +7,10 @@ import { Button } from "../components/ui/Button";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, NetworkError } from "../api/apiClient";
 import { getDashboardWorkStatus, type DashboardWorkStatus } from "../api/dashboardApi";
-import { listObjects } from "../api/objectsApi";
+import { getObjectBudgets, listObjects, type ObjectBudgetSummary } from "../api/objectsApi";
 import { listBrigades } from "../api/brigadesApi";
 import { listWorkOrders } from "../api/workOrdersApi";
+import { formatCurrency } from "../utils/format";
 import BrigadirDashboardPage from "./BrigadirDashboardPage";
 
 function describeError(error: unknown, fallback: string): string {
@@ -29,22 +30,25 @@ function CompanyDashboardPage() {
   const [objectCount, setObjectCount] = useState(0);
   const [brigadeCount, setBrigadeCount] = useState(0);
   const [workOrderCount, setWorkOrderCount] = useState(0);
+  const [budgets, setBudgets] = useState<ObjectBudgetSummary[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState("");
 
   async function loadAll() {
     setLoadState("loading");
     try {
-      const [status, objects, brigades, workOrders] = await Promise.all([
+      const [status, objects, brigades, workOrders, budgetSummaries] = await Promise.all([
         getDashboardWorkStatus(),
         listObjects(1, 1),
         listBrigades(1, 1),
         listWorkOrders(1, 1),
+        getObjectBudgets(),
       ]);
       setWorkStatus(status);
       setObjectCount(objects.totalCount);
       setBrigadeCount(brigades.totalCount);
       setWorkOrderCount(workOrders.totalCount);
+      setBudgets(budgetSummaries);
       setLoadState("ready");
     } catch (error) {
       setLoadError(describeError(error, "Не удалось загрузить сводку"));
@@ -60,6 +64,12 @@ function CompanyDashboardPage() {
     () => workStatus?.workOrderStatusCounts.reduce((sum, s) => sum + s.count, 0) ?? 0,
     [workStatus],
   );
+
+  const financeSummary = useMemo(() => {
+    const totalBudget = budgets.reduce((sum, b) => sum + (b.budget ?? 0), 0);
+    const totalActualCost = budgets.reduce((sum, b) => sum + b.actualCost, 0);
+    return { totalBudget, totalActualCost, totalRemaining: totalBudget - totalActualCost };
+  }, [budgets]);
 
   return (
     <AppLayout title="Обзор" subtitle="Сводка по компании">
@@ -110,12 +120,17 @@ function CompanyDashboardPage() {
             </Card>
           </div>
 
-          <Card style={{ marginTop: 16, padding: 16 }}>
-            <div className="flex items-start gap-2 text-sm text-ink-secondary">
-              <Info size={16} className="mt-0.5 shrink-0" />
-              <span>Финансовая сводка (бюджет/факт по всем объектам) недоступна — на backend нет общего агрегата расходов по компании, только постатейная разбивка по одному объекту (см. страницу «Объекты»).</span>
-            </div>
-          </Card>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <MetricCard label="Бюджет" value={formatCurrency(financeSummary.totalBudget)} icon={Landmark} tone="blue" footer="Сумма бюджетов по всем объектам" />
+            <MetricCard label="Факт" value={formatCurrency(financeSummary.totalActualCost)} icon={Wallet} tone="orange" footer="Фактические расходы по всем объектам" />
+            <MetricCard
+              label="Остаток"
+              value={formatCurrency(financeSummary.totalRemaining)}
+              icon={Scale}
+              tone={financeSummary.totalRemaining < 0 ? "red" : "green"}
+              footer="Бюджет минус факт по компании"
+            />
+          </div>
         </>
       )}
     </AppLayout>

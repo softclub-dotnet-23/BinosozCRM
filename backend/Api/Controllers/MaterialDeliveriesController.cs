@@ -61,4 +61,15 @@ public sealed class MaterialDeliveriesController(ISender sender) : ControllerBas
         var result = await sender.Send(new GetMaterialDeliveryQuery(materialDeliveryId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    // Absolute route (not nested under this controller's material-deliveries
+    // prefix) — a materials catalog is conceptually its own resource, even
+    // though the aggregate it's read from is MaterialDelivery and there's no
+    // separate MaterialsController for it.
+    [HttpGet("/api/v1/materials/catalog")]
+    public async Task<IActionResult> ListCatalog(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ListMaterialCatalogQuery(), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }
