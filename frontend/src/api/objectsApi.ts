@@ -62,3 +62,30 @@ export function updateObject(objectId: string, input: UpdateObjectInput): Promis
 export function getObjectCostBreakdown(objectId: string): Promise<ObjectCostBreakdown> {
   return request<ObjectCostBreakdown>(`/api/v1/objects/${objectId}/cost-breakdown`);
 }
+
+/** Matches Application/Objects/EstimateItemDto.cs — a per-object estimate line item (not a company-wide "Estimate" entity). */
+export interface EstimateItem {
+  id: string;
+  objectId: string;
+  workType: string;
+  unit: string;
+  plannedQty: number;
+  plannedUnitPrice: number;
+  stage: string | null;
+}
+
+export function getEstimateItems(objectId: string, page: number, pageSize: number): Promise<PagedResult<EstimateItem>> {
+  return request<PagedResult<EstimateItem>>(`/api/v1/objects/${objectId}/estimate-items?page=${page}&pageSize=${pageSize}`);
+}
+
+export interface CreateEstimateItemInput {
+  workType: string;
+  unit: string;
+  plannedQty: number;
+  plannedUnitPrice: number;
+  stage?: string;
+}
+
+export function createEstimateItem(objectId: string, input: CreateEstimateItemInput): Promise<EstimateItem> {
+  return request<EstimateItem>(`/api/v1/objects/${objectId}/estimate-items`, { method: "POST", body: input });
+}

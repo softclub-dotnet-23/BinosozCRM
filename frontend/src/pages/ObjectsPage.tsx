@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertCircle, Building2, CheckCircle2, Eye, Flag, Loader2, Pencil, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
+import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/StatusBadge";
@@ -22,6 +23,7 @@ import {
   type ObjectCostBreakdown,
 } from "../api/objectsApi";
 import { createCustomer, listCustomers, type Customer } from "../api/customersApi";
+import { ObjectEstimateItems } from "../components/objects/ObjectEstimateItems";
 import { formatCurrency } from "../utils/format";
 
 const STATUS_OPTIONS: { value: BackendObjectStatus; label: string; tone: "blue" | "green" | "orange" | "purple" | "red" }[] = [
@@ -259,12 +261,12 @@ export default function ObjectsPage() {
       subtitle="Управление строительными объектами и их статусами"
       search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "Поиск объектов, адресов, заказчиков..." }}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggeredGrid className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Всего объектов" value={String(kpis.total)} icon={Building2} tone="orange" footer="Все проекты компании" />
         <MetricCard label="В работе" value={String(kpis.inProgress)} icon={CheckCircle2} tone="green" footer="Активные объекты" />
         <MetricCard label="Завершены" value={String(kpis.completed)} icon={Flag} tone="blue" footer="Закрытые проекты" />
         <MetricCard label="Приостановлены" value={String(kpis.suspended)} icon={AlertCircle} tone="red" footer="Требуют внимания" />
-      </div>
+      </StaggeredGrid>
 
       {loadState === "error" && (
         <Card style={{ marginTop: 16, padding: 24 }}>
@@ -365,24 +367,29 @@ export default function ObjectsPage() {
         </form>
       </Modal>
 
-      <Modal open={viewTarget !== null} onClose={() => setViewTarget(null)} title="Объект" description={viewTarget?.name} size="sm">
+      <Modal open={viewTarget !== null} onClose={() => setViewTarget(null)} title="Объект" description={viewTarget?.name} size="lg">
         {viewTarget && (
-          <div className="users-modal-form">
-            <label><span>Заказчик</span><input readOnly value={customerNameById.get(viewTarget.customerId) ?? "—"} /></label>
-            <label><span>Адрес</span><input readOnly value={viewTarget.address ?? "—"} /></label>
-            <label><span>Статус</span><input readOnly value={STATUS_LABEL[viewTarget.status]} /></label>
-            <label><span>Бюджет</span><input readOnly value={viewTarget.budget != null ? formatCurrency(viewTarget.budget) : "—"} /></label>
-            {costLoading && <p className="text-sm text-ink-muted">Загрузка расходов...</p>}
-            {costBreakdown && (
-              <>
-                <label><span>Материалы</span><input readOnly value={formatCurrency(costBreakdown.materialCost)} /></label>
-                <label><span>Сдельная оплата</span><input readOnly value={formatCurrency(costBreakdown.pieceworkPayrollCost)} /></label>
-                <label><span>Почасовая оплата</span><input readOnly value={formatCurrency(costBreakdown.hourlyPayrollCost)} /></label>
-                <label><span>Оплачиваемые отсутствия</span><input readOnly value={formatCurrency(costBreakdown.paidAbsencePayrollCost)} /></label>
-                <label><span>Итого расходов</span><input readOnly value={formatCurrency(costBreakdown.totalCost)} /></label>
-                <p className="text-xs text-ink-muted">{costBreakdown.note}</p>
-              </>
-            )}
+          <div className="flex flex-col gap-5">
+            <div className="users-modal-form">
+              <label><span>Заказчик</span><input readOnly value={customerNameById.get(viewTarget.customerId) ?? "—"} /></label>
+              <label><span>Адрес</span><input readOnly value={viewTarget.address ?? "—"} /></label>
+              <label><span>Статус</span><input readOnly value={STATUS_LABEL[viewTarget.status]} /></label>
+              <label><span>Бюджет</span><input readOnly value={viewTarget.budget != null ? formatCurrency(viewTarget.budget) : "—"} /></label>
+              {costLoading && <p className="text-sm text-ink-muted">Загрузка расходов...</p>}
+              {costBreakdown && (
+                <>
+                  <label><span>Материалы</span><input readOnly value={formatCurrency(costBreakdown.materialCost)} /></label>
+                  <label><span>Сдельная оплата</span><input readOnly value={formatCurrency(costBreakdown.pieceworkPayrollCost)} /></label>
+                  <label><span>Почасовая оплата</span><input readOnly value={formatCurrency(costBreakdown.hourlyPayrollCost)} /></label>
+                  <label><span>Оплачиваемые отсутствия</span><input readOnly value={formatCurrency(costBreakdown.paidAbsencePayrollCost)} /></label>
+                  <label><span>Итого расходов</span><input readOnly value={formatCurrency(costBreakdown.totalCost)} /></label>
+                  <p className="text-xs text-ink-muted">{costBreakdown.note}</p>
+                </>
+              )}
+            </div>
+
+            <ObjectEstimateItems objectId={viewTarget.id} />
+
             <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={() => setViewTarget(null)}>Закрыть</Button></div>
           </div>
         )}
