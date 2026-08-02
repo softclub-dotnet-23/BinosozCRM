@@ -81,3 +81,15 @@ export function groupByDocument(deliveries: MaterialDelivery[]): MaterialDeliver
     };
   });
 }
+
+/** Matches Application/Materials/MaterialCatalogEntryDto.cs — distinct (MaterialName, Unit) pairs aggregated from MaterialDelivery, no separate catalog table. */
+export interface MaterialCatalogEntry {
+  materialName: string;
+  unit: string;
+  lastUnitCost: number;
+  deliveryCount: number;
+}
+
+export function listMaterialCatalog(): Promise<MaterialCatalogEntry[]> {
+  return request<MaterialCatalogEntry[]>("/api/v1/materials/catalog");
+}

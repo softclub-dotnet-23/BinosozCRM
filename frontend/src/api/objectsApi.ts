@@ -102,3 +102,16 @@ export interface StockBalanceItem {
 export function getObjectStockBalance(objectId: string): Promise<StockBalanceItem[]> {
   return request<StockBalanceItem[]>(`/api/v1/objects/${objectId}/stock`);
 }
+
+/** Matches Application/Objects/ObjectBudgetSummaryDto.cs — ActualCost reuses the same MASTER §8.10 calculator as ObjectCostBreakdown, computed for every object in one call. */
+export interface ObjectBudgetSummary {
+  objectId: string;
+  objectName: string;
+  budget: number | null;
+  actualCost: number;
+  remaining: number | null;
+}
+
+export function getObjectBudgets(): Promise<ObjectBudgetSummary[]> {
+  return request<ObjectBudgetSummary[]>("/api/v1/objects/budgets");
+}

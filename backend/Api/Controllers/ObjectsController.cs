@@ -124,4 +124,11 @@ public sealed class ObjectsController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetStockBalanceQuery(objectId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    [HttpGet("budgets")]
+    public async Task<IActionResult> ListBudgets(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new ListObjectBudgetsQuery(), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }
