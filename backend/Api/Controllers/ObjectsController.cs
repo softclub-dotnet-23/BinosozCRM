@@ -118,7 +118,11 @@ public sealed class ObjectsController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    // Worker (post-MASTER addition, docs/PROGRESS.md) reads their own
+    // brigade's object stock — a narrower read than Prorab+'s
+    // ProrabObjectAssignment-wide access, scoped in the handler.
     [HttpGet("{objectId:guid}/stock")]
+    [Authorize(Roles = "Owner,Prorab,Worker")]
     public async Task<IActionResult> GetStockBalance(Guid objectId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetStockBalanceQuery(objectId), cancellationToken);

@@ -28,7 +28,7 @@ public sealed class IndividualTasksController(ISender sender) : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -39,7 +39,7 @@ public sealed class IndividualTasksController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{taskId:guid}")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> Get(Guid taskId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetIndividualTaskQuery(taskId), cancellationToken);
@@ -47,7 +47,7 @@ public sealed class IndividualTasksController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{taskId:guid}/start")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> Start(Guid taskId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new StartIndividualTaskCommand(taskId), cancellationToken);
@@ -55,7 +55,7 @@ public sealed class IndividualTasksController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{taskId:guid}/complete")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> Complete(Guid taskId, CompleteIndividualTaskRequest? request, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CompleteIndividualTaskCommand(taskId, request?.BonusAmount), cancellationToken);

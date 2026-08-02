@@ -605,7 +605,7 @@ export interface PayrollFilters {
 // Auth / accounts
 // ---------------------------------------------------------------------------
 
-export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "accountant" | "storekeeper";
+export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "accountant" | "storekeeper" | "worker";
 
 export type UserAccountStatus = "active" | "inactive" | "blocked";
 

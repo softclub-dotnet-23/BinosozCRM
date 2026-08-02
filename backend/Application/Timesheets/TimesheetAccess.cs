@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.IndividualTasks;
 using Application.Objects;
+using Application.Workers;
 using Domain.Common;
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +9,11 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.Timesheets;
 
 // Mirrors WorkOrderAccess/BrigadeAccess/ProrabObjectAccess (§11.5 rules 2-3:
-// isolation is manual, not an EF global filter) for the two roles that touch
-// a specific Timesheet: Brigadir (scoped to their own BrigadeId via the
-// Worker the timesheet belongs to) and Prorab+ (scoped by
-// ProrabObjectAssignment on the timesheet's ObjectId). Same 404-not-403
+// isolation is manual, not an EF global filter) for the roles that touch a
+// specific Timesheet: Brigadir (scoped to their own BrigadeId via the
+// Worker the timesheet belongs to), Worker (scoped one level further, to
+// their own WorkerId only — not their whole brigade's), and Prorab+ (scoped
+// by ProrabObjectAssignment on the timesheet's ObjectId). Same 404-not-403
 // pattern as every other isolation check in this codebase.
 internal static class TimesheetAccess
 {
@@ -42,6 +44,23 @@ internal static class TimesheetAccess
 
         var worker = await context.Workers.FirstOrDefaultAsync(w => w.Id == timesheet.WorkerId, cancellationToken);
         if (worker is null || worker.BrigadeId != brigadeResult.Value)
+            return Result.Failure<Timesheet>(new Error("TIMESHEET_NOT_FOUND", "Timesheet not found."));
+
+        return Result.Success(timesheet);
+    }
+
+    public static async Task<Result<Timesheet>> GetForWorkerAsync(
+        IApplicationDbContext context,
+        ICurrentUserService currentUser,
+        Guid timesheetId,
+        CancellationToken cancellationToken)
+    {
+        var workerResult = await WorkerAccess.GetCallerWorkerIdOrFailureAsync(context, currentUser, cancellationToken);
+        if (workerResult.IsFailure)
+            return Result.Failure<Timesheet>(workerResult.Error);
+
+        var timesheet = await context.Timesheets.FirstOrDefaultAsync(t => t.Id == timesheetId, cancellationToken);
+        if (timesheet is null || timesheet.WorkerId != workerResult.Value)
             return Result.Failure<Timesheet>(new Error("TIMESHEET_NOT_FOUND", "Timesheet not found."));
 
         return Result.Success(timesheet);

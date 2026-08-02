@@ -1,6 +1,8 @@
 using Application.Common.Interfaces;
+using Application.Workers;
 using Domain.Common;
 using Domain.Entities;
+using Domain.Enums;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.Timesheets;
 
 // MASTER §9.4/§8.4: POST /timesheets/check-in — Brigadir, for themselves or
-// any worker in their own brigade ("за всю бригаду и за себя"). §8.1:
+// any worker in their own brigade ("за всю бригаду и за себя"). Worker
+// (post-MASTER addition) is narrower: only themselves, never another
+// worker — self check-in only. §8.1:
 // LateMinutes is computed once, right here, and never recalculated —
 // PlannedStartTime is a snapshot of Worker.ShiftStartTime taken at Timesheet
 // creation, so a rate/schedule change tomorrow can't rewrite today's
@@ -33,17 +37,29 @@ public sealed class CheckInCommandHandler(
 {
     public async Task<Result<TimesheetDto>> Handle(CheckInCommand request, CancellationToken cancellationToken)
     {
-        var brigadeResult = await TimesheetAccess.GetCallerBrigadeIdOrFailureAsync(context, currentUser, cancellationToken);
-        if (brigadeResult.IsFailure)
-            return Result.Failure<TimesheetDto>(brigadeResult.Error);
-
-        // §4's "не видит чужие бригады" applied to *whom* the Brigadir can
-        // act on behalf of, not just what they can read — a WorkerId outside
-        // their own brigade genuinely exists elsewhere in the roster, but
-        // reads as not-found here, same as every other cross-brigade lookup.
         var worker = await context.Workers.FirstOrDefaultAsync(w => w.Id == request.WorkerId, cancellationToken);
-        if (worker is null || worker.BrigadeId != brigadeResult.Value)
+        if (worker is null)
             return Result.Failure<TimesheetDto>(new Error("WORKER_NOT_FOUND", "Worker not found."));
+
+        if (currentUser.Role == Role.Worker)
+        {
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
+            if (ownWorkerId != worker.Id)
+                return Result.Failure<TimesheetDto>(new Error("WORKER_NOT_FOUND", "Worker not found."));
+        }
+        else
+        {
+            // §4's "не видит чужие бригады" applied to *whom* the Brigadir can
+            // act on behalf of, not just what they can read — a WorkerId outside
+            // their own brigade genuinely exists elsewhere in the roster, but
+            // reads as not-found here, same as every other cross-brigade lookup.
+            var brigadeResult = await TimesheetAccess.GetCallerBrigadeIdOrFailureAsync(context, currentUser, cancellationToken);
+            if (brigadeResult.IsFailure)
+                return Result.Failure<TimesheetDto>(brigadeResult.Error);
+
+            if (worker.BrigadeId != brigadeResult.Value)
+                return Result.Failure<TimesheetDto>(new Error("WORKER_NOT_FOUND", "Worker not found."));
+        }
 
         if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
             return Result.Failure<TimesheetDto>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));

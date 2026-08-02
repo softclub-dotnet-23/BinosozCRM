@@ -2,13 +2,17 @@ import type { UserRole } from "../../types";
 
 /**
  * `administrator` and `storekeeper` are UI-only placeholders: the backend's
- * Role enum (Domain/Enums/Role.cs) only has Owner/Prorab/Brigadir/Accountant,
- * and mapBackendRole() (api/authApi.ts) can never produce either of them from
- * a real login. They stay in this type/map for pages that already reference
- * them, but no authenticated session will ever carry one until/unless the
- * backend adds a matching role — a decision this frontend integration
- * explicitly did not make on its own (see 2026-07-31 frontend-integration
- * checkpoint notes in docs/PROGRESS.md).
+ * Role enum (Domain/Enums/Role.cs) only has Owner/Prorab/Brigadir/Accountant/
+ * Worker, and mapBackendRole() (api/authApi.ts) can never produce either of
+ * them from a real login. They stay in this type/map for pages that already
+ * reference them, but no authenticated session will ever carry one until/
+ * unless the backend adds a matching role — a decision this frontend
+ * integration explicitly did not make on its own (see 2026-07-31 frontend-
+ * integration checkpoint notes in docs/PROGRESS.md).
+ *
+ * `worker` (added with the Worker-role checkpoint) IS a real backend role —
+ * see docs/PROGRESS.md's Worker-role entry for the MASTER §4 decision it
+ * overturns (regular workers now get a real, scoped web login).
  */
 
 /** Landing route right after login, and where a role gets bounced back to if it opens a route it can't use. */
@@ -19,6 +23,7 @@ export const ROLE_HOME: Record<UserRole, string> = {
   prorab: "/works",
   brigadir: "/brigades",
   storekeeper: "/inventory/materials",
+  worker: "/dashboard",
 };
 
 const FULL_ACCESS = "*" as const;
@@ -46,6 +51,7 @@ const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   prorab: ["/dashboard", "/objects", "/works", "/brigades/*", "/attendance", "/inventory/*", "/reports"],
   brigadir: ["/dashboard", "/works", "/brigades", "/attendance", "/inventory/materials"],
   storekeeper: ["/dashboard", "/inventory/*", "/reports"],
+  worker: ["/dashboard", "/tasks", "/attendance", "/inventory/materials", "/photo-reports", "/profile"],
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
@@ -55,6 +61,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
   prorab: "Прораб",
   brigadir: "Бригадир",
   storekeeper: "Снабженец",
+  worker: "Рабочий",
 };
 
 export function isRouteAllowed(role: UserRole, pathname: string): boolean {

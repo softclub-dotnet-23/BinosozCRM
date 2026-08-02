@@ -1,6 +1,8 @@
 using Application.Common.Interfaces;
+using Application.IndividualTasks;
 using Application.Objects;
 using Domain.Common;
+using Domain.Enums;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -31,9 +33,27 @@ public sealed class GetStockBalanceQueryHandler(IApplicationDbContext context, I
         if (!await context.ConstructionObjects.AnyAsync(o => o.Id == request.ObjectId, cancellationToken))
             return Result.Failure<IReadOnlyList<StockBalanceDto>>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
 
-        var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
-        if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId))
-            return Result.Failure<IReadOnlyList<StockBalanceDto>>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
+        if (currentUser.Role == Role.Worker)
+        {
+            var brigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
+            if (brigadeId is null)
+                return Result.Failure<IReadOnlyList<StockBalanceDto>>(new Error("WORKER_NOT_FOUND", "No worker record linked to this account."));
+
+            var ownBrigadeObjectIds = await context.WorkOrders.AsNoTracking()
+                .Where(w => w.BrigadeId == brigadeId.Value)
+                .Select(w => w.ObjectId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (!ownBrigadeObjectIds.Contains(request.ObjectId))
+                return Result.Failure<IReadOnlyList<StockBalanceDto>>(new Error("OBJECT_NOT_FOUND", "Construction object not found."));
+        }
+        else
+        {
+            var allowedObjectIds = await ProrabObjectAccess.GetAllowedObjectIdsAsync(context, currentUser, cancellationToken);
+            if (allowedObjectIds is not null && !allowedObjectIds.Contains(request.ObjectId))
+                return Result.Failure<IReadOnlyList<StockBalanceDto>>(new Error("PRORAB_NOT_ASSIGNED_TO_OBJECT", "You are not assigned to this object."));
+        }
 
         var delivered = await context.MaterialDeliveries.AsNoTracking()
             .Where(d => d.ObjectId == request.ObjectId)

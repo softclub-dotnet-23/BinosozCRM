@@ -15,5 +15,9 @@ public enum AdminAuditAction
     BrigadirAssigned,
     PayRateChanged,
     PayrollPaid,
-    AdvanceIssued
+    AdvanceIssued,
+    // Worker-role checkpoint (docs/PROGRESS.md, post-MASTER addition): an
+    // Owner linking an existing Worker record to a new login-capable User —
+    // same "власть" category §11.7 covers (who can log in as whom).
+    WorkerUserLinked
 }

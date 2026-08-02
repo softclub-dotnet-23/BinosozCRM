@@ -28,6 +28,9 @@ const PayrollPage = lazy(() => import("./pages/PayrollPage"));
 const ReportsPage = lazy(() => import("./pages/ReportsPage"));
 const UsersPage = lazy(() => import("./pages/UsersPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const WorkerTasksPage = lazy(() => import("./pages/WorkerTasksPage"));
+const WorkerPhotoReportsPage = lazy(() => import("./pages/WorkerPhotoReportsPage"));
+const WorkerProfilePage = lazy(() => import("./pages/WorkerProfilePage"));
 
 function App() {
   return (
@@ -68,6 +71,9 @@ function App() {
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/tasks" element={<WorkerTasksPage />} />
+                <Route path="/photo-reports" element={<WorkerPhotoReportsPage />} />
+                <Route path="/profile" element={<WorkerProfilePage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Routes>

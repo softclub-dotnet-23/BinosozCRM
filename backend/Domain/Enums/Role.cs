@@ -5,5 +5,6 @@ public enum Role
     Owner,
     Prorab,
     Brigadir,
-    Accountant
+    Accountant,
+    Worker
 }

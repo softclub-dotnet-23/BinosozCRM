@@ -53,7 +53,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     }
 
     [HttpGet("mine")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> ListMine([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -64,7 +64,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     }
 
     [HttpGet("{workOrderId:guid}")]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
     public async Task<IActionResult> Get(Guid workOrderId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetWorkOrderQuery(workOrderId), cancellationToken);
@@ -130,7 +130,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     }
 
     [HttpGet("{workOrderId:guid}/log")]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
     public async Task<IActionResult> GetLog(Guid workOrderId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetWorkOrderLogQuery(workOrderId), cancellationToken);
@@ -142,7 +142,7 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
     // doesn't change), so this isn't in the /assign../reject transition
     // family above.
     [HttpPost("{workOrderId:guid}/progress")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> AddProgress(
         Guid workOrderId,
         [FromForm] decimal reportedQty,

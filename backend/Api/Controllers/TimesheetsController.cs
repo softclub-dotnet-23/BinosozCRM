@@ -18,7 +18,7 @@ namespace Api.Controllers;
 public sealed class TimesheetsController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
     public async Task<IActionResult> List([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
     {
         var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
@@ -43,7 +43,7 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
     }
 
     [HttpGet("{timesheetId:guid}")]
-    [Authorize(Roles = "Owner,Prorab,Brigadir")]
+    [Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
     public async Task<IActionResult> Get(Guid timesheetId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetTimesheetQuery(timesheetId), cancellationToken);
@@ -51,7 +51,7 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("check-in")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> CheckIn(CheckInRequest request, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CheckInCommand(request.WorkerId, request.ObjectId), cancellationToken);
@@ -59,7 +59,7 @@ public sealed class TimesheetsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{timesheetId:guid}/check-out")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> CheckOut(Guid timesheetId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CheckOutCommand(timesheetId), cancellationToken);

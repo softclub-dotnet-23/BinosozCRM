@@ -53,13 +53,15 @@ const ROLE_CLASS_NAME: Partial<Record<UserRole, string>> = {
 };
 
 // Chart color per real, backend-assignable role (see ROLE_OPTIONS below) —
-// administrator/storekeeper/worker are UI-only labels elsewhere and never
-// appear here, so they have no chart color.
+// administrator/storekeeper are UI-only labels elsewhere and never appear
+// here, so they have no chart color. worker (Worker-role checkpoint) IS a
+// real backend-assignable role, unlike those two.
 const ROLE_CHART_COLOR: Partial<Record<UserRole, string>> = {
   owner: "var(--color-green)",
   prorab: "var(--color-blue)",
   brigadir: "var(--color-purple)",
   accountant: "var(--color-warning)",
+  worker: "var(--color-red)",
 };
 
 const STATUS_OPTIONS: { value: UserTab; label: string }[] = [
@@ -68,7 +70,7 @@ const STATUS_OPTIONS: { value: UserTab; label: string }[] = [
   { value: "inactive", label: "Неактивные" },
 ];
 
-// Only the four roles the backend can actually assign — administrator/storekeeper
+// Only the roles the backend can actually assign — administrator/storekeeper
 // have no server-side equivalent (roleAccess.ts) and can never appear here.
 const ROLE_OPTIONS = BACKEND_ROLES.map((backendRole) => {
   const role = mapToBackendRoleReverseLabel(backendRole);
@@ -85,6 +87,8 @@ function mapToBackendRoleReverseLabel(role: BackendRole): UserRole {
       return "brigadir";
     case "Accountant":
       return "accountant";
+    case "Worker":
+      return "worker";
   }
 }
 
