@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Domain.Entities;
 using Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -280,6 +281,49 @@ public sealed class WorkOrdersHttpTests : IDisposable
             .Select(order => order.Status)
             .SingleAsync();
         storedStatus.Should().Be(WorkOrderStatus.New, "a foreign company's mutation must not reach the order");
+    }
+
+    // GET /work-orders/{id} had no HTTP-level test at all for the Brigadir
+    // path (only the Prorab+/foreign-company angles were covered above) —
+    // this is the exact "can a Brigadir open someone else's work order by
+    // ID" question, over the real ASP.NET pipeline rather than the handler
+    // directly.
+    [Fact]
+    public async Task Brigadir_can_open_their_own_brigades_order_by_id_but_not_a_different_brigades()
+    {
+        var seed = await ApiHttpTestSupport.SeedAsync(_fixture);
+        using var owner = ApiHttpTestSupport.CreateClient(_factory, seed.Owner, seed.Company.Id);
+        using var brigadir = ApiHttpTestSupport.CreateClient(_factory, seed.Brigadir, seed.Company.Id);
+
+        var ownOrderId = await CreateWorkOrderAsync(seed, owner, "Own brigade order");
+
+        Guid otherBrigadeId;
+        await using (var setupContext = _fixture.CreateDbContext())
+        {
+            var otherBrigade = Brigade.Create(seed.Company.Id, "Second brigade, same company");
+            setupContext.Brigades.Add(otherBrigade);
+            await setupContext.SaveChangesAsync(CancellationToken.None);
+            otherBrigadeId = otherBrigade.Id;
+        }
+
+        using var otherOrderResponse = await owner.PostAsync(
+            "/api/v1/work-orders",
+            WorkOrderJson(seed, "Other brigade order", brigadeId: otherBrigadeId));
+        otherOrderResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var otherOrderBody = await ApiHttpTestSupport.ReadJsonAsync(otherOrderResponse);
+        var otherOrderId = otherOrderBody.RootElement.GetProperty("id").GetGuid();
+
+        using (var ownGet = await brigadir.GetAsync($"/api/v1/work-orders/{ownOrderId}"))
+        {
+            ownGet.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var ownBody = await ApiHttpTestSupport.ReadJsonAsync(ownGet);
+            ownBody.RootElement.GetProperty("id").GetGuid().Should().Be(ownOrderId);
+        }
+
+        using (var crossGet = await brigadir.GetAsync($"/api/v1/work-orders/{otherOrderId}"))
+        {
+            await ApiHttpTestSupport.AssertErrorAsync(crossGet, HttpStatusCode.NotFound, "WORK_ORDER_NOT_FOUND");
+        }
     }
 
     [Fact]
