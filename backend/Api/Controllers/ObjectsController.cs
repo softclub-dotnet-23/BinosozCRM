@@ -1,5 +1,6 @@
 using Api.Common;
 using Api.Contracts.Objects;
+using Application.Materials;
 using Application.Objects;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -114,6 +115,13 @@ public sealed class ObjectsController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetCostBreakdown(Guid objectId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetObjectCostBreakdownQuery(objectId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    [HttpGet("{objectId:guid}/stock")]
+    public async Task<IActionResult> GetStockBalance(Guid objectId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetStockBalanceQuery(objectId), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }

@@ -89,3 +89,16 @@ export interface CreateEstimateItemInput {
 export function createEstimateItem(objectId: string, input: CreateEstimateItemInput): Promise<EstimateItem> {
   return request<EstimateItem>(`/api/v1/objects/${objectId}/estimate-items`, { method: "POST", body: input });
 }
+
+/** Matches Application/Materials/StockBalanceDto.cs — computed on the fly from MaterialDelivery/MaterialConsumptionReport, not a stored entity. */
+export interface StockBalanceItem {
+  materialName: string;
+  unit: string;
+  totalDelivered: number;
+  totalConsumed: number;
+  balance: number;
+}
+
+export function getObjectStockBalance(objectId: string): Promise<StockBalanceItem[]> {
+  return request<StockBalanceItem[]>(`/api/v1/objects/${objectId}/stock`);
+}
