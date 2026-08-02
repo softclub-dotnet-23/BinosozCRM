@@ -13,6 +13,7 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
 import { ApiError, NetworkError } from "../api/apiClient";
+import "../styles/users.css";
 import {
   createObject,
   getObjectCostBreakdown,
