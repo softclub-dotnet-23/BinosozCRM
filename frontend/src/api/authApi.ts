@@ -1,7 +1,7 @@
 import { request } from "./apiClient";
 import type { UserRole } from "../types";
 
-export type BackendRole = "Owner" | "Prorab" | "Brigadir" | "Accountant";
+export type BackendRole = "Owner" | "Prorab" | "Brigadir" | "Accountant" | "Worker";
 
 export interface AuthTokens {
   accessToken: string;
@@ -11,7 +11,7 @@ export interface AuthTokens {
   role: BackendRole;
 }
 
-/** Backend only ever returns these four (Domain/Enums/Role.cs) — an unrecognized value here means the API added a role this frontend doesn't know about yet, which should fail loudly rather than silently default. */
+/** Backend only ever returns these five (Domain/Enums/Role.cs) — an unrecognized value here means the API added a role this frontend doesn't know about yet, which should fail loudly rather than silently default. */
 export function mapBackendRole(role: BackendRole): UserRole {
   switch (role) {
     case "Owner":
@@ -22,13 +22,15 @@ export function mapBackendRole(role: BackendRole): UserRole {
       return "brigadir";
     case "Accountant":
       return "accountant";
+    case "Worker":
+      return "worker";
     default:
       throw new Error(`Unmapped backend role: ${role as string}`);
   }
 }
 
 /** Every role a real backend account can be given — for role-picker UIs. administrator/storekeeper are frontend-only placeholders (roleAccess.ts) and never appear here. */
-export const BACKEND_ROLES: readonly BackendRole[] = ["Owner", "Prorab", "Brigadir", "Accountant"];
+export const BACKEND_ROLES: readonly BackendRole[] = ["Owner", "Prorab", "Brigadir", "Accountant", "Worker"];
 
 export function mapToBackendRole(role: UserRole): BackendRole {
   switch (role) {
@@ -40,6 +42,8 @@ export function mapToBackendRole(role: UserRole): BackendRole {
       return "Brigadir";
     case "accountant":
       return "Accountant";
+    case "worker":
+      return "Worker";
     default:
       throw new Error(`"${role}" has no backend equivalent — administrator/storekeeper cannot be sent to the API.`);
   }

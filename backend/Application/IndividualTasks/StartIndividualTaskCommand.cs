@@ -1,5 +1,6 @@
 using Application.Common;
 using Application.Common.Interfaces;
+using Application.Workers;
 using Domain.Common;
 using Domain.Enums;
 using FluentValidation;
@@ -23,16 +24,26 @@ public sealed class StartIndividualTaskCommandHandler(IApplicationDbContext cont
 {
     public async Task<Result<IndividualTaskDto>> Handle(StartIndividualTaskCommand request, CancellationToken cancellationToken)
     {
-        var callerBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
-        if (callerBrigadeId is null)
-            return Result.Failure<IndividualTaskDto>(new Error("WORKER_NOT_FOUND", "No worker record linked to this account."));
-
         var task = await context.IndividualTasks.FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken);
+        if (task is null)
+            return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
 
         // §4: "не видит чужие бригады (404, не 403)" — a task genuinely
-        // missing and a task belonging to another brigade look identical.
-        if (task is null || task.BrigadeId != callerBrigadeId.Value)
-            return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+        // missing and a task belonging to another brigade/worker look
+        // identical. Worker is narrower than Brigadir: own task only, not
+        // the whole brigade's.
+        if (currentUser.Role == Role.Worker)
+        {
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
+            if (ownWorkerId != task.AssignedToWorkerId)
+                return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+        }
+        else
+        {
+            var callerBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
+            if (callerBrigadeId is null || task.BrigadeId != callerBrigadeId.Value)
+                return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+        }
 
         var fromStatus = task.Status;
         var result = task.Start(DateTimeOffset.UtcNow);

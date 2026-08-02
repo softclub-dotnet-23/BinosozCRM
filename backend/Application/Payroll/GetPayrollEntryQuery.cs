@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Workers;
 using Domain.Common;
 using Domain.Enums;
 using FluentValidation;
@@ -26,12 +27,9 @@ public sealed class GetPayrollEntryQueryHandler(IApplicationDbContext context, I
         if (entry is null)
             return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ENTRY_NOT_FOUND", "Payroll entry not found."));
 
-        if (currentUser.Role == Role.Brigadir)
+        if (currentUser.Role is Role.Brigadir or Role.Worker)
         {
-            var ownWorkerId = await context.Workers
-                .Where(w => w.UserId == currentUser.UserId)
-                .Select(w => (Guid?)w.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
 
             if (entry.WorkerId != ownWorkerId)
                 return Result.Failure<PayrollEntryDto>(new Error("PAYROLL_ENTRY_NOT_FOUND", "Payroll entry not found."));

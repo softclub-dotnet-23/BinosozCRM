@@ -7,10 +7,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.WorkOrders;
 
-// MASTER §9.4: GET /work-orders/{id}/log — Prorab+, Brigadir(own). Isolation
-// branches on the caller's role since the two sides use different scoping
-// rules (ProrabObjectAssignment vs. own BrigadeId) — same split as every
-// other WorkOrder handler in this file.
+// MASTER §9.4: GET /work-orders/{id}/log — Prorab+, Brigadir(own). Worker
+// (post-MASTER addition) reuses the same own-brigade scoping as Brigadir —
+// read-only, no narrower AssignedToWorkerId concept applies to a WorkOrder.
+// Isolation branches on the caller's role since Prorab+ uses a different
+// scoping rule (ProrabObjectAssignment vs. own BrigadeId) — same split as
+// every other WorkOrder handler in this file.
 public sealed record GetWorkOrderLogQuery(Guid WorkOrderId) : IRequest<Result<List<TaskLogDto>>>;
 
 public sealed class GetWorkOrderLogQueryValidator : AbstractValidator<GetWorkOrderLogQuery>
@@ -26,7 +28,7 @@ public sealed class GetWorkOrderLogQueryHandler(IApplicationDbContext context, I
 {
     public async Task<Result<List<TaskLogDto>>> Handle(GetWorkOrderLogQuery request, CancellationToken cancellationToken)
     {
-        var accessResult = currentUser.Role == Role.Brigadir
+        var accessResult = currentUser.Role is Role.Brigadir or Role.Worker
             ? await WorkOrderAccess.GetForBrigadirAsync(context, currentUser, request.WorkOrderId, cancellationToken)
             : await WorkOrderAccess.GetForProrabAsync(context, currentUser, request.WorkOrderId, cancellationToken);
 

@@ -10,10 +10,14 @@ using Microsoft.Extensions.Options;
 namespace Application.WorkOrders;
 
 // MASTER §9.4/§5.12: POST /work-orders/{id}/progress — Brigadir, own
-// brigade. §7.1: "ReportedQty принимается только при InProgress" — not a
-// state transition itself (WorkOrder.Status doesn't change), so no
-// TaskLogWriter call here, unlike every handler in WorkOrderAccess's other
-// callers.
+// brigade. Worker (post-MASTER addition) shares the exact same access
+// check: WorkOrderAccess.GetForBrigadirAsync resolves "the caller's own
+// brigade via their own linked Worker row" regardless of the caller's
+// role — a Worker submitting a photo report on their own brigade's order
+// is authorized by the identical rule, not a separate one. §7.1:
+// "ReportedQty принимается только при InProgress" — not a state transition
+// itself (WorkOrder.Status doesn't change), so no TaskLogWriter call here,
+// unlike every handler in WorkOrderAccess's other callers.
 public sealed record AddWorkOrderProgressCommand(
     Guid WorkOrderId,
     decimal ReportedQty,

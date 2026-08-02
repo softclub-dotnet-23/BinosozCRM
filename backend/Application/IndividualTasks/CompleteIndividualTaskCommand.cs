@@ -1,5 +1,6 @@
 using Application.Common;
 using Application.Common.Interfaces;
+using Application.Workers;
 using Domain.Common;
 using Domain.Enums;
 using FluentValidation;
@@ -34,14 +35,30 @@ public sealed class CompleteIndividualTaskCommandHandler(IApplicationDbContext c
 {
     public async Task<Result<IndividualTaskDto>> Handle(CompleteIndividualTaskCommand request, CancellationToken cancellationToken)
     {
-        var callerBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
-        if (callerBrigadeId is null)
-            return Result.Failure<IndividualTaskDto>(new Error("WORKER_NOT_FOUND", "No worker record linked to this account."));
-
         var task = await context.IndividualTasks.FirstOrDefaultAsync(t => t.Id == request.TaskId, cancellationToken);
-
-        if (task is null || task.BrigadeId != callerBrigadeId.Value)
+        if (task is null)
             return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+
+        var isWorker = currentUser.Role == Role.Worker;
+        if (isWorker)
+        {
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
+            if (ownWorkerId != task.AssignedToWorkerId)
+                return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+        }
+        else
+        {
+            var callerBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
+            if (callerBrigadeId is null || task.BrigadeId != callerBrigadeId.Value)
+                return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Task not found."));
+        }
+
+        // A Worker proposing their own bonus is a conflict of interest —
+        // §4's "Brigadir не подтверждает свои премии" extends the same way
+        // one level down: proposing is Brigadir's call to make about a
+        // worker, not a worker's call to make about themselves.
+        if (isWorker && request.BonusAmount is not null)
+            return Result.Failure<IndividualTaskDto>(new Error("BONUS_NOT_ELIGIBLE", "A worker cannot propose their own bonus."));
 
         var fromStatus = task.Status;
         var result = task.Complete(DateTimeOffset.UtcNow);

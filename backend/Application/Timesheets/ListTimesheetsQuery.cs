@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Objects;
+using Application.Workers;
 using Domain.Common;
 using Domain.Enums;
 using MediatR;
@@ -10,7 +11,8 @@ namespace Application.Timesheets;
 
 // MASTER §9.4: GET /timesheets — Prorab+ (ProrabObjectAssignment on
 // ObjectId) / Brigadir(own — every worker in their own brigade, not just
-// themselves, mirrors §8.4's "за всю бригаду и за себя").
+// themselves, mirrors §8.4's "за всю бригаду и за себя"). Worker
+// (post-MASTER addition): own WorkerId only.
 public sealed record ListTimesheetsQuery(int Page, int PageSize) : IRequest<Result<PagedResult<TimesheetDto>>>;
 
 public sealed class ListTimesheetsQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
@@ -32,6 +34,14 @@ public sealed class ListTimesheetsQueryHandler(IApplicationDbContext context, IC
                 .ToListAsync(cancellationToken);
 
             query = query.Where(t => brigadeWorkerIds.Contains(t.WorkerId));
+        }
+        else if (currentUser.Role == Role.Worker)
+        {
+            var workerResult = await WorkerAccess.GetCallerWorkerIdOrFailureAsync(context, currentUser, cancellationToken);
+            if (workerResult.IsFailure)
+                return Result.Failure<PagedResult<TimesheetDto>>(workerResult.Error);
+
+            query = query.Where(t => t.WorkerId == workerResult.Value);
         }
         else
         {

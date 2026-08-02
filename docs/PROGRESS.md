@@ -30,6 +30,79 @@ points at where the `shahrom` branch's own narrative lives.
   journals.
 
 ## Current Status
+**Worker role — web login, MVP (2026-08-02), branch `worker2`.** User
+decision that overturns MASTER §4's "Worker (рабочий) — не пользователь
+системы" — regular workers now get a real, scoped web login instead of
+being reported on exclusively by their Brigadir. This is a genuine spec
+change, not a bug fix; MASTER.md §4 itself is not yet updated to match (the
+Domain/Application code is the current source of truth for this one
+decision until §4 is revised).
+
+Backend: `Role.Worker` added to `Domain/Enums/Role.cs` (stored as a plain
+`int` column — confirmed via an empty `dotnet ef migrations add` dry run, no
+migration needed). New `Application/Workers/WorkerAccess.cs` mirrors
+`BrigadeAccess` one level narrower (own `WorkerId`, not own `BrigadeId`).
+Extended to `Role.Worker`, always 404-not-403 on a mismatch (MASTER §11.5
+rules 2-3): IndividualTasks (List/Get/Start/Complete, scoped to
+`AssignedToWorkerId == own` — narrower and more precise than Brigadir's
+whole-brigade scope; a Worker cannot propose their own bonus, rejected
+server-side), Timesheets (List/Get/CheckIn/CheckOut, scoped to self only,
+never another worker), Payroll/PayrollAdvances (refactored Brigadir's
+existing own-`WorkerId` inline queries to the new `WorkerAccess` helper,
+extended to Worker identically), Lookups (own-brigade object/worker name
+resolution, same as Brigadir), WorkOrders (`GET /work-orders/mine`, `.../log`
+read-only; `POST .../progress` — reused `WorkOrderAccess.GetForBrigadirAsync`
+as-is, since its own-brigade-membership check was already role-agnostic
+despite the name), Materials (`GET /objects/{id}/stock` scoped to own
+brigade's objects; `GET,POST /material-requests` scoped to
+`RequestedByUserId == self` for both Brigadir and Worker — previously
+Brigadir couldn't even read this list). New `GET /workers/me`
+(`GetOwnWorkerProfileQuery`) — own record, always full detail (own
+PayRate/Document*, the masking in `WorkerDto.FromEntity` is for viewing
+*someone else's* row). New `Worker.LinkUser()` domain method +
+`POST /workers/{id}/link-user` (Owner-only) — the realistic onboarding path
+for a Worker/Brigadir hired before logins existed: Owner creates the `User`
+via the existing `CreateUserCommand`, then links it to the pre-existing
+`Worker` row. New `AdminAuditAction.WorkerUserLinked`. Backend build clean,
+0 warnings. Integration tests need Docker/Postgres (Testcontainers) —
+**not runnable in this environment, not run for this checkpoint** — run
+`dotnet test backend/backend.slnx --no-build` locally before merging.
+
+Frontend: `worker` added to `UserRole`/`ROLE_HOME`(`/dashboard`)/
+`ROLE_ALLOWED_PREFIXES`/`ROLE_LABEL` (`roleAccess.ts`) and to
+`BackendRole`/`mapBackendRole`/`mapToBackendRole`/`BACKEND_ROLES`
+(`authApi.ts`) — shipped together with the backend enum change, since
+`mapBackendRole` throws on an unmapped role and a split deploy would break
+real Worker logins. New pages, all backend-wired from the first commit (no
+mock/localStorage phase, unlike Brigadir's page-by-page history):
+`WorkerDashboardPage`, `WorkerTasksPage`, `WorkerAttendancePage`,
+`WorkerMaterialsPage`, `WorkerPhotoReportsPage`, `WorkerProfilePage` — same
+shape as every Brigadir page (`loadState` state machine, `describeError()`
+mapping `ApiError`/`NetworkError`, `EmptyState`/`ErrorState`, no fabricated
+data). Wired into the existing generic routes via
+`if (user?.role === "worker") return <WorkerXPage />` branches in
+`DashboardPage`/`AttendancePage`/`MaterialsPage`, matching the Brigadir
+pattern exactly (`App.tsx` itself stays role-agnostic); `/tasks`,
+`/photo-reports`, `/profile` are new routes (no Brigadir equivalent
+existed). `Sidebar.tsx` gained a `WORKER_NAV_ITEMS` array via a small
+`navItemsForRole()` dispatch. New `frontend/src/api/individualTasksApi.ts`;
+extended `workersApi.ts` (`getMyWorkerProfile`) and `materialRequestsApi.ts`
+(`createMaterialRequest`, and `listMaterialRequests`'s doc comment — no
+longer Brigadir-Telegram-only). `tsc -b` clean, `vite build` clean, `oxlint`
+clean (`src/` — pre-existing `node_modules` noise from the lint config is
+unrelated).
+
+**Explicitly deferred, not silently dropped** — no backend entity exists
+for any of these, and building one was ruled out of this MVP pass: Schedule
+(no future-shift-planning entity; MASTER §15 open question #6 already
+excludes overtime/shift-norms from MVP), Documents (`WorkerDocument` would
+be a new entity + file-storage wiring), Notifications (no `Notification`
+entity — a live feed is plausible via the existing SignalR hub
+`/hubs/work-orders` without one, but that's new frontend real-time
+client infra, not done here), Problem Reports and Messages-to-Prorab (no
+`ProblemReport`/`WorkerMessage` entity, no messaging infrastructure at all).
+Each needs its own MASTER.md decision before being built, not an
+extrapolation from this checkpoint.
 
 **Phase 1 — Объекты и бригады: ✅ COMPLETE (2026-07-18)** — see
 `docs/phase-summaries/Phase1-summary.md`.

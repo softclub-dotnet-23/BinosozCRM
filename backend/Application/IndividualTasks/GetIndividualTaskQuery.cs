@@ -1,5 +1,7 @@
 using Application.Common.Interfaces;
+using Application.Workers;
 using Domain.Common;
+using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,9 +18,18 @@ public sealed class GetIndividualTaskQueryHandler(IApplicationDbContext context,
         if (task is null)
             return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Individual task not found."));
 
-        var ownBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
-        if (ownBrigadeId != task.BrigadeId)
-            return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Individual task not found."));
+        if (currentUser.Role == Role.Worker)
+        {
+            var ownWorkerId = await WorkerAccess.GetCallerWorkerIdAsync(context, currentUser, cancellationToken);
+            if (ownWorkerId != task.AssignedToWorkerId)
+                return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Individual task not found."));
+        }
+        else
+        {
+            var ownBrigadeId = await BrigadeAccess.GetCallerBrigadeIdAsync(context, currentUser, cancellationToken);
+            if (ownBrigadeId != task.BrigadeId)
+                return Result.Failure<IndividualTaskDto>(new Error("INDIVIDUAL_TASK_NOT_FOUND", "Individual task not found."));
+        }
 
         return Result.Success(IndividualTaskDto.FromEntity(task));
     }

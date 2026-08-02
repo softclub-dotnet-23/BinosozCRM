@@ -18,7 +18,7 @@ namespace Api.Controllers;
 // names no endpoint for it at all (Phase 5 Step 11, PROGRESS.md).
 [ApiController]
 [Route("api/v1/payroll")]
-[Authorize(Roles = "Owner,Accountant,Brigadir")]
+[Authorize(Roles = "Owner,Accountant,Brigadir,Worker")]
 public sealed class PayrollController(ISender sender) : ControllerBase
 {
     [HttpGet]

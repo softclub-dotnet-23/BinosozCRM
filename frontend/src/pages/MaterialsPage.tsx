@@ -5,9 +5,11 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { useAuth } from "../context/AuthContext";
 import { ApiError, NetworkError } from "../api/apiClient";
 import { listMaterialCatalog, type MaterialCatalogEntry } from "../api/materialDeliveriesApi";
 import { formatCurrency } from "../utils/format";
+import WorkerMaterialsPage from "./WorkerMaterialsPage";
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
@@ -16,6 +18,12 @@ function describeError(error: unknown, fallback: string): string {
 }
 
 export default function MaterialsPage() {
+  const { user } = useAuth();
+  if (user?.role === "worker") return <WorkerMaterialsPage />;
+  return <CompanyMaterialsPage />;
+}
+
+function CompanyMaterialsPage() {
   const [items, setItems] = useState<MaterialCatalogEntry[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState("");

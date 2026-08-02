@@ -56,11 +56,33 @@ public sealed class WorkersController(ISender sender) : ControllerBase
         return result.ToActionResult(HttpContext);
     }
 
+    // Worker-role checkpoint (docs/PROGRESS.md, post-MASTER addition): links
+    // an existing Worker record to a new login-capable User — see
+    // LinkWorkerUserCommand's own comment for the onboarding flow.
+    [HttpPost("workers/{workerId:guid}/link-user")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> LinkUser(Guid workerId, LinkWorkerUserRequest request, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new LinkWorkerUserCommand(workerId, request.UserId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpPut("workers/{workerId:guid}/pay-rate")]
     [Authorize(Roles = "Owner")]
     public async Task<IActionResult> ChangePayRate(Guid workerId, ChangeWorkerPayRateRequest request, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new ChangeWorkerPayRateCommand(workerId, request.PayRateType, request.PayRate, request.EffectiveFrom), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    // Post-MASTER addition (Worker-role checkpoint, docs/PROGRESS.md): a
+    // Brigadir or Worker reading their own linked Worker record — full
+    // details, no masking (see GetOwnWorkerProfileQuery's own comment).
+    [HttpGet("workers/me")]
+    [Authorize(Roles = "Brigadir,Worker")]
+    public async Task<IActionResult> GetMe(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetOwnWorkerProfileQuery(), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
 }
