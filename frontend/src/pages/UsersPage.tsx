@@ -433,7 +433,7 @@ export default function UsersPage() {
 
             <aside className="users-aside">
               <Card className="p-5">
-                <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+                <h2 className="text-[17px] font-bold text-ink">Фильтры</h2>
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FilterLabel label="Поиск" className="sm:col-span-2">
                     <div className="relative">
@@ -476,7 +476,7 @@ export default function UsersPage() {
               </Card>
 
               <Card className="p-5">
-                <h2 className="text-[15px] font-bold text-ink">Пользователи по ролям</h2>
+                <h2 className="text-[17px] font-bold text-ink">Пользователи по ролям</h2>
                 {roleDistribution.length === 0 ? (
                   <p className="mt-4 text-sm text-ink-muted">Пользователей пока нет</p>
                 ) : (
@@ -557,7 +557,7 @@ function UserAvatar({ user }: { user: AppUser }) {
 function FilterLabel({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <label className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <span className="text-xs font-medium text-ink-secondary">{label}</span>
+      <span className="text-sm font-medium text-ink-secondary">{label}</span>
       {children}
     </label>
   );
