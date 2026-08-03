@@ -20,7 +20,7 @@ export function MetricCard({ label, value, icon, tone, footer, progress, progres
         <IconContainer icon={icon} tone={tone} />
         <div className="min-w-0 flex-1 pt-0.5">
           <p className="text-sm text-ink-secondary">{label}</p>
-          <p className="mt-1 whitespace-nowrap text-[22px] font-bold leading-tight tabular text-ink">{value}</p>
+          <p className="mt-1 wrap-break-word text-[22px] font-bold leading-tight tabular text-ink">{value}</p>
         </div>
       </div>
       {typeof progress === "number" ? (

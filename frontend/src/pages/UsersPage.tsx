@@ -4,16 +4,13 @@ import {
   Check,
   Copy,
   Eye,
-  Grid2X2,
   KeyRound,
   Loader2,
   MoreVertical,
   Plus,
-  Search,
   ShieldCheck,
   UserCheck,
   UserRound,
-  UserX,
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Avatar } from "../components/ui/Avatar";
@@ -21,8 +18,6 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { Modal } from "../components/ui/Modal";
-import { DonutChart } from "../components/charts/DonutChart";
-import { CategoryLegend } from "../components/charts/CategoryLegend";
 import { useAuth } from "../context/AuthContext";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { useToast } from "../hooks/useToast";
@@ -40,10 +35,8 @@ import {
 } from "../api/usersApi";
 import { ROLE_LABEL } from "../lib/auth/roleAccess";
 import { resolvePersonPhoto } from "../utils/personPhotos";
-import type { CategorySpend, UserRole } from "../types";
+import type { UserRole } from "../types";
 import "../styles/users.css";
-
-type UserTab = "all" | "active" | "inactive";
 
 const ROLE_CLASS_NAME: Partial<Record<UserRole, string>> = {
   owner: "role-owner",
@@ -51,24 +44,6 @@ const ROLE_CLASS_NAME: Partial<Record<UserRole, string>> = {
   brigadir: "role-brigadir",
   accountant: "role-accountant",
 };
-
-// Chart color per real, backend-assignable role (see ROLE_OPTIONS below) —
-// administrator/storekeeper are UI-only labels elsewhere and never appear
-// here, so they have no chart color. worker (Worker-role checkpoint) IS a
-// real backend-assignable role, unlike those two.
-const ROLE_CHART_COLOR: Partial<Record<UserRole, string>> = {
-  owner: "var(--color-green)",
-  prorab: "var(--color-blue)",
-  brigadir: "var(--color-purple)",
-  accountant: "var(--color-warning)",
-  worker: "var(--color-red)",
-};
-
-const STATUS_OPTIONS: { value: UserTab; label: string }[] = [
-  { value: "all", label: "Все статусы" },
-  { value: "active", label: "Активные" },
-  { value: "inactive", label: "Неактивные" },
-];
 
 // Only the roles the backend can actually assign — administrator/storekeeper
 // have no server-side equivalent (roleAccess.ts) and can never appear here.
@@ -131,8 +106,6 @@ export default function UsersPage() {
   const [loadError, setLoadError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<UserTab>("all");
-  const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = usePersistentState("users.page.size.v1", 10);
 
@@ -180,42 +153,17 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return users.filter((user) => {
-      if (tab === "active" && !user.isActive) return false;
-      if (tab === "inactive" && user.isActive) return false;
-      if (roleFilter !== "all" && user.role !== roleFilter) return false;
-      if (query && !`${user.fullName} ${user.phone}`.toLowerCase().includes(query)) return false;
-      return true;
-    });
-  }, [users, search, tab, roleFilter]);
+    return users.filter((user) => !query || `${user.fullName} ${user.phone}`.toLowerCase().includes(query));
+  }, [users, search]);
 
   const pageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const visibleUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
   const stats = useMemo(() => {
     const active = users.filter((u) => u.isActive).length;
-    const inactive = users.filter((u) => !u.isActive).length;
     const owners = users.filter((u) => u.role === "owner").length;
-    const pendingPasswordChange = users.filter((u) => u.forcePasswordChange).length;
-    return { total: users.length, active, inactive, owners, pendingPasswordChange };
+    return { total: users.length, active, owners };
   }, [users]);
-
-  const roleDistribution: CategorySpend[] = useMemo(
-    () =>
-      ROLE_OPTIONS.map(({ value, label }) => {
-        const role = mapToBackendRoleReverseLabel(value);
-        const count = users.filter((u) => u.role === role).length;
-        return { category: label, amount: count, color: ROLE_CHART_COLOR[role] ?? "var(--color-ink-muted)" };
-      }).filter((entry) => entry.amount > 0),
-    [users],
-  );
-
-  function resetFilters() {
-    setSearch("");
-    setRoleFilter("all");
-    setTab("all");
-    setPage(1);
-  }
 
   function openCreate() {
     setCreateForm(CREATE_FORM_INITIAL);
@@ -340,9 +288,7 @@ export default function UsersPage() {
           <div className="users-kpi-grid">
             <UserKpi icon={UserRound} tone="green" label="Всего пользователей" value={String(stats.total)} suffix="учётных записей" />
             <UserKpi icon={UserCheck} tone="blue" label="Активные" value={String(stats.active)} suffix="пользователя" />
-            <UserKpi icon={UserX} tone="orange" label="Неактивные" value={String(stats.inactive)} suffix="пользователя" />
             <UserKpi icon={ShieldCheck} tone="purple" label="Владельцы" value={String(stats.owners)} suffix="учётных записей" />
-            <UserKpi icon={Grid2X2} tone="yellow" label="Требуют смены пароля" value={String(stats.pendingPasswordChange)} suffix="пользователей" />
           </div>
           <div className="users-top-actions">
             <Button onClick={openCreate}><Plus size={15} /> Добавить пользователя</Button>
@@ -364,7 +310,7 @@ export default function UsersPage() {
         )}
 
         {loadState === "ready" && (
-          <div className="users-content-grid">
+          <>
             <Card className="users-table-card">
               {filteredUsers.length === 0 ? (
                 <div style={{ padding: 40, textAlign: "center", color: "var(--color-ink-muted)" }}>Пользователи не найдены</div>
@@ -430,70 +376,7 @@ export default function UsersPage() {
                 </label>
               </div>
             </Card>
-
-            <aside className="users-aside">
-              <Card className="p-5">
-                <h2 className="text-[17px] font-bold text-ink">Фильтры</h2>
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FilterLabel label="Поиск" className="sm:col-span-2">
-                    <div className="relative">
-                      <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
-                      <input
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Имя или телефон"
-                        className="h-11 w-full rounded-[10px] border border-border-strong bg-white pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-muted outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
-                      />
-                    </div>
-                  </FilterLabel>
-                  <FilterLabel label="Роль">
-                    <CustomSelect
-                      size="md"
-                      fullWidth
-                      className="h-11"
-                      value={roleFilter}
-                      onValueChange={(value) => { setRoleFilter(value); setPage(1); }}
-                      options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS.map((o) => ({ value: mapToBackendRoleReverseLabel(o.value), label: o.label }))]}
-                      aria-label="Роль"
-                    />
-                  </FilterLabel>
-                  <FilterLabel label="Статус">
-                    <CustomSelect
-                      size="md"
-                      fullWidth
-                      className="h-11"
-                      value={tab}
-                      onValueChange={(value) => { setTab(value as UserTab); setPage(1); }}
-                      options={STATUS_OPTIONS}
-                      aria-label="Статус"
-                    />
-                  </FilterLabel>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <Button size="md" className="h-11 w-full" onClick={() => setPage(1)}>Применить</Button>
-                  <Button size="md" variant="secondary" className="h-11 w-full" onClick={resetFilters}>Сбросить</Button>
-                </div>
-              </Card>
-
-              <Card className="p-5">
-                <h2 className="text-[17px] font-bold text-ink">Пользователи по ролям</h2>
-                {roleDistribution.length === 0 ? (
-                  <p className="mt-4 text-sm text-ink-muted">Пользователей пока нет</p>
-                ) : (
-                  <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-                    <DonutChart
-                      data={roleDistribution}
-                      centerLabel="всего"
-                      centerValue={String(roleDistribution.reduce((sum, entry) => sum + entry.amount, 0))}
-                      size={168}
-                      valueFormatter={(value) => `${value}`}
-                    />
-                    <CategoryLegend data={roleDistribution} />
-                  </div>
-                )}
-              </Card>
-            </aside>
-          </div>
+          </>
         )}
       </div>
 
@@ -551,15 +434,6 @@ function UserAvatar({ user }: { user: AppUser }) {
     <img className="users-row-avatar" src={src} alt={user.fullName} loading="lazy" decoding="async" />
   ) : (
     <Avatar name={user.fullName} size="sm" />
-  );
-}
-
-function FilterLabel({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <label className={`flex flex-col gap-1.5 ${className ?? ""}`}>
-      <span className="text-sm font-medium text-ink-secondary">{label}</span>
-      {children}
-    </label>
   );
 }
 
