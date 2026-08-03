@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Package, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
@@ -9,11 +9,11 @@ import { DataTable, type DataTableColumn } from "../components/tables/DataTable"
 import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
-import { Modal } from "../components/ui/Modal";
+import { MaterialRequestModal } from "../components/worker/MaterialRequestModal";
 import { useToast } from "../hooks/useToast";
 import { ApiError, NetworkError } from "../api/apiClient";
 import { getObjectStockBalance, type StockBalanceItem } from "../api/objectsApi";
-import { createMaterialRequest, listMaterialRequests, type MaterialRequest, type MaterialRequestStatus } from "../api/materialRequestsApi";
+import { listMaterialRequests, type MaterialRequest, type MaterialRequestStatus } from "../api/materialRequestsApi";
 import { listObjectLookups, type LookupItem } from "../api/lookupsApi";
 
 function describeError(error: unknown, fallback: string): string {
@@ -43,8 +43,6 @@ const STATUS_TONE: Record<MaterialRequestStatus, "blue" | "orange" | "green" | "
   Rejected: "red",
 };
 
-const CREATE_FORM_INITIAL = { materialName: "", unit: "", qty: "" };
-
 /**
  * GET /objects/{id}/stock is Worker-scoped to their own brigade's objects
  * (Application/Materials/GetStockBalanceQuery.cs, Worker-role checkpoint).
@@ -63,11 +61,7 @@ export default function WorkerMaterialsPage() {
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "unavailable">("loading");
   const [loadError, setLoadError] = useState("");
   const [stockLoading, setStockLoading] = useState(false);
-
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState(CREATE_FORM_INITIAL);
-  const [createError, setCreateError] = useState("");
-  const [creating, setCreating] = useState(false);
 
   async function loadAll() {
     setLoadState("loading");
@@ -110,43 +104,6 @@ export default function WorkerMaterialsPage() {
     delivered: requests.filter((r) => r.status === "Delivered").length,
   }), [requests]);
 
-  function openCreate() {
-    setCreateForm({ ...CREATE_FORM_INITIAL });
-    setCreateError("");
-    setCreateOpen(true);
-  }
-
-  async function submitCreate(event: FormEvent) {
-    event.preventDefault();
-    if (creating) return;
-    const qty = Number(createForm.qty);
-    if (!selectedObjectId) {
-      setCreateError("Нет доступного объекта");
-      return;
-    }
-    if (!createForm.materialName.trim() || !createForm.unit.trim() || !createForm.qty || qty <= 0) {
-      setCreateError("Заполните материал, единицу измерения и количество больше нуля");
-      return;
-    }
-    setCreating(true);
-    setCreateError("");
-    try {
-      const created = await createMaterialRequest({
-        objectId: selectedObjectId,
-        materialName: createForm.materialName.trim(),
-        unit: createForm.unit.trim(),
-        qty,
-      });
-      setRequests((current) => [created, ...current]);
-      setCreateOpen(false);
-      showToast("Заявка отправлена");
-    } catch (error) {
-      setCreateError(describeError(error, "Не удалось отправить заявку"));
-    } finally {
-      setCreating(false);
-    }
-  }
-
   const stockColumns: DataTableColumn<StockBalanceItem>[] = [
     { key: "material", header: "Материал", render: (row) => <span className="font-semibold text-ink">{row.materialName}</span> },
     { key: "unit", header: "Ед. изм.", render: (row) => <span className="text-ink-secondary">{row.unit}</span> },
@@ -167,7 +124,7 @@ export default function WorkerMaterialsPage() {
     <AppLayout
       title="Материалы"
       subtitle="Остатки на объекте и ваши заявки"
-      action={tab === "requests" ? <Button onClick={openCreate} disabled={!selectedObjectId}><Plus size={15} /> Новая заявка</Button> : undefined}
+      action={tab === "requests" ? <Button onClick={() => setCreateOpen(true)} disabled={!selectedObjectId}><Plus size={15} /> Новая заявка</Button> : undefined}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard label="Всего заявок" value={String(kpis.totalRequests)} icon={Package} tone="blue" footer="За всё время" />
@@ -222,18 +179,15 @@ export default function WorkerMaterialsPage() {
         </Card>
       )}
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Новая заявка на материал" size="sm">
-        <form className="users-modal-form" onSubmit={(e) => void submitCreate(e)}>
-          <label><span>Материал</span><input value={createForm.materialName} onChange={(e) => setCreateForm((f) => ({ ...f, materialName: e.target.value }))} autoFocus /></label>
-          <label><span>Единица измерения</span><input value={createForm.unit} onChange={(e) => setCreateForm((f) => ({ ...f, unit: e.target.value }))} placeholder="кг, шт, м3..." /></label>
-          <label><span>Количество</span><input type="number" min="0" step="0.01" value={createForm.qty} onChange={(e) => setCreateForm((f) => ({ ...f, qty: e.target.value }))} /></label>
-          {createError && <p className="users-modal-error" role="alert">{createError}</p>}
-          <div className="users-modal-actions">
-            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Отмена</Button>
-            <Button type="submit" disabled={creating}>{creating ? "Отправка..." : "Отправить"}</Button>
-          </div>
-        </form>
-      </Modal>
+      <MaterialRequestModal
+        open={createOpen}
+        objectId={selectedObjectId}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={(created) => {
+          setRequests((current) => [created, ...current]);
+          showToast("Заявка отправлена");
+        }}
+      />
     </AppLayout>
   );
 }

@@ -26,6 +26,19 @@ public sealed class GetMyBrigadeQueryHandler(IApplicationDbContext context, ICur
         if (brigade is null)
             return Result.Failure<BrigadeDto>(new Error("WORKER_NOT_FOUND", "No brigade linked to this account."));
 
-        return Result.Success(BrigadeDto.FromEntity(brigade));
+        // MASTER §4: a Brigadir is simultaneously a User (login) and a
+        // Worker (listed in their own brigade via Worker.UserId) — resolve
+        // their display name the same way BrigadeAccess resolves "own
+        // brigade": through the linked Worker row, not a direct User lookup
+        // (Worker-dashboard checkpoint, docs/PROGRESS.md — the shift card
+        // needs a human-readable brigadir name, not just a raw Guid).
+        var brigadirFullName = brigade.BrigadirUserId is null
+            ? null
+            : await context.Workers
+                .Where(w => w.UserId == brigade.BrigadirUserId)
+                .Select(w => w.FullName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        return Result.Success(BrigadeDto.FromEntity(brigade, brigadirFullName));
     }
 }

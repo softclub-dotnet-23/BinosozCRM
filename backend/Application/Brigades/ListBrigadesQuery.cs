@@ -21,7 +21,7 @@ public sealed class ListBrigadesQueryHandler(IApplicationDbContext context)
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        var dtos = items.Select(BrigadeDto.FromEntity).ToList();
+        var dtos = items.Select(b => BrigadeDto.FromEntity(b)).ToList();
 
         return Result.Success(new PagedResult<BrigadeDto>(dtos, request.Page, request.PageSize, totalCount));
     }
