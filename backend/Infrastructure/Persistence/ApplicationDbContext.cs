@@ -38,6 +38,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<TelegramLink> TelegramLinks => Set<TelegramLink>();
     public DbSet<TelegramLinkCode> TelegramLinkCodes => Set<TelegramLinkCode>();
     public DbSet<TelegramUpdateLog> TelegramUpdateLogs => Set<TelegramUpdateLog>();
+    public DbSet<IssueReport> IssueReports => Set<IssueReport>();
 
     // Read via a property (not a captured local) so EF Core's per-instance
     // substitution for global query filters applies — see OnModelCreating.

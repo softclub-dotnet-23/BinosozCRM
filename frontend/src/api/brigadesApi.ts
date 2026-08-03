@@ -6,6 +6,8 @@ export interface Brigade {
   name: string;
   brigadirUserId: string | null;
   isActive: boolean;
+  /** Resolved server-side only by getMyBrigade() — null for every other list/mutation response. */
+  brigadirFullName: string | null;
 }
 
 export function listBrigades(

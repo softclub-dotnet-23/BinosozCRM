@@ -30,6 +30,7 @@ public interface IApplicationDbContext
     DbSet<AdminAuditLog> AdminAuditLogs { get; }
     DbSet<PasswordResetToken> PasswordResetTokens { get; }
     DbSet<TelegramLink> TelegramLinks { get; }
+    DbSet<IssueReport> IssueReports { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }
