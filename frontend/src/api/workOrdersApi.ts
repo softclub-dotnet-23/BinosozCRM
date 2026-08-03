@@ -115,3 +115,8 @@ export function addWorkOrderProgress(workOrderId: string, input: AddWorkOrderPro
 export function getWorkOrderLog(workOrderId: string): Promise<TaskLogEntry[]> {
   return request<TaskLogEntry[]>(`/api/v1/work-orders/${workOrderId}/log`);
 }
+
+/** Brigadir/Worker: own submitted progress reports across all work orders, newest first. */
+export function listMyWorkOrderProgress(page: number, pageSize: number): Promise<PagedResult<WorkOrderProgress>> {
+  return request<PagedResult<WorkOrderProgress>>(`/api/v1/work-orders/progress/mine?page=${page}&pageSize=${pageSize}`);
+}

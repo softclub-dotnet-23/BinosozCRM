@@ -35,7 +35,7 @@ public sealed class BrigadesController(ISender sender) : ControllerBase
     }
 
     [HttpGet("mine")]
-    [Authorize(Roles = "Brigadir")]
+    [Authorize(Roles = "Brigadir,Worker")]
     public async Task<IActionResult> GetMine(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetMyBrigadeQuery(), cancellationToken);

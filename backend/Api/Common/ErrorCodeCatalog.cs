@@ -70,6 +70,8 @@ public static class ErrorCodeCatalog
         ["TIMESHEET_ABSENCE_CONFLICT"] = StatusCodes.Status400BadRequest,
         ["MATERIAL_REQUEST_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
         ["MATERIAL_REQUEST_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["ISSUE_REPORT_INVALID_TRANSITION"] = StatusCodes.Status400BadRequest,
+        ["ISSUE_REPORT_NOT_FOUND"] = StatusCodes.Status404NotFound,
         ["PAYROLL_ADJUSTMENT_REASON_REQUIRED"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ALREADY_PAID"] = StatusCodes.Status400BadRequest,
         ["PAYROLL_ENTRY_NOT_FOUND"] = StatusCodes.Status404NotFound,

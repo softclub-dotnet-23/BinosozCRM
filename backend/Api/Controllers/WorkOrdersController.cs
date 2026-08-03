@@ -63,6 +63,21 @@ public sealed class WorkOrdersController(ISender sender, IBusinessTimeProvider b
         return result.ToActionResult(HttpContext);
     }
 
+    // New (Worker-dashboard checkpoint, docs/PROGRESS.md): own submitted
+    // progress reports across all work orders — not in MASTER §9.4's
+    // original table. Routed ahead of {workOrderId:guid} so "progress"
+    // never matches that route's guid constraint.
+    [HttpGet("progress/mine")]
+    [Authorize(Roles = "Brigadir,Worker")]
+    public async Task<IActionResult> ListMyProgress([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
+        var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
+
+        var result = await sender.Send(new ListMyWorkOrderProgressQuery(clampedPage, clampedPageSize), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
     [HttpGet("{workOrderId:guid}")]
     [Authorize(Roles = "Owner,Prorab,Brigadir,Worker")]
     public async Task<IActionResult> Get(Guid workOrderId, CancellationToken cancellationToken)
