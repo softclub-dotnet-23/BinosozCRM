@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { ApiError, NetworkError } from '../../api/apiClient';
 import { createMaterialRequest, type MaterialRequest } from '../../api/materialRequestsApi';
+import '../../styles/users.css';
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return 'Не удалось подключиться к серверу';

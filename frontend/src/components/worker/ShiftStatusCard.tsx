@@ -11,6 +11,7 @@ import type { LookupItem } from '../../api/lookupsApi';
 import type { Brigade } from '../../api/brigadesApi';
 import { formatDushanbeTime } from '../../utils/dushanbeTime';
 import { useElapsedLabel } from './useElapsedTime';
+import '../../styles/users.css';
 
 function describeError(error: unknown, fallback: string): string {
   if (error instanceof NetworkError) return 'Не удалось подключиться к серверу';
