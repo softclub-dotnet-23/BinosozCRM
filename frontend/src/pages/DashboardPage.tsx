@@ -8,7 +8,6 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/StatusBadge";
 import { PageHeader } from "../components/ui/PageHeader";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
-import { RiskList } from "../components/tables/RiskList";
 import { ObjectBudgetChart } from "../components/charts/ObjectBudgetChart";
 import { useAuth } from "../context/AuthContext";
 import { ApiError, NetworkError } from "../api/apiClient";
@@ -20,11 +19,9 @@ import {
   type ConstructionObject,
   type ObjectBudgetSummary,
 } from "../api/objectsApi";
-import { listBrigades, type Brigade } from "../api/brigadesApi";
 import { listWorkOrders, type WorkOrder, type WorkOrderStatus } from "../api/workOrdersApi";
 import { listPayrollEntries } from "../api/payrollApi";
 import { formatCurrency, formatPercent } from "../utils/format";
-import type { RiskItem } from "../types";
 import BrigadirDashboardPage from "./BrigadirDashboardPage";
 import WorkerDashboardPage from "./WorkerDashboardPage";
 
@@ -46,7 +43,6 @@ const OBJECT_STATUS_TONE: Record<BackendObjectStatus, "blue" | "green" | "orange
 };
 
 const DONE_WORK_ORDER_STATUSES: WorkOrderStatus[] = ["Accepted", "Closed"];
-const TERMINAL_WORK_ORDER_STATUSES: WorkOrderStatus[] = ["Accepted", "Closed", "Rejected"];
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -62,7 +58,6 @@ function CompanyDashboardPage() {
   const [workStatus, setWorkStatus] = useState<DashboardWorkStatus | null>(null);
   const [objects, setObjects] = useState<ConstructionObject[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [brigades, setBrigades] = useState<Brigade[]>([]);
   const [budgets, setBudgets] = useState<ObjectBudgetSummary[]>([]);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = useState("");
@@ -75,17 +70,15 @@ function CompanyDashboardPage() {
   async function loadCore() {
     setLoadState("loading");
     try {
-      const [status, objectsResult, workOrdersResult, brigadesResult, budgetSummaries] = await Promise.all([
+      const [status, objectsResult, workOrdersResult, budgetSummaries] = await Promise.all([
         getDashboardWorkStatus(),
         listObjects(1, 100),
         listWorkOrders(1, 100),
-        listBrigades(1, 100),
         getObjectBudgets(),
       ]);
       setWorkStatus(status);
       setObjects(objectsResult.items);
       setWorkOrders(workOrdersResult.items);
-      setBrigades(brigadesResult.items);
       setBudgets(budgetSummaries);
       setLoadState("ready");
     } catch (error) {
@@ -116,9 +109,6 @@ function CompanyDashboardPage() {
     () => workStatus?.workOrderStatusCounts.reduce((sum, s) => sum + s.count, 0) ?? 0,
     [workStatus],
   );
-
-  const objectNameById = useMemo(() => new Map(objects.map((o) => [o.id, o.name])), [objects]);
-  const brigadeNameById = useMemo(() => new Map(brigades.map((b) => [b.id, b.name])), [brigades]);
 
   const objectCounts = useMemo(() => ({
     total: objects.length,
@@ -152,31 +142,6 @@ function CompanyDashboardPage() {
     [budgets, objectStatusById],
   );
 
-  // "Требует внимания" — real overdue work orders only. Low-stock materials
-  // were dropped: no par-level/threshold field exists anywhere to define "low".
-  const attentionItems: RiskItem[] = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return workOrders
-      .filter((w) => w.dueDate && !TERMINAL_WORK_ORDER_STATUSES.includes(w.status))
-      .map((w) => {
-        const dueDate = new Date(w.dueDate!);
-        const overdueDays = Math.round((today.getTime() - dueDate.getTime()) / 86_400_000);
-        return { workOrder: w, overdueDays };
-      })
-      .filter((x) => x.overdueDays > 0)
-      .sort((a, b) => b.overdueDays - a.overdueDays)
-      .slice(0, 6)
-      .map(({ workOrder, overdueDays }) => ({
-        id: workOrder.id,
-        title: workOrder.title,
-        description: `${objectNameById.get(workOrder.objectId) ?? "—"} · Бригада «${brigadeNameById.get(workOrder.brigadeId) ?? "—"}»`,
-        badgeLabel: `Просрочено на ${overdueDays} дн.`,
-        severity: overdueDays > 7 ? ("red" as const) : ("orange" as const),
-        icon: "clock" as const,
-      }));
-  }, [workOrders, objectNameById, brigadeNameById]);
-
   const budgetChartData = useMemo(
     () =>
       [...budgets]
@@ -187,12 +152,13 @@ function CompanyDashboardPage() {
   );
 
   const objectColumns: DataTableColumn<(typeof objectStateRows)[number]>[] = [
-    { key: "objectName", header: "Объект", render: (row) => <span className="font-semibold text-ink">{row.objectName}</span> },
-    { key: "budget", header: "Бюджет", render: (row) => <span className="tabular text-ink">{row.budget != null ? formatCurrency(row.budget) : "—"}</span> },
-    { key: "actualCost", header: "Факт", render: (row) => <span className="tabular text-ink-secondary">{formatCurrency(row.actualCost)}</span> },
+    { key: "objectName", header: "Объект", width: "28%", render: (row) => <span className="font-semibold text-ink">{row.objectName}</span> },
+    { key: "budget", header: "Бюджет", width: "18%", render: (row) => <span className="tabular text-ink">{row.budget != null ? formatCurrency(row.budget) : "—"}</span> },
+    { key: "actualCost", header: "Факт", width: "18%", render: (row) => <span className="tabular text-ink-secondary">{formatCurrency(row.actualCost)}</span> },
     {
       key: "remaining",
       header: "Остаток",
+      width: "18%",
       render: (row) =>
         row.remaining != null ? (
           <Badge tone={row.remaining < 0 ? "red" : "green"}>{formatCurrency(row.remaining)}</Badge>
@@ -203,6 +169,7 @@ function CompanyDashboardPage() {
     {
       key: "status",
       header: "Статус",
+      width: "18%",
       render: (row) => (row.status ? <Badge tone={OBJECT_STATUS_TONE[row.status]}>{OBJECT_STATUS_LABEL[row.status]}</Badge> : <span className="text-ink-muted">—</span>),
     },
   ];
@@ -285,7 +252,7 @@ function CompanyDashboardPage() {
             </Card>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1.4fr_1fr]">
+          <div className="mt-4 grid grid-cols-1 gap-4">
             <Card className="min-w-0">
               <PageHeader
                 title="Состояние объектов"
@@ -299,15 +266,6 @@ function CompanyDashboardPage() {
                 <DataTable columns={objectColumns} rows={objectStateRows} rowKey={(row) => row.objectId} />
               ) : (
                 <p className="px-5 pb-5 text-sm text-ink-muted sm:px-6">Объектов пока нет</p>
-              )}
-            </Card>
-
-            <Card className="min-w-0">
-              <PageHeader title="Требует внимания" />
-              {attentionItems.length > 0 ? (
-                <RiskList items={attentionItems} onOpen={() => navigate("/works")} />
-              ) : (
-                <p className="px-5 pb-5 text-sm text-ink-muted sm:px-6">Просроченных нарядов нет</p>
               )}
             </Card>
           </div>
