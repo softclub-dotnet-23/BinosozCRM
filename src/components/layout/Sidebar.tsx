@@ -1,74 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Bell,
   Building2,
   Calculator,
   Calendar,
-  CalendarCheck,
-  CalendarDays,
   Camera,
   ChevronDown,
   ClipboardCheck,
-  ClipboardList,
   HardHat,
   Home,
-  LifeBuoy,
+  LogOut,
   Package,
   Settings,
-  TriangleAlert,
   User,
-  UserRound,
   Users,
   Wallet,
   BarChart3,
   X,
-} from "lucide-react";
-import { cn } from "../../utils/cn";
-import { AppLogo } from "../common/AppLogo";
-import { SessionAvatar } from "./SessionAvatar";
-import { MobileProfileCard } from "./MobileProfileCard";
-import { useAuth } from "../../context/AuthContext";
-import { useLanguage } from "../../context/LanguageContext";
-import { useToast } from "../../hooks/useToast";
-import { isRouteAllowed } from "../../lib/auth/roleAccess";
-import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
-import { notificationsRepository } from "../../data/repositories";
-import { WorkerProblemModal } from "../worker/WorkerProblemModal";
-import type { AppStrings } from "../../lib/i18n/appStrings";
-
-/**
- * Icon-only crop of the official logo (see AppLogo/binosoz-main-logo.svg) for the
- * collapsed sidebar's ~40px icon slot — the full horizontal lockup doesn't fit there
- * without shrinking the wordmark to illegibility, so this is the same brand mark
- * geometry, not a different logo.
- */
-function CollapsedLogoMark({ className = "h-6 w-6" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="-5 -5 210 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path
-        fill="#FF5A00"
-        fillRule="evenodd"
-        d="M20,20 L58,20 Q95,20 110,42 L154,9 L147,2 L185,5 L181,43 L173,34 L130,68 Q110,95 98,108 Q158,108 158,161 Q158,215 98,215 L35,215 Q20,215 20,200 Z
-           M78,140 L128,140 Q140,140 140,158 L140,178 Q140,196 122,196 L80,196 Q68,196 68,178 L68,158 Q68,140 78,140 Z
-           M72,38 L98,38 Q108,38 108,50 L108,75 Q108,90 95,90 L72,90 Q62,90 62,75 L62,50 Q62,38 72,38 Z"
-      />
-    </svg>
-  );
-}
+} from 'lucide-react';
+import { cn } from '../../utils/cn';
+import { SessionAvatar } from './SessionAvatar';
+import { useAuth } from '../../context/AuthContext';
+import { isRouteAllowed, ROLE_LABEL } from '../../lib/auth/roleAccess';
 
 interface NavItem {
   to: string;
   label: string;
   icon: typeof Home;
-  badge?: number;
-}
-
-interface NavAction {
-  label: string;
-  icon: typeof Home;
-  onClick: () => void;
-  badge?: number;
 }
 
 interface NavGroup {
@@ -77,125 +35,71 @@ interface NavGroup {
   children: { to: string; label: string }[];
 }
 
-type NavEntry = NavItem | NavGroup | NavAction;
+type NavEntry = NavItem | NavGroup;
 
 function isNavGroup(entry: NavEntry): entry is NavGroup {
-  return "children" in entry;
+  return 'children' in entry;
 }
 
-function isNavAction(entry: NavEntry): entry is NavAction {
-  return "onClick" in entry;
-}
+const NAV_ITEMS: NavEntry[] = [
+  { to: '/dashboard', label: 'Обзор', icon: Home },
+  { to: '/objects', label: 'Объекты', icon: Building2 },
+  {
+    label: 'Сметы и бюджеты',
+    icon: Calculator,
+    children: [
+      { to: '/estimates', label: 'Сметы' },
+      { to: '/budgets', label: 'Бюджеты' },
+    ],
+  },
+  { to: '/works', label: 'Работы', icon: ClipboardCheck },
+  {
+    label: 'Бригады',
+    icon: HardHat,
+    children: [
+      { to: '/brigades', label: 'Список бригад' },
+      { to: '/brigades/composition', label: 'Состав бригад' },
+    ],
+  },
+  { to: '/employees', label: 'Сотрудники', icon: User },
+  { to: '/attendance', label: 'Посещаемость', icon: Calendar },
+  {
+    label: 'Склад и материалы',
+    icon: Package,
+    children: [
+      { to: '/inventory/materials', label: 'Материалы' },
+      { to: '/inventory/material-requests', label: 'Заявки на материалы' },
+      { to: '/inventory/receipts', label: 'Поступления' },
+      { to: '/inventory/write-offs', label: 'Списания' },
+      { to: '/inventory/stock', label: 'Остатки' },
+    ],
+  },
+  { to: '/payroll', label: 'Зарплаты', icon: Wallet },
+  { to: '/reports', label: 'Отчёты', icon: BarChart3 },
+  { to: '/users', label: 'Пользователи', icon: Users },
+  { to: '/settings', label: 'Настройки', icon: Settings },
+];
 
-function buildNavItems(s: AppStrings["sidebar"]): NavEntry[] {
-  return [
-    { to: "/dashboard", label: s.dashboard, icon: Home },
-    { to: "/objects", label: s.objects, icon: Building2 },
-    {
-      label: s.estimatesAndBudgets,
-      icon: Calculator,
-      children: [
-        { to: "/estimates", label: s.estimates },
-        { to: "/budgets", label: s.budgets },
-      ],
-    },
-    {
-      label: s.works,
-      icon: ClipboardCheck,
-      children: [
-        { to: "/works", label: "Список работ" },
-        { to: "/individual-tasks", label: "Индивидуальные задачи" },
-      ],
-    },
-    {
-      label: s.brigades,
-      icon: HardHat,
-      children: [
-        { to: "/brigades", label: s.brigadesList },
-        { to: "/brigades/composition", label: s.brigadesComposition },
-        { to: "/brigades/assignments", label: s.assignments },
-      ],
-    },
-    { to: "/employees", label: s.employees, icon: User },
-    {
-      label: s.attendance,
-      icon: Calendar,
-      children: [
-        { to: "/timesheets", label: "Табели" },
-        { to: "/absences", label: "Отсутствия" },
-      ],
-    },
-    {
-      label: s.warehouse,
-      icon: Package,
-      children: [
-        { to: "/inventory/materials", label: s.materials },
-        { to: "/material-requests", label: "Заявки на материалы" },
-        { to: "/material-deliveries", label: "Поступления материалов" },
-        { to: "/material-consumption-reports", label: "Списания материалов" },
-        { to: "/inventory/transfers", label: s.transfers },
-        { to: "/inventory/stock", label: s.stock },
-      ],
-    },
-    {
-      label: s.payroll,
-      icon: Wallet,
-      children: [
-        { to: "/payroll-entries", label: "Начисления зарплаты" },
-        { to: "/payroll-advances", label: "Авансы" },
-      ],
-    },
-    { to: "/reports", label: s.reports, icon: BarChart3 },
-    { to: "/users", label: s.users, icon: Users },
-    { to: "/settings", label: s.settings, icon: Settings },
-  ];
-}
+const BRIGADIR_NAV_ITEMS: NavEntry[] = [
+  { to: '/dashboard', label: 'Обзор', icon: Home },
+  { to: '/brigades', label: 'Моя бригада', icon: Users },
+  { to: '/works', label: 'Назначенные работы', icon: ClipboardCheck },
+  { to: '/attendance', label: 'Посещаемость', icon: Calendar },
+];
 
-function buildBrigadirNavItems(s: AppStrings["sidebar"], onNotYetAvailable: (label: string) => void): NavEntry[] {
-  return [
-    { to: "/dashboard", label: s.dashboard, icon: Home },
-    { to: "/brigades", label: s.myBrigade, icon: Users },
-    {
-      label: s.assignedWorks,
-      icon: ClipboardCheck,
-      children: [
-        { to: "/works", label: "Список работ" },
-        { to: "/individual-tasks", label: "Мои задачи" },
-        { to: "/work-orders", label: "Мои наряды" },
-      ],
-    },
-    {
-      label: s.attendance,
-      icon: Calendar,
-      children: [{ to: "/timesheets", label: "Табели" }],
-    },
-    {
-      label: s.materials,
-      icon: Package,
-      children: [
-        { to: "/inventory/materials", label: "Каталог материалов" },
-        { to: "/material-requests", label: "Заявки на материалы" },
-        { to: "/material-consumption-reports", label: "Списания материалов" },
-      ],
-    },
-    { to: "/reports", label: s.reports, icon: BarChart3 },
-    { to: "/payroll-entries", label: "Начисления зарплаты", icon: Wallet },
-    { label: "Уведомления", icon: Bell, badge: 2, onClick: () => onNotYetAvailable("Уведомления") },
-    { to: "/profile", label: "Профиль", icon: User },
-  ];
-}
+const WORKER_NAV_ITEMS: NavEntry[] = [
+  { to: '/dashboard', label: 'Обзор', icon: Home },
+  { to: '/tasks', label: 'Задачи', icon: ClipboardCheck },
+  { to: '/attendance', label: 'Табель', icon: Calendar },
+  { to: '/inventory/materials', label: 'Материалы', icon: Package },
+  { to: '/photo-reports', label: 'Фотоотчёты', icon: Camera },
+  { to: '/profile', label: 'Профиль', icon: User },
+];
 
-function buildWorkerNavItems(s: AppStrings["worker"], unreadCount: number): NavEntry[] {
-  return [
-    { to: "/worker/dashboard", label: s.sidebarDashboard, icon: Home },
-    { to: "/worker/tasks", label: s.sidebarTasks, icon: ClipboardList },
-    { to: "/worker/attendance", label: s.sidebarAttendance, icon: CalendarCheck },
-    { to: "/worker/schedule", label: s.sidebarSchedule, icon: CalendarDays },
-    { to: "/worker/materials", label: s.sidebarMaterials, icon: Package },
-    { to: "/worker/photo-reports", label: s.sidebarPhotoReports, icon: Camera },
-    { to: "/worker/notifications", label: s.sidebarNotifications, icon: Bell, badge: unreadCount || undefined },
-    { to: "/worker/profile", label: s.sidebarProfile, icon: UserRound },
-  ];
+function navItemsForRole(role: string): NavEntry[] {
+  if (role === 'brigadir') return BRIGADIR_NAV_ITEMS;
+  if (role === 'worker') return WORKER_NAV_ITEMS;
+  return NAV_ITEMS;
 }
 
 interface SidebarProps {
@@ -204,63 +108,58 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
-export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }: SidebarProps) {
+export function Sidebar({
+  collapsed = false,
+  mobileOpen = false,
+  onCloseMobile,
+}: SidebarProps) {
   const location = useLocation();
-  const { user } = useAuth();
-  const { strings } = useLanguage();
-  const { showToast } = useToast();
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
-  const [problemModalOpen, setProblemModalOpen] = useState(false);
-  const navRef = useRef<HTMLElement>(null);
-
-  const notifications = useRepositorySnapshot(notificationsRepository);
-  const unreadCount = useMemo(
-    () => (user ? notifications.filter((n) => n.userId === user.id && !n.read).length : 0),
-    [notifications, user],
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(),
   );
 
   const visibleNavItems = useMemo(
     () =>
       user
-        ? (user.role === "worker"
-            ? buildWorkerNavItems(strings.worker, unreadCount)
-            : user.role === "brigadir"
-              ? buildBrigadirNavItems(strings.sidebar, (label) => showToast(`«${label}» — раздел в разработке`, "info"))
-              : buildNavItems(strings.sidebar)
-          ).map((entry) =>
-            isNavGroup(entry) ? { ...entry, children: entry.children.filter((c) => isRouteAllowed(user.role, c.to)) } : entry,
-          ).filter((entry) => (isNavGroup(entry) ? entry.children.length > 0 : isNavAction(entry) ? true : isRouteAllowed(user.role, entry.to)))
+        ? navItemsForRole(user.role)
+            .map((entry) =>
+              isNavGroup(entry)
+                ? {
+                    ...entry,
+                    children: entry.children.filter((c) =>
+                      isRouteAllowed(user.role, c.to),
+                    ),
+                  }
+                : entry,
+            )
+            .filter((entry) =>
+              isNavGroup(entry)
+                ? entry.children.length > 0
+                : isRouteAllowed(user.role, entry.to),
+            )
         : [],
-    [user, strings, showToast, unreadCount],
+    [user],
   );
 
   useEffect(() => {
     visibleNavItems.forEach((entry) => {
-      if (isNavGroup(entry) && entry.children.some((c) => location.pathname.startsWith(c.to))) {
-        setExpandedGroups((prev) => (prev.has(entry.label) ? prev : new Set(prev).add(entry.label)));
+      if (
+        isNavGroup(entry) &&
+        entry.children.some((c) => location.pathname.startsWith(c.to))
+      ) {
+        setExpandedGroups((prev) =>
+          prev.has(entry.label) ? prev : new Set(prev).add(entry.label),
+        );
       }
     });
   }, [location.pathname, visibleNavItems]);
 
-  // Keep the active item (and its expanded group) in view when the sidebar's own list
-  // is taller than the viewport — otherwise navigating can leave the active link
-  // scrolled out of sight with no visual link back to where you are in the menu.
-  useEffect(() => {
-    const active = navRef.current?.querySelector('[aria-current="page"]');
-    active?.scrollIntoView({ block: "nearest" });
-  }, [location.pathname, expandedGroups]);
-
-  // The mobile drawer's backdrop and X button already close it; Escape didn't (Modal/Drawer
-  // elsewhere in the app already treat Escape as a close key, this brought the mobile sidebar
-  // drawer in line with that same convention).
-  useEffect(() => {
-    if (!mobileOpen) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onCloseMobile?.();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [mobileOpen, onCloseMobile]);
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
 
   function toggleGroup(label: string) {
     setExpandedGroups((prev) => {
@@ -275,41 +174,58 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
     <>
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-[#171717]/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-ink/40 lg:hidden"
           onClick={onCloseMobile}
           aria-hidden="true"
         />
       )}
       <aside
+        // data-sidebar-state reflects this component's own collapsed prop
+        // directly — settings.css/users.css key off it instead of matching
+        // the literal "w-[236px]" Tailwind class string below, which would
+        // silently stop matching if that arbitrary value ever changes.
+        data-sidebar-state={collapsed ? 'collapsed' : 'expanded'}
         className={cn(
-          "flex h-screen flex-col border-r border-border bg-card transition-[width,transform] duration-200",
-          collapsed ? "w-[84px]" : "w-[200px]",
-          "fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:z-auto",
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          'flex h-screen flex-col border-r border-border bg-card transition-[width,transform] duration-200',
+          collapsed ? 'w-[84px]' : 'w-[236px]',
+          'fixed inset-y-0 left-0 z-50 lg:sticky lg:top-0 lg:z-auto',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
       >
         <div className="flex items-center justify-between gap-2 px-5 py-6">
           <div className="flex min-w-0 flex-1 items-center overflow-hidden">
             {collapsed ? (
-              <CollapsedLogoMark className="h-8 w-8 shrink-0" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft">
+                <img
+                  src="/images/binosoz-mark.svg"
+                  alt="BINOSOZ Construction Management CRM"
+                  className="h-6 w-6 object-contain"
+                />
+              </div>
             ) : (
-              <AppLogo className="app-logo" />
+              <img
+                src="/images/binosoz-logo.svg"
+                alt="BINOSOZ Construction Management CRM"
+                className="h-11 max-w-full object-contain"
+              />
             )}
           </div>
           <button
             type="button"
-            aria-label={strings.sidebar.closeMenu}
+            aria-label="Закрыть меню"
             onClick={onCloseMobile}
-            className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-3 lg:hidden"
+            className="rounded-lg p-1.5 text-ink-muted hover:bg-[#F5F5F4] lg:hidden"
           >
             <X size={18} />
           </button>
         </div>
 
-        <nav ref={navRef} className="sidebar-nav-scroll flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
           {visibleNavItems.map((entry) => {
             if (isNavGroup(entry)) {
-              const isGroupActive = entry.children.some((c) => location.pathname.startsWith(c.to));
+              const isGroupActive = entry.children.some((c) =>
+                location.pathname.startsWith(c.to),
+              );
               const isExpanded = expandedGroups.has(entry.label);
 
               if (collapsed) {
@@ -319,8 +235,10 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                     to={entry.children[0].to}
                     title={entry.label}
                     className={cn(
-                      "relative flex items-center justify-center rounded-lg px-0 py-2.5 text-sm font-medium transition-colors duration-150",
-                      isGroupActive ? "bg-primary-soft text-primary" : "text-ink-secondary hover:bg-surface-2 hover:text-ink",
+                      'relative flex items-center justify-center rounded-lg px-0 py-2.5 text-sm font-medium transition-colors duration-150',
+                      isGroupActive
+                        ? 'bg-primary-soft text-primary'
+                        : 'text-ink-secondary hover:bg-[#F7F7F6] hover:text-ink',
                     )}
                   >
                     <entry.icon size={18} className="shrink-0" />
@@ -333,20 +251,26 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                   <button
                     type="button"
                     onClick={() => toggleGroup(entry.label)}
-                    title={entry.label}
                     className={cn(
-                      "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors duration-150",
-                      isGroupActive ? "bg-primary-soft text-primary" : "text-ink-secondary hover:bg-surface-2 hover:text-ink",
+                      'relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150',
+                      isGroupActive
+                        ? 'bg-primary-soft text-primary'
+                        : 'text-ink-secondary hover:bg-[#F7F7F6] hover:text-ink',
                     )}
                   >
                     {isGroupActive && (
                       <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                     )}
                     <entry.icon size={18} className="shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-left">{entry.label}</span>
+                    <span className="flex-1 truncate text-left">
+                      {entry.label}
+                    </span>
                     <ChevronDown
-                      size={14}
-                      className={cn("shrink-0 transition-transform duration-150", isExpanded && "rotate-180")}
+                      size={15}
+                      className={cn(
+                        'shrink-0 transition-transform duration-150',
+                        isExpanded && 'rotate-180',
+                      )}
                     />
                   </button>
                   {isExpanded && (
@@ -359,8 +283,10 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                           onClick={onCloseMobile}
                           className={({ isActive }) =>
                             cn(
-                              "block rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
-                              isActive ? "bg-primary-soft text-primary" : "text-ink-secondary hover:bg-surface-2 hover:text-ink",
+                              'block rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150',
+                              isActive
+                                ? 'bg-primary-soft text-primary'
+                                : 'text-ink-secondary hover:bg-[#F7F7F6] hover:text-ink',
                             )
                           }
                         >
@@ -373,31 +299,6 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
               );
             }
 
-            if (isNavAction(entry)) {
-              return (
-                <button
-                  key={entry.label}
-                  type="button"
-                  onClick={entry.onClick}
-                  title={collapsed ? entry.label : undefined}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-ink",
-                    collapsed && "justify-center px-0",
-                  )}
-                >
-                  <span className="relative shrink-0">
-                    <entry.icon size={18} />
-                    {!!entry.badge && (
-                      <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
-                        {entry.badge}
-                      </span>
-                    )}
-                  </span>
-                  {!collapsed && <span className="min-w-0 flex-1 text-left leading-tight">{entry.label}</span>}
-                </button>
-              );
-            }
-
             return (
               <NavLink
                 key={entry.to}
@@ -405,9 +306,11 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
                   cn(
-                    "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
-                    isActive ? "bg-primary-soft text-primary" : "text-ink-secondary hover:bg-surface-2 hover:text-ink",
-                    collapsed && "justify-center px-0",
+                    'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150',
+                    isActive
+                      ? 'bg-primary-soft text-primary'
+                      : 'text-ink-secondary hover:bg-[#F7F7F6] hover:text-ink',
+                    collapsed && 'justify-center px-0',
                   )
                 }
                 title={collapsed ? entry.label : undefined}
@@ -417,15 +320,10 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
                     {isActive && (
                       <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                     )}
-                    <span className="relative shrink-0">
-                      <entry.icon size={18} />
-                      {!!entry.badge && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">
-                          {entry.badge}
-                        </span>
-                      )}
-                    </span>
-                    {!collapsed && <span className="min-w-0 flex-1 leading-tight">{entry.label}</span>}
+                    <entry.icon size={18} className="shrink-0" />
+                    {!collapsed && (
+                      <span className="truncate">{entry.label}</span>
+                    )}
                   </>
                 )}
               </NavLink>
@@ -434,57 +332,38 @@ export function Sidebar({ collapsed = false, mobileOpen = false, onCloseMobile }
         </nav>
 
         {user && (
-          <div className="space-y-3 border-t border-border p-4">
-            {!collapsed && user.role === "brigadir" && (
-              <div className="rounded-xl border border-border-strong bg-surface-1 p-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
-                  <LifeBuoy size={14} className="text-primary" /> Нужна помощь?
-                </p>
-                <p className="mt-0.5 text-xs text-ink-secondary">Свяжитесь с прорабом</p>
-              </div>
-            )}
-
-            {user.role === "worker" && (
-              <button
-                type="button"
-                onClick={() => setProblemModalOpen(true)}
-                className={cn(
-                  "flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink",
-                  collapsed && "px-0",
-                )}
-                title={collapsed ? strings.worker.sidebarReportProblem : undefined}
-              >
-                <TriangleAlert size={16} />
-                {!collapsed && strings.worker.sidebarReportProblem}
-              </button>
-            )}
-
-            {/* Desktop/tablet: compact identity readout, no logout — that lives in the top-right
-                Header profile menu. Mobile: the drawer swaps this for the full MobileProfileCard
-                below, which carries its own logout action. */}
-            <div className={cn("hidden items-center gap-3 lg:flex", collapsed && "justify-center")}>
+          <div className="border-t border-border p-4">
+            <div
+              className={cn(
+                'flex items-center gap-3',
+                collapsed && 'justify-center',
+              )}
+            >
               <SessionAvatar user={user} />
               {!collapsed && (
-                <div className="min-w-0 flex-1 leading-tight">
-                  <p className="truncate text-sm font-semibold text-ink">{user.fullName}</p>
-                  <p className="truncate text-xs text-ink-muted">{strings.common.roleLabels[user.role]}</p>
-                  {(user.role === "brigadir" || user.role === "worker") && (
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-green">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green" /> Онлайн
-                    </p>
-                  )}
+                <div className="min-w-0 leading-tight">
+                  <p className="truncate text-sm font-semibold text-ink">
+                    {user.fullName}
+                  </p>
+                  <p className="truncate text-xs text-ink-muted">
+                    {ROLE_LABEL[user.role]}
+                  </p>
                 </div>
               )}
-              {!collapsed && user.role === "brigadir" && <ChevronDown size={14} className="shrink-0 text-ink-muted" />}
             </div>
-
-            <div className="lg:hidden">
-              <MobileProfileCard onBeforeLogout={onCloseMobile} />
-            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={cn(
+                'mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-border-strong py-2 text-sm font-medium text-ink-secondary transition-colors hover:bg-[#F7F7F6] hover:text-ink',
+              )}
+            >
+              <LogOut size={16} />
+              {!collapsed && 'Выйти'}
+            </button>
           </div>
         )}
       </aside>
-      {user?.role === "worker" && <WorkerProblemModal open={problemModalOpen} onClose={() => setProblemModalOpen(false)} />}
     </>
   );
 }

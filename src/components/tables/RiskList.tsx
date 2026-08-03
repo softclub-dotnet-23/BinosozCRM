@@ -3,7 +3,6 @@ import type { RiskIcon, RiskItem } from "../../types";
 import { IconContainer } from "../ui/IconContainer";
 import { Badge } from "../ui/StatusBadge";
 import { Button } from "../ui/Button";
-import { useLanguage } from "../../context/LanguageContext";
 
 const ICONS: Record<RiskIcon, typeof Clock> = {
   trend: TrendingUp,
@@ -18,28 +17,23 @@ const SEVERITY_TONE = {
 } as const;
 
 export function RiskList({ items, onOpen }: { items: RiskItem[]; onOpen?: (item: RiskItem) => void }) {
-  const { strings } = useLanguage();
   return (
     <div className="divide-y divide-border px-2 sm:px-3">
       {items.map((item) => {
         const Icon = ICONS[item.icon];
         return (
-          <div key={item.id} className="flex flex-wrap items-start gap-x-3.5 gap-y-2 px-3 py-3.5">
+          <div key={item.id} className="flex items-start gap-3.5 px-3 py-3.5">
             <IconContainer icon={Icon} tone={SEVERITY_TONE[item.severity]} size="sm" />
-            <div className="min-w-35 flex-1">
+            <div className="min-w-0 flex-1">
               <p className="break-words text-sm font-semibold leading-snug text-ink">{item.title}</p>
               <p className="mt-0.5 break-words text-xs leading-snug text-ink-secondary">{item.description}</p>
             </div>
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <div className="hidden sm:block">
-                <Badge tone={SEVERITY_TONE[item.severity]} className="px-3 py-1.5 text-sm">
-                  {item.badgeLabel}
-                </Badge>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => onOpen?.(item)}>
-                {strings.common.open}
-              </Button>
+            <div className="hidden shrink-0 text-right sm:block">
+              <Badge tone={SEVERITY_TONE[item.severity]}>{item.badgeLabel}</Badge>
             </div>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => onOpen?.(item)}>
+              Открыть
+            </Button>
           </div>
         );
       })}

@@ -1,0 +1,1 @@
+function e(e){return`binosoz:${e}`}function t(){try{return typeof window<`u`&&!!window.localStorage}catch{return!1}}function n(n){if(t())try{let t=window.localStorage.getItem(e(n));return t==null?void 0:JSON.parse(t)}catch{return}}function r(n,r){if(t())try{window.localStorage.setItem(e(n),JSON.stringify(r))}catch{}}export{r as n,n as t};

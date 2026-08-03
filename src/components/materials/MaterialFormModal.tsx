@@ -81,17 +81,12 @@ export function MaterialFormModal({ open, material, onClose, onSave }: MaterialF
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
-  // Reads the file as a data: URL rather than URL.createObjectURL(file) — an object URL is
-  // only valid for the current page session and goes stale (broken image) the moment this
-  // material is persisted to localStorage and the page is reloaded. A data: URL is a plain
-  // string that survives that round trip like any other stored imageUrl.
   function handleImageChange(file: File | undefined) {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    setImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   }
 
   function validate(): boolean {
@@ -240,7 +235,7 @@ export function MaterialFormModal({ open, material, onClose, onSave }: MaterialF
 
         <div className="sm:col-span-2">
           <p className="text-sm font-medium text-ink">Изображение материала</p>
-          <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-border-strong text-center transition-colors hover:bg-surface-1">
+          <label className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-border-strong text-center transition-colors hover:bg-app-bg">
             {imagePreview ? (
               <img src={imagePreview} alt="Предпросмотр материала" className="h-28 w-28 object-cover" />
             ) : (

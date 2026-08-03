@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Button } from "../ui/Button";
+import { forgotPassword } from "../../api/authApi";
 
 interface ForgotPasswordModalProps {
   open: boolean;
@@ -12,11 +13,12 @@ const inputClass =
   "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 
 /**
- * There's no backend here to actually send a reset email/SMS, so this never
- * claims to have sent one — it validates input, shows a real loading state,
- * then a neutral "here's what would happen" message that's explicit about
- * being a demo. It also never confirms or denies that the entered account
- * exists, matching authService's same non-enumeration guarantee.
+ * Calls the real POST /auth/forgot-password, which always returns success
+ * regardless of whether the phone exists (backend's own non-enumeration
+ * guarantee — MASTER §9.4/§11.2) — so the neutral "if an account exists..."
+ * message here isn't a demo placeholder, it's the accurate description of
+ * what the backend actually does. The reset token itself is delivered via
+ * Telegram, not this UI.
  */
 export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps) {
   const [value, setValue] = useState("");
@@ -33,44 +35,47 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
     }
   }, [open]);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (submitting) return;
     if (!value.trim()) {
-      setError("Укажите логин, телефон или email");
+      setError("Укажите номер телефона");
       return;
     }
     setError("");
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+    try {
+      await forgotPassword(value.trim());
       setSubmitted(true);
-    }, 500);
+    } catch {
+      setError("Не удалось отправить запрос. Проверьте соединение и попробуйте снова.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Восстановление пароля" description="Демо-режим восстановления доступа" size="sm">
+    <Modal open={open} onClose={onClose} title="Восстановление пароля" description="Укажите телефон, привязанный к учётной записи" size="sm">
       {submitted ? (
-        <div className="flex items-start gap-3 rounded-[10px] bg-surface-3 p-4">
+        <div className="flex items-start gap-3 rounded-[10px] bg-[#F5F5F4] p-4">
           <Info size={18} className="mt-0.5 shrink-0 text-ink-secondary" />
           <p className="text-sm text-ink-secondary">
-            Если учётная запись с указанными данными существует, на неё будет отправлена инструкция по
-            восстановлению доступа. В этой демо-версии реальная отправка не выполняется — интеграция с
-            backend/почтовым сервисом появится позже.
+            Если учётная запись с указанным телефоном существует, инструкция по восстановлению доступа будет
+            отправлена через Telegram-бот, привязанный к аккаунту.
           </p>
         </div>
       ) : (
         <>
           <label className="block text-sm font-medium text-ink" htmlFor="forgot-password-input">
-            Логин, телефон или email
+            Номер телефона
             <input
               id="forgot-password-input"
-              type="text"
+              type="tel"
               value={value}
               onChange={(e) => {
                 setValue(e.target.value);
                 setError("");
               }}
-              placeholder="Введите логин, телефон или email"
+              placeholder="Введите номер телефона"
               className={inputClass}
               aria-invalid={Boolean(error)}
               aria-describedby={error ? "forgot-password-error" : undefined}

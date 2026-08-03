@@ -53,7 +53,7 @@ export function TransferDetailDrawer({ transfer, onClose, onEdit, onDuplicate, o
           </dl>
 
           {transfer.basis && (
-            <div className="rounded-lg bg-surface-3 px-3.5 py-2.5">
+            <div className="rounded-lg bg-[#F5F5F4] px-3.5 py-2.5">
               <p className="text-xs font-semibold text-ink-secondary">Основание</p>
               <p className="mt-1 text-sm text-ink">{transfer.basis}</p>
             </div>
@@ -63,7 +63,7 @@ export function TransferDetailDrawer({ transfer, onClose, onEdit, onDuplicate, o
             <p className="mb-2.5 text-sm font-bold text-ink">Материалы</p>
             <div className="space-y-2">
               {transfer.lines.map((line, i) => (
-                <div key={i} className="flex items-center justify-between rounded-lg bg-surface-3 px-3 py-2 text-sm">
+                <div key={i} className="flex items-center justify-between rounded-lg bg-[#F5F5F4] px-3 py-2 text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-ink">{line.materialName}</p>
                     <p className="text-xs text-ink-muted">
@@ -83,7 +83,7 @@ export function TransferDetailDrawer({ transfer, onClose, onEdit, onDuplicate, o
           </div>
 
           {transfer.note && (
-            <div className="rounded-lg bg-surface-3 px-3.5 py-2.5">
+            <div className="rounded-lg bg-[#F5F5F4] px-3.5 py-2.5">
               <p className="text-xs font-semibold text-ink-secondary">Примечание</p>
               <p className="mt-1 text-sm text-ink">{transfer.note}</p>
             </div>

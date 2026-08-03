@@ -1,414 +1,212 @@
-import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, CalendarCheck, Loader2, LogIn, LogOut } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
-import { useChartAnimation } from "../hooks/useChartAnimation";
+import { MetricCard } from "../components/ui/MetricCard";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/StatusBadge";
+import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { CustomSelect } from "../components/ui/CustomSelect";
+import { EmptyState } from "../components/ui/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
+import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
-import { cn } from "../utils/cn";
-import {
-  AlertIcon,
-  Badge,
-  BarChartIcon,
-  BuildingIcon,
-  Card,
-  CardHeader,
-  CalendarIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ClipboardIcon,
-  ClockIcon,
-  EyeIcon,
-  KpiCard,
-  PersonAvatar,
-  PhoneIcon,
-  UserIcon,
-  UserXIcon,
-} from "../components/brigadir/shared";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { checkIn, checkOut, listTimesheets, type Timesheet } from "../api/timesheetsApi";
+import { listObjectLookups, listWorkerLookups, toNameMap, type LookupItem } from "../api/lookupsApi";
+import { formatDushanbeTime } from "../utils/dushanbeTime";
 
-type AttendanceStatus = "present" | "late" | "absent" | "dayoff";
-
-const STATUS_LABEL: Record<AttendanceStatus, string> = {
-  present: "Присутствует",
-  late: "Опоздал",
-  absent: "Отсутствует",
-  dayoff: "Выходной",
-};
-const STATUS_COLOR: Record<AttendanceStatus, string> = {
-  present: "green",
-  late: "orange",
-  absent: "red",
-  dayoff: "gray",
-};
-
-const people = [
-  { name: "Абдуллоев Бахтиёр", role: "Арматурщик", photo: "abdulloev-bakhtiyor.jpg", arrival: "08:05", departure: "—", status: "present" as AttendanceStatus, note: "—" },
-  { name: "Юсупов Далер", role: "Плотник", photo: "daler-yusupov.jpg", arrival: "08:18", departure: "—", status: "late" as AttendanceStatus, note: "Опоздание 18 мин" },
-  { name: "Рустамов Комрон", role: "Мастер", photo: "rustamov-komron.jpg", arrival: "—", departure: "—", status: "absent" as AttendanceStatus, note: "Не вышел" },
-  { name: "Темуров Фирӯз", role: "Подсобный рабочий", photo: "temurov-firuz.jpg", arrival: "08:02", departure: "17:05", status: "present" as AttendanceStatus, note: "—" },
-  { name: "Саидов Акмал", role: "Бетонщик", photo: "rustam-saidov.jpg", arrival: "08:30", departure: "—", status: "late" as AttendanceStatus, note: "Опоздание 30 мин" },
-  { name: "Ибрагимов Шохрух", role: "Сварщик", photo: "mirzoev-shakhrom.jpg", arrival: "—", departure: "—", status: "dayoff" as AttendanceStatus, note: "—" },
-];
-
-const TABS: { key: "all" | AttendanceStatus; label: string }[] = [
-  { key: "all", label: "Все" },
-  { key: "present", label: "Присутствуют" },
-  { key: "late", label: "Опоздания" },
-  { key: "absent", label: "Отсутствуют" },
-];
-
-const weekAttendance = [
-  { day: "Пн|14 июл", value: 95 },
-  { day: "Вт|15 июл", value: 90 },
-  { day: "Ср|16 июл", value: 93 },
-  { day: "Чт|17 июл", value: 88 },
-  { day: "Пт|18 июл", value: 94 },
-  { day: "Сб|19 июл", value: 85 },
-  { day: "Вс|20 июл", value: 80 },
-];
-
-const daySummary = [
-  { label: "Присутствуют", value: "22", color: "green", icon: UserIcon },
-  { label: "Опоздали", value: "3", color: "orange", icon: ClockIcon },
-  { label: "Отсутствуют", value: "3", color: "red", icon: UserXIcon },
-  { label: "Средняя явка", value: "92%", color: "blue", icon: BarChartIcon },
-];
-
-type TimelineState = "done" | "current" | "upcoming";
-
-function buildTimeline(person: (typeof people)[number]): { label: string; time: string; state: TimelineState }[] {
-  const raw = [
-    { label: "Утренний приход", time: person.arrival, filled: person.arrival !== "—" },
-    { label: "Обеденный перерыв", time: person.arrival !== "—" ? "12:30 – 13:00" : "—", filled: person.arrival !== "—" },
-    { label: "Окончание смены", time: person.departure, filled: person.departure !== "—" },
-    { label: "Проверка безопасности", time: "—", filled: false },
-  ];
-  let currentAssigned = false;
-  return raw.map(({ label, time, filled }) => {
-    if (filled) return { label, time, state: "done" as const };
-    if (!currentAssigned && (person.status === "present" || person.status === "late")) {
-      currentAssigned = true;
-      return { label, time, state: "current" as const };
-    }
-    return { label, time, state: "upcoming" as const };
-  });
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Сессия истекла. Войдите в систему заново.";
+    if (error.status === 403) return "У вас нет прав для этого действия.";
+    if (error.code === "TIMESHEET_ABSENCE_CONFLICT") return "У этого сотрудника оформлено отсутствие на эту дату.";
+    if (error.code === "TIMESHEET_ALREADY_CHECKED_IN") return "Этот сотрудник уже отмечен сегодня.";
+    return error.message || fallback;
+  }
+  return fallback;
 }
 
-function BarValueLabel({ x = 0, y = 0, width = 0, value }: { x?: number; y?: number; width?: number; value?: number }) {
-  return (
-    <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">
-      {value}%
-    </text>
-  );
-}
-
-function DayTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
-  const [day = "", date = ""] = (payload?.value ?? "").split("|");
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text textAnchor="middle" fill="#64748b" fontSize="9">
-        <tspan x="0" dy="12">{day}</tspan>
-        <tspan x="0" dy="12">{date}</tspan>
-      </text>
-    </g>
-  );
-}
-
+/**
+ * GET /timesheets, POST /timesheets/check-in and /{id}/check-out are all
+ * real, Brigadir-scoped-to-own-brigade endpoints. The only reason this page
+ * was previously a placeholder is that there was no way for a Brigadir to
+ * resolve worker/object names for their own crew — /lookups/workers and
+ * /lookups/objects (both scoped to the caller's own brigade) close that gap.
+ */
 export default function BrigadirAttendancePage() {
   const { showToast } = useToast();
-  const chartAnim = useChartAnimation();
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"all" | AttendanceStatus>("all");
-  const [selected, setSelected] = useState(0);
 
-  const searched = people.filter((p) => `${p.name} ${p.role}`.toLowerCase().includes(search.toLowerCase()));
-  const filtered = tab === "all" ? searched : searched.filter((p) => p.status === tab);
-  const person = people[selected];
-  const timeline = useMemo(() => buildTimeline(person), [person]);
+  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
+  const [workers, setWorkers] = useState<LookupItem[]>([]);
+  const [objects, setObjects] = useState<LookupItem[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error" | "unavailable">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkInWorkerId, setCheckInWorkerId] = useState("");
+  const [checkInObjectId, setCheckInObjectId] = useState("");
+  const [checkInError, setCheckInError] = useState("");
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [timesheetsResult, workersResult, objectsResult] = await Promise.all([
+        listTimesheets(1, 100),
+        listWorkerLookups({ limit: 100 }),
+        listObjectLookups({ limit: 100 }),
+      ]);
+      setTimesheets(timesheetsResult.items);
+      setWorkers(workersResult);
+      setObjects(objectsResult);
+      setLoadState("ready");
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "WORKER_NOT_FOUND") {
+        setLoadState("unavailable");
+        return;
+      }
+      setLoadError(describeError(error, "Не удалось загрузить посещаемость"));
+      setLoadState("error");
+    }
+  }
+
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const workerNameById = useMemo(() => toNameMap(workers), [workers]);
+  const objectNameById = useMemo(() => toNameMap(objects), [objects]);
+
+  const kpis = useMemo(() => ({
+    total: timesheets.length,
+    open: timesheets.filter((t) => t.checkInAt && !t.checkOutAt).length,
+    pendingApproval: timesheets.filter((t) => !t.approvedAt).length,
+  }), [timesheets]);
+
+  function openCheckIn() {
+    setCheckInWorkerId(workers[0]?.id ?? "");
+    setCheckInObjectId(objects[0]?.id ?? "");
+    setCheckInError("");
+    setCheckInOpen(true);
+  }
+
+  async function submitCheckIn(event: FormEvent) {
+    event.preventDefault();
+    if (checkingIn) return;
+    if (!checkInWorkerId || !checkInObjectId) {
+      setCheckInError("Выберите сотрудника и объект");
+      return;
+    }
+    setCheckingIn(true);
+    setCheckInError("");
+    try {
+      const created = await checkIn(checkInWorkerId, checkInObjectId);
+      setTimesheets((current) => [created, ...current.filter((t) => t.id !== created.id)]);
+      setCheckInOpen(false);
+      showToast("Приход отмечен");
+    } catch (error) {
+      setCheckInError(describeError(error, "Не удалось отметить приход"));
+    } finally {
+      setCheckingIn(false);
+    }
+  }
+
+  async function handleCheckOut(timesheet: Timesheet) {
+    if (busyId) return;
+    setBusyId(timesheet.id);
+    try {
+      const updated = await checkOut(timesheet.id);
+      setTimesheets((current) => current.map((t) => (t.id === updated.id ? updated : t)));
+      showToast("Уход отмечен");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось отметить уход"), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const columns: DataTableColumn<Timesheet>[] = [
+    { key: "worker", header: "Сотрудник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
+    { key: "date", header: "Дата", render: (row) => <span className="text-ink-secondary">{row.date}</span> },
+    { key: "checkIn", header: "Приход", render: (row) => <span className="text-ink-secondary">{row.checkInAt ? formatDushanbeTime(row.checkInAt) : "—"}</span> },
+    { key: "checkOut", header: "Уход", render: (row) => <span className="text-ink-secondary">{row.checkOutAt ? formatDushanbeTime(row.checkOutAt) : "—"}</span> },
+    { key: "late", header: "Опоздание", render: (row) => (row.lateMinutes ? <Badge tone="orange">{row.lateMinutes} мин</Badge> : <span className="text-ink-muted">—</span>) },
+    { key: "approved", header: "Статус", render: (row) => <Badge tone={row.approvedAt ? "green" : "orange"}>{row.approvedAt ? "Утверждён" : "Ожидает"}</Badge> },
+    {
+      key: "actions",
+      header: "Действия",
+      headerClassName: "text-right",
+      className: "text-right",
+      render: (row) =>
+        row.checkInAt && !row.checkOutAt ? (
+          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => void handleCheckOut(row)}>
+              <LogOut size={13} /> Отметить уход
+            </Button>
+          </div>
+        ) : null,
+    },
+  ];
 
   return (
     <AppLayout
       title="Посещаемость"
-      subtitle="Учет присутствия бригады, опозданий и отсутствий"
-      titleBelowHeader
-      contentMaxWidth="1280px"
-      search={{ value: search, onChange: setSearch, placeholder: "Поиск..." }}
+      subtitle="Отметки прихода и ухода вашей бригады"
+      action={<Button onClick={openCheckIn} disabled={workers.length === 0 || objects.length === 0}><LogIn size={15} /> Отметить приход</Button>}
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Всего отметок" value="28" note="за сегодня" color="blue" icon={ClipboardIcon} />
-        <KpiCard label="Присутствуют" value="22" note="на объекте сейчас" color="green" icon={UserIcon} />
-        <KpiCard label="Опоздания" value="3" note="сегодня" color="orange" icon={ClockIcon} />
-        <KpiCard label="Отсутствуют" value="3" note="не вышли" color="red" icon={UserXIcon} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Всего отметок" value={String(kpis.total)} icon={CalendarCheck} tone="orange" footer="За всё время" />
+        <MetricCard label="Открытых смен" value={String(kpis.open)} icon={CalendarCheck} tone="blue" footer="Отмечен приход, нет ухода" />
+        <MetricCard label="Ожидают утверждения" value={String(kpis.pendingApproval)} icon={CalendarCheck} tone="green" footer="Прораб ещё не утвердил" />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className="flex flex-col gap-4">
-          <Card className="overflow-hidden rounded-2xl">
-            <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-              <h2 className="text-[15px] font-bold">Список посещаемости</h2>
-              <button
-                type="button"
-                onClick={() => showToast("Выбор даты — функция в разработке", "info")}
-                className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong px-3 text-xs font-semibold text-ink-secondary hover:bg-surface-2"
-              >
-                <CalendarIcon size={14} className="text-ink-muted" /> 20 июля 2026 <ChevronDownIcon size={13} className="text-ink-muted" />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2 px-5 pt-3.5">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                    tab === t.key ? "border-primary/50 bg-primary-soft text-primary" : "border-border-strong text-ink-secondary hover:bg-surface-2",
-                  )}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 table-scroll-x overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left">
-                <thead className="bg-slate-50 text-[10px] font-semibold text-ink-muted">
-                  <tr>
-                    <th className="px-5 py-2.5">Сотрудник</th>
-                    <th className="px-2">Объект</th>
-                    <th className="px-2">Приход</th>
-                    <th className="px-2">Уход</th>
-                    <th className="px-2">Статус</th>
-                    <th className="px-2">Примечание</th>
-                    <th className="px-5 text-right">Действие</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filtered.map((row) => {
-                    const idx = people.findIndex((p) => p.name === row.name);
-                    const resolved = row.status === "dayoff" || (row.status === "present" && row.departure !== "—");
-                    return (
-                      <tr
-                        key={row.name}
-                        onClick={() => setSelected(idx)}
-                        className={cn("cursor-pointer text-[11.5px] hover:bg-orange-50/40", selected === idx && "bg-orange-50/60")}
-                      >
-                        <td className="px-5 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <PersonAvatar name={row.name} photo={row.photo} size={30} />
-                            <span className="whitespace-nowrap font-semibold">{row.name}</span>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-2 text-ink-secondary">ЖК «Сомони»</td>
-                        <td className="whitespace-nowrap px-2 text-ink-secondary">{row.arrival}</td>
-                        <td className="whitespace-nowrap px-2 text-ink-secondary">{row.departure}</td>
-                        <td className="whitespace-nowrap px-2">
-                          <Badge color={STATUS_COLOR[row.status]}>{STATUS_LABEL[row.status]}</Badge>
-                        </td>
-                        <td className="whitespace-nowrap px-2 text-ink-secondary">{row.note}</td>
-                        <td className="px-5 text-right">
-                          {resolved ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelected(idx);
-                              }}
-                              aria-label="Открыть"
-                              className="ml-auto flex h-7 w-7 items-center justify-center rounded-md border border-border-strong text-ink-secondary hover:bg-surface-2"
-                            >
-                              <EyeIcon size={14} />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelected(idx);
-                              }}
-                              className="ml-auto rounded-md border border-primary/50 px-3 py-1.5 text-[11px] font-bold text-primary hover:bg-primary hover:text-white"
-                            >
-                              Открыть
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-6 text-center text-xs text-ink-muted">Ничего не найдено</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex items-center justify-between border-t border-border px-5 py-3 text-[11px] text-ink-secondary">
-              <span>Показано 1–6 из 28</span>
-              <div className="flex gap-1">
-                {["‹", "1", "2", "3", "…", "5", "›"].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => showToast("Переход по страницам — функция в разработке", "info")}
-                    className={cn(
-                      "h-7 min-w-7 rounded-md border px-1.5 text-xs font-semibold",
-                      n === "1" ? "border-primary/50 bg-primary-soft text-primary" : "border-border-strong text-ink-secondary hover:bg-surface-2",
-                    )}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </Card>
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
 
-          <Card className="p-5 rounded-2xl">
-            <h2 className="text-[15px] font-bold">Посещаемость за неделю</h2>
-            <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_96px]">
-              <div className="h-[190px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weekAttendance} margin={{ top: 20, right: 4, left: -20, bottom: 0 }}>
-                    <CartesianGrid vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="day" tick={<DayTick />} height={32} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(30, 79, 122, 0.05)" }}
-                      contentStyle={{
-                        padding: "6px 9px",
-                        borderRadius: "8px",
-                        border: "1px solid #e5e7eb",
-                        background: "rgba(255,255,255,.97)",
-                        boxShadow: "0 6px 18px rgba(15,23,42,.10)",
-                        fontSize: "10px",
-                        lineHeight: 1.25,
-                      }}
-                      labelStyle={{ marginBottom: "3px", color: "#64748b", fontSize: "9px", fontWeight: 600 }}
-                      itemStyle={{ padding: 0, color: "#1e4f7a", fontSize: "10px", fontWeight: 700 }}
-                      separator=": "
-                    />
-                    <Bar dataKey="value" name="Посещаемость" fill="#1e4f7a" radius={[3, 3, 0, 0]} maxBarSize={28} {...chartAnim}>
-                      <LabelList dataKey="value" content={<BarValueLabel />} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-1">
-                {[
-                  ["Норма", "100%", "text-ink"],
-                  ["Факт", "92%", "text-green"],
-                  ["Опоздания", "3", "text-warning"],
-                  ["Пропуски", "2", "text-red"],
-                ].map(([a, b, c]) => (
-                  <div key={a} className="flex h-[45px] flex-col justify-center rounded-lg border border-border px-2.5 py-1">
-                    <p className="text-[9px] text-ink-muted">{a}</p>
-                    <b className={cn("block text-[17px] leading-tight", c)}>{b}</b>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        </div>
+      {loadState === "unavailable" && (
+        <Card className="mt-4 p-0">
+          <ErrorState
+            title="Бригада не найдена"
+            description="Ваша учётная запись не привязана ни к одной бригаде. Обратитесь к администратору."
+          />
+        </Card>
+      )}
 
-        <div className="flex flex-col gap-4">
-          <Card className="overflow-hidden rounded-2xl">
-            <CardHeader onMore={() => showToast("Действия с деталями посещаемости", "info")}>Детали посещаемости</CardHeader>
-            <div className="p-5">
-              <div className="flex items-center gap-3">
-                <PersonAvatar name={person.name} photo={person.photo} size={48} />
-                <div>
-                  <p className="text-sm font-bold">{person.name}</p>
-                  <p className="text-xs text-ink-muted">{person.role}</p>
-                </div>
-              </div>
-              <dl className="mt-4 space-y-2 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="flex items-center gap-1.5 text-ink-secondary"><BuildingIcon size={13} className="text-ink-muted" /> Объект:</dt>
-                  <dd className="font-semibold">ЖК «Сомони»</dd>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="flex items-center gap-1.5 text-ink-secondary"><UserIcon size={13} className="text-ink-muted" /> Бригадир:</dt>
-                  <dd className="font-semibold">Комрон Саидов</dd>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="flex items-center gap-1.5 text-ink-secondary"><ClockIcon size={13} className="text-ink-muted" /> Время прихода:</dt>
-                  <dd className="font-semibold">{person.arrival}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="flex items-center gap-1.5 text-ink-secondary"><CheckIcon size={13} className="text-ink-muted" /> Статус:</dt>
-                  <dd><Badge color={STATUS_COLOR[person.status]}>{STATUS_LABEL[person.status]}</Badge></dd>
-                </div>
-              </dl>
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-              <div className="relative mt-5 space-y-4 pl-6 text-xs before:absolute before:bottom-3 before:left-[7px] before:top-2 before:w-px before:bg-border">
-                {timeline.map((step) => (
-                  <div key={step.label} className="relative flex items-center justify-between gap-3">
-                    <span
-                      className={cn(
-                        "absolute -left-6 top-0 grid h-3.5 w-3.5 place-items-center rounded-full border",
-                        step.state === "done" && "border-green bg-green text-white",
-                        step.state === "current" && "border-blue bg-white",
-                        step.state === "upcoming" && "border-border-strong bg-white",
-                      )}
-                    >
-                      {step.state === "done" && <CheckIcon size={9} />}
-                    </span>
-                    <span className="text-ink-secondary">{step.label}</span>
-                    <b>{step.time}</b>
-                  </div>
-                ))}
-              </div>
+      {loadState === "ready" && (
+        <Card className="mt-4">
+          <div className="mt-4">
+            {timesheets.length > 0 ? (
+              <DataTable columns={columns} rows={timesheets} rowKey={(row) => row.id} />
+            ) : (
+              <EmptyState icon={CalendarCheck} title="Отметок пока нет" description="Отметьте приход первого сотрудника" />
+            )}
+          </div>
+        </Card>
+      )}
 
-              <div className="mt-5 grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => showToast("Статус отмечен")}
-                  className="h-10 rounded-[10px] bg-primary text-xs font-bold text-white hover:bg-primary-hover"
-                >
-                  Отметить статус
-                </button>
-                <button
-                  type="button"
-                  onClick={() => showToast("Проблема отправлена прорабу", "info")}
-                  className="flex h-10 items-center justify-center gap-1.5 rounded-[10px] border border-primary/50 text-xs font-bold text-primary hover:bg-primary hover:text-white"
-                >
-                  <AlertIcon size={14} /> Сообщить о проблеме
-                </button>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-5 rounded-2xl">
-            <h2 className="text-[14px] font-bold">Сводка за день</h2>
-            <div className="mt-3.5 grid grid-cols-2 gap-2.5">
-              {daySummary.map((s) => (
-                <div key={s.label} className="rounded-lg border border-border p-2.5">
-                  <div className="flex items-center gap-1.5 text-[10px] text-ink-muted">
-                    <s.icon size={13} className={cn(s.color === "green" && "text-green", s.color === "orange" && "text-warning", s.color === "red" && "text-red", s.color === "blue" && "text-blue")} />
-                    {s.label}
-                  </div>
-                  <b className="mt-1 block text-xl">{s.value}</b>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-5 rounded-2xl">
-            <h2 className="text-[14px] font-bold">Краткая сводка</h2>
-            <div className="mt-3.5 grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-              <p className="flex flex-col gap-0.5"><span className="text-ink-muted">Объект</span><b className="font-semibold">ЖК «Сомони»</b></p>
-              <p className="flex flex-col gap-0.5"><span className="text-ink-muted">Активных задач</span><b className="font-semibold">5</b></p>
-              <p className="flex flex-col gap-0.5"><span className="text-ink-muted">Прораб</span><b className="font-semibold">Комрон Саидов</b></p>
-              <p className="flex flex-col gap-0.5"><span className="text-ink-muted">Замечания</span><b className="font-semibold text-red">2</b></p>
-              <p className="col-span-2 flex flex-col gap-0.5"><span className="text-ink-muted">Следующая проверка</span><b className="font-semibold">20 июля</b></p>
-            </div>
-            <button
-              type="button"
-              onClick={() => showToast("Звонок прорабу", "info")}
-              className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-primary/50 text-xs font-bold text-primary hover:bg-primary hover:text-white"
-            >
-              <PhoneIcon size={14} /> Связаться с прорабом
-            </button>
-          </Card>
-        </div>
-      </div>
+      <Modal open={checkInOpen} onClose={() => setCheckInOpen(false)} title="Отметить приход" size="sm">
+        <form className="users-modal-form" onSubmit={submitCheckIn}>
+          <label><span>Сотрудник</span><CustomSelect fullWidth value={checkInWorkerId} onValueChange={setCheckInWorkerId} options={workers.map((w) => ({ value: w.id, label: w.name }))} /></label>
+          <label><span>Объект</span><CustomSelect fullWidth value={checkInObjectId} onValueChange={setCheckInObjectId} options={objects.map((o) => ({ value: o.id, label: o.name }))} /></label>
+          {checkInError && <p className="users-modal-error" role="alert">{checkInError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setCheckInOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={checkingIn}>{checkingIn ? "Сохранение..." : "Отметить"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
   );
 }

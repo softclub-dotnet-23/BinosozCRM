@@ -1,0 +1,1 @@
+var e=new Intl.NumberFormat(`ru-RU`);function t(t){return e.format(t)}function n(t){return`${e.format(t)} сомони`}function r(t){let r=Math.abs(t);if(r>=1e6){let e=Math.round(t/1e6*10)/10;return`${Number.isInteger(e)?String(e):e.toFixed(1)} млн`}return r>=1e3?`${e.format(Math.round(t/1e3))} тыс.`:n(t)}export{n,t as r,r as t};

@@ -1,13 +1,14 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  CalendarDays,
-  Download,
+  AlertCircle,
+  Check,
+  Copy,
   Eye,
   Grid2X2,
+  KeyRound,
+  Loader2,
   MoreVertical,
-  Pencil,
   Plus,
-  Power,
   Search,
   ShieldCheck,
   UserCheck,
@@ -16,162 +17,312 @@ import {
 } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Avatar } from "../components/ui/Avatar";
-import { AppImage } from "../components/ui/AppImage";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { CustomSelect } from "../components/ui/CustomSelect";
-import { DropdownMenu } from "../components/ui/DropdownMenu";
 import { Modal } from "../components/ui/Modal";
+import { DonutChart } from "../components/charts/DonutChart";
+import { CategoryLegend } from "../components/charts/CategoryLegend";
 import { useAuth } from "../context/AuthContext";
-import { useLanguage } from "../context/LanguageContext";
-import { useRepositoryState } from "../hooks/useRepositoryState";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { usersRepository } from "../data/repositories";
+import { useToast } from "../hooks/useToast";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { BACKEND_ROLES, mapToBackendRole, type BackendRole } from "../api/authApi";
+import {
+  activateUser,
+  changeUserRole,
+  createUser,
+  deactivateUser,
+  listUsers,
+  resetUserPassword,
+  type AppUser,
+  type CreatedUser,
+} from "../api/usersApi";
+import { ROLE_LABEL } from "../lib/auth/roleAccess";
 import { resolvePersonPhoto } from "../utils/personPhotos";
-import type { AppStrings } from "../lib/i18n/appStrings";
-import type { UserAccount, UserAccountStatus, UserRole } from "../types";
+import type { CategorySpend, UserRole } from "../types";
 import "../styles/users.css";
 
 type UserTab = "all" | "active" | "inactive";
-type UsersStrings = AppStrings["users"];
 
-const ROLE_CLASS_NAME: Record<UserRole, string> = {
+const ROLE_CLASS_NAME: Partial<Record<UserRole, string>> = {
   owner: "role-owner",
-  administrator: "role-admin",
   prorab: "role-prorab",
   brigadir: "role-brigadir",
-  worker: "role-worker",
-  storekeeper: "role-supply",
   accountant: "role-accountant",
 };
 
-const ROLE_KEYS = Object.keys(ROLE_CLASS_NAME) as UserRole[];
-
-const EMPTY_FORM: Omit<UserAccount, "id" | "registeredAt"> = {
-  fullName: "",
-  login: "",
-  role: "brigadir",
-  phone: "",
-  email: "",
-  status: "active",
-  employeeId: null,
+// Chart color per real, backend-assignable role (see ROLE_OPTIONS below) —
+// administrator/storekeeper are UI-only labels elsewhere and never appear
+// here, so they have no chart color. worker (Worker-role checkpoint) IS a
+// real backend-assignable role, unlike those two.
+const ROLE_CHART_COLOR: Partial<Record<UserRole, string>> = {
+  owner: "var(--color-green)",
+  prorab: "var(--color-blue)",
+  brigadir: "var(--color-purple)",
+  accountant: "var(--color-warning)",
+  worker: "var(--color-red)",
 };
 
-const TAJIK_PHONE_RE = /^\+992 \d{2} \d{3} ?\d{2} ?\d{2}$|^\+992 9\d{2} \d{2} \d{2} \d{2}$/;
+const STATUS_OPTIONS: { value: UserTab; label: string }[] = [
+  { value: "all", label: "Все статусы" },
+  { value: "active", label: "Активные" },
+  { value: "inactive", label: "Неактивные" },
+];
+
+// Only the roles the backend can actually assign — administrator/storekeeper
+// have no server-side equivalent (roleAccess.ts) and can never appear here.
+const ROLE_OPTIONS = BACKEND_ROLES.map((backendRole) => {
+  const role = mapToBackendRoleReverseLabel(backendRole);
+  return { value: backendRole, label: ROLE_LABEL[role] };
+});
+
+function mapToBackendRoleReverseLabel(role: BackendRole): UserRole {
+  switch (role) {
+    case "Owner":
+      return "owner";
+    case "Prorab":
+      return "prorab";
+    case "Brigadir":
+      return "brigadir";
+    case "Accountant":
+      return "accountant";
+    case "Worker":
+      return "worker";
+  }
+}
+
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case "PHONE_ALREADY_IN_USE":
+        return "Пользователь с этим номером телефона уже существует";
+      case "CANNOT_MODIFY_OWN_ACCOUNT":
+        return "Нельзя изменить собственную учётную запись";
+      case "USER_NOT_FOUND":
+        return "Пользователь не найден";
+      default:
+        return error.message || fallback;
+    }
+  }
+  return fallback;
+}
+
+function describeResetError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "Сессия истекла. Войдите в систему заново.";
+    if (error.status === 403) return "У вас нет прав для этого действия.";
+    if (error.code === "USER_NOT_FOUND") return "Пользователь не найден";
+    return error.message || fallback;
+  }
+  return fallback;
+}
+
+const CREATE_FORM_INITIAL = { fullName: "", phone: "", role: "Brigadir" as BackendRole };
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
-  const { strings } = useLanguage();
-  const s = strings.users;
-  const { roleLabels } = strings.common;
-  const [users, setUsers] = useRepositoryState(usersRepository);
+  const { showToast } = useToast();
+
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<UserTab>("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = usePersistentState("users.page.size.v1", 10);
-  const [modalMode, setModalMode] = useState<"add" | "edit" | "view" | null>(null);
-  const [selected, setSelected] = useState<UserAccount | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState("");
 
-  const roleOptions = useMemo(() => ROLE_KEYS.map((value) => ({ value, label: roleLabels[value] })), [roleLabels]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(CREATE_FORM_INITIAL);
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const [viewUser, setViewUser] = useState<AppUser | null>(null);
+  const [roleTarget, setRoleTarget] = useState<AppUser | null>(null);
+  const [roleChangeValue, setRoleChangeValue] = useState<BackendRole>("Brigadir");
+  const [roleChangeError, setRoleChangeError] = useState("");
+  const [savingRole, setSavingRole] = useState(false);
+
+  const [revealedPassword, setRevealedPassword] = useState<CreatedUser | null>(null);
+  const [copyConfirmed, setCopyConfirmed] = useState(false);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+
+  const [resetTarget, setResetTarget] = useState<AppUser | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
+
+  async function loadUsers() {
+    setLoadState("loading");
+    try {
+      // Users is a small, Owner-only administrative list (no server-side
+      // search/filter endpoint exists) — one bulk fetch at the backend's own
+      // page-size cap, filtered/paginated client-side, rather than a request
+      // per keystroke or per filter change.
+      const result = await listUsers(1, 100);
+      setUsers(result.items);
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить пользователей"));
+      setLoadState("error");
+    }
+  }
+
+  useEffect(() => {
+    void loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return users.filter((user) => {
-      if (tab === "active" && user.status !== "active") return false;
-      if (tab === "inactive" && user.status === "active") return false;
+      if (tab === "active" && !user.isActive) return false;
+      if (tab === "inactive" && user.isActive) return false;
       if (roleFilter !== "all" && user.role !== roleFilter) return false;
-      if (statusFilter !== "all" && user.status !== statusFilter) return false;
-      if (dateFrom && user.registeredAt < dateFrom) return false;
-      if (dateTo && user.registeredAt > dateTo) return false;
-      if (query && !`${user.fullName} ${user.login} ${user.email} ${user.phone}`.toLowerCase().includes(query)) return false;
+      if (query && !`${user.fullName} ${user.phone}`.toLowerCase().includes(query)) return false;
       return true;
     });
-  }, [users, search, tab, roleFilter, statusFilter, dateFrom, dateTo]);
+  }, [users, search, tab, roleFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const visibleUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
   const stats = useMemo(() => {
-    const active = users.filter((u) => u.status === "active").length;
-    const inactive = users.filter((u) => u.status !== "active").length;
-    const administrators = users.filter((u) => u.role === "administrator" || u.role === "owner").length;
-    return { total: users.length, active, inactive, administrators, roleCount: roleOptions.length };
-  }, [users, roleOptions]);
+    const active = users.filter((u) => u.isActive).length;
+    const inactive = users.filter((u) => !u.isActive).length;
+    const owners = users.filter((u) => u.role === "owner").length;
+    const pendingPasswordChange = users.filter((u) => u.forcePasswordChange).length;
+    return { total: users.length, active, inactive, owners, pendingPasswordChange };
+  }, [users]);
 
-  const roleDistribution = useMemo(() => {
-    const total = users.length || 1;
-    return roleOptions.map(({ value, label }) => {
-      const count = users.filter((u) => u.role === value).length;
-      return { role: value, label, count, percent: (count / total) * 100 };
-    }).filter((entry) => entry.count > 0);
-  }, [users, roleOptions]);
+  const roleDistribution: CategorySpend[] = useMemo(
+    () =>
+      ROLE_OPTIONS.map(({ value, label }) => {
+        const role = mapToBackendRoleReverseLabel(value);
+        const count = users.filter((u) => u.role === role).length;
+        return { category: label, amount: count, color: ROLE_CHART_COLOR[role] ?? "var(--color-ink-muted)" };
+      }).filter((entry) => entry.amount > 0),
+    [users],
+  );
 
   function resetFilters() {
     setSearch("");
     setRoleFilter("all");
-    setStatusFilter("all");
-    setDateFrom("");
-    setDateTo("");
+    setTab("all");
     setPage(1);
   }
 
-  function openAdd() {
-    setSelected(null);
-    setForm(EMPTY_FORM);
-    setFormError("");
-    setModalMode("add");
+  function openCreate() {
+    setCreateForm(CREATE_FORM_INITIAL);
+    setCreateError("");
+    setCreateOpen(true);
   }
 
-  function openUser(user: UserAccount, mode: "view" | "edit") {
-    setSelected(user);
-    setForm({ fullName: user.fullName, login: user.login, role: user.role, phone: user.phone, email: user.email, status: user.status, employeeId: user.employeeId });
-    setFormError("");
-    setModalMode(mode);
-  }
-
-  function submitUser(event: FormEvent) {
+  async function submitCreate(event: FormEvent) {
     event.preventDefault();
-    if (!form.fullName.trim() || !form.login.trim() || !form.email.trim()) {
-      setFormError(s.errorRequiredFields);
+    if (creating) return;
+    if (!createForm.fullName.trim() || !createForm.phone.trim()) {
+      setCreateError("Заполните имя и телефон");
       return;
     }
-    if (form.phone.trim() && !TAJIK_PHONE_RE.test(form.phone.trim())) {
-      setFormError(s.errorPhoneFormat);
-      return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createUser(createForm.fullName.trim(), createForm.phone.trim(), createForm.role);
+      setUsers((current) => [created.user, ...current]);
+      setCreateOpen(false);
+      setCopyConfirmed(false);
+      setRevealedPassword(created);
+    } catch (error) {
+      setCreateError(describeError(error, "Не удалось создать пользователя"));
+    } finally {
+      setCreating(false);
     }
-    const normalizedLogin = form.login.trim().toLowerCase();
-    const loginTaken = users.some(
-      (user) => user.login.toLowerCase() === normalizedLogin && user.id !== selected?.id,
-    );
-    if (loginTaken) {
-      setFormError(s.errorLoginTaken);
-      return;
-    }
-    if (modalMode === "edit" && selected) {
-      setUsers((current) => current.map((user) => (user.id === selected.id ? { ...user, ...form, login: normalizedLogin } : user)));
-    } else {
-      setUsers((current) => [
-        { ...form, login: normalizedLogin, id: `user-${Date.now()}`, registeredAt: new Date().toISOString().slice(0, 10) },
-        ...current,
-      ]);
-    }
-    setModalMode(null);
   }
 
-  function toggleStatus(user: UserAccount) {
-    if (user.id === currentUser?.id) return;
-    setUsers((current) => current.map((row) => (row.id === user.id ? { ...row, status: row.status === "active" ? "inactive" : "active" } : row)));
+  function openRoleChange(user: AppUser) {
+    setRoleTarget(user);
+    setRoleChangeValue(mapToBackendRole(user.role));
+    setRoleChangeError("");
+  }
+
+  async function submitRoleChange(event: FormEvent) {
+    event.preventDefault();
+    if (!roleTarget || savingRole) return;
+    setSavingRole(true);
+    setRoleChangeError("");
+    try {
+      const updated = await changeUserRole(roleTarget.id, roleChangeValue);
+      setUsers((current) => current.map((u) => (u.id === updated.id ? updated : u)));
+      setRoleTarget(null);
+      showToast("Роль обновлена");
+    } catch (error) {
+      setRoleChangeError(describeError(error, "Не удалось изменить роль"));
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
+  async function toggleStatus(user: AppUser) {
+    if (user.id === currentUser?.id || busyUserId) return;
+    setBusyUserId(user.id);
+    try {
+      const updated = user.isActive ? await deactivateUser(user.id) : await activateUser(user.id);
+      setUsers((current) => current.map((u) => (u.id === updated.id ? updated : u)));
+      showToast(updated.isActive ? "Пользователь активирован" : "Пользователь деактивирован");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось изменить статус"), "error");
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  function openReset(user: AppUser) {
+    setResetTarget(user);
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetError("");
+  }
+
+  function closeReset() {
+    setResetTarget(null);
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetError("");
+  }
+
+  async function submitReset(event: FormEvent) {
+    event.preventDefault();
+    if (!resetTarget || resettingPassword) return;
+    if (resetNewPassword.length < 8) {
+      setResetError("Новый пароль должен содержать не менее 8 символов");
+      return;
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError("Пароли не совпадают");
+      return;
+    }
+    setResettingPassword(true);
+    setResetError("");
+    try {
+      await resetUserPassword(resetTarget.id, resetNewPassword);
+      showToast("Пароль сброшен");
+      closeReset();
+    } catch (error) {
+      setResetError(describeResetError(error, "Не удалось сбросить пароль"));
+    } finally {
+      setResettingPassword(false);
+    }
   }
 
   function exportCsv() {
-    const rows = filteredUsers.map((user) => [user.fullName, roleLabels[user.role], user.phone, user.email, user.status]);
-    const csv = [[s.csvUser, s.csvRole, s.csvPhone, s.csvEmail, s.csvStatus], ...rows]
+    const rows = filteredUsers.map((user) => [user.fullName, ROLE_LABEL[user.role], user.phone, user.isActive ? "Активен" : "Неактивен"]);
+    const csv = [["Пользователь", "Роль", "Телефон", "Статус"], ...rows]
       .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
       .join("\n");
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
@@ -182,123 +333,210 @@ export default function UsersPage() {
     URL.revokeObjectURL(url);
   }
 
-  function statusLabel(status: UserAccountStatus): string {
-    if (status === "active") return s.statusActive;
-    if (status === "blocked") return s.statusBlocked;
-    return s.statusInactive;
-  }
-
   return (
-    <AppLayout title={s.pageTitle} subtitle={s.pageSubtitle} search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: s.searchPlaceholder }}>
+    <AppLayout title="Пользователи" subtitle="Управление учётными записями и правами доступа" search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "Поиск по пользователям..." }}>
       <div className="users-page">
-        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-warning bg-warning-soft p-4 text-sm text-ink">
-          <ShieldCheck size={18} className="mt-0.5 shrink-0 text-warning" />
-          <div>
-            <p className="font-semibold text-warning">Модуль управления пользователями недоступен на бэкенде</p>
-            <p className="mt-0.5 text-ink-secondary">
-              Backend поддерживает только вход в систему и профиль текущего пользователя (GET /users/me не
-              реализован). Список, создание, редактирование и удаление пользователей ниже — демонстрационные
-              данные, не связанные с реальным сервером. Действия не будут сохранены.
-            </p>
-          </div>
-        </div>
         <div className="users-overview-row">
           <div className="users-kpi-grid">
-            <UserKpi icon={UserRound} tone="green" label={s.kpiTotal} value={String(stats.total)} suffix={s.kpiTotalSuffix} />
-            <UserKpi icon={UserCheck} tone="blue" label={s.kpiActive} value={String(stats.active)} suffix={s.kpiActiveSuffix} />
-            <UserKpi icon={UserX} tone="orange" label={s.kpiInactive} value={String(stats.inactive)} suffix={s.kpiInactiveSuffix} />
-            <UserKpi icon={ShieldCheck} tone="purple" label={s.kpiAdmins} value={String(stats.administrators)} suffix={s.kpiAdminsSuffix} />
-            <UserKpi icon={Grid2X2} tone="yellow" label={s.kpiRoles} value={String(stats.roleCount)} suffix={s.kpiRolesSuffix} />
+            <UserKpi icon={UserRound} tone="green" label="Всего пользователей" value={String(stats.total)} suffix="учётных записей" />
+            <UserKpi icon={UserCheck} tone="blue" label="Активные" value={String(stats.active)} suffix="пользователя" />
+            <UserKpi icon={UserX} tone="orange" label="Неактивные" value={String(stats.inactive)} suffix="пользователя" />
+            <UserKpi icon={ShieldCheck} tone="purple" label="Владельцы" value={String(stats.owners)} suffix="учётных записей" />
+            <UserKpi icon={Grid2X2} tone="yellow" label="Требуют смены пароля" value={String(stats.pendingPasswordChange)} suffix="пользователей" />
           </div>
           <div className="users-top-actions">
-            <Button onClick={openAdd}><Plus size={15} /> {s.addUser}</Button>
-            <Button variant="secondary" onClick={exportCsv}><Download size={15} /> {s.export}</Button>
+            <Button onClick={openCreate}><Plus size={15} /> Добавить пользователя</Button>
+            <Button variant="secondary" onClick={exportCsv} disabled={loadState !== "ready"}>Экспорт</Button>
           </div>
         </div>
 
-        <div className="users-content-grid">
-          <Card className="users-table-card">
-            <div className="users-tabs">
-              {([['all', s.tabAll], ['active', s.tabActive], ['inactive', s.tabInactive]] as [UserTab, string][]).map(([key, label]) => (
-                <button key={key} type="button" className={tab === key ? "active" : ""} onClick={() => { setTab(key); setPage(1); }}>{label}</button>
-              ))}
-            </div>
-            <div className="users-table-scroll">
-              <table>
-                <thead><tr><th><input type="checkbox" aria-label={s.colSelectAll} /></th><th>{s.colUser}</th><th>{s.colRole}</th><th>{s.colPhone}</th><th>{s.colEmail}</th><th>{s.colStatus}</th><th>{s.colRegisteredAt}</th><th>{s.colActions}</th></tr></thead>
-                <tbody>
-                  {visibleUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td><input type="checkbox" aria-label={s.selectUser(user.fullName)} /></td>
-                      <td><div className="users-person"><UserAvatar user={user} /><div><strong>{user.fullName}</strong><span>@{user.login}</span></div></div></td>
-                      <td><span className={`user-role ${ROLE_CLASS_NAME[user.role]}`}>{roleLabels[user.role]}</span></td>
-                      <td className="nowrap">{user.phone}</td>
-                      <td>{user.email}</td>
-                      <td><span className={`user-status ${user.status === "active" ? "active" : "inactive"}`}>{statusLabel(user.status)}</span></td>
-                      <td className="nowrap">{user.registeredAt}</td>
-                      <td className="text-right">
-                        <div className="flex items-center justify-end">
-                          <DropdownMenu
-                            trigger={<MoreVertical size={16} />}
-                            items={[
-                              { label: s.actionView, icon: <Eye size={14} />, onClick: () => openUser(user, "view") },
-                              { label: s.actionEdit, icon: <Pencil size={14} />, onClick: () => openUser(user, "edit") },
-                              {
-                                label: user.id === currentUser?.id ? s.actionChangeStatusDisabled : s.actionChangeStatus,
-                                icon: <Power size={14} />,
-                                onClick: () => toggleStatus(user),
-                                disabled: user.id === currentUser?.id,
-                              },
-                            ]}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="users-pagination">
-              <span>{strings.common.paginationShown(visibleUsers.length ? (page - 1) * pageSize + 1 : 0, Math.min(page * pageSize, filteredUsers.length), filteredUsers.length, s.paginationItemLabel)}</span>
-              <div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>‹</button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} className={page === index + 1 ? "active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>›</button></div>
-              <label>
-                {strings.common.showPerPage}{" "}
-                <CustomSelect
-                  size="sm"
-                  value={String(pageSize)}
-                  onValueChange={(value) => { setPageSize(Number(value)); setPage(1); }}
-                  options={[{ value: "10", label: "10" }, { value: "25", label: "25" }, { value: "50", label: "50" }]}
-                />
-              </label>
-            </div>
+        {loadState === "error" && (
+          <Card className="users-table-card" style={{ padding: 24 }}>
+            <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+            <Button size="sm" variant="secondary" onClick={() => void loadUsers()} style={{ marginTop: 12 }}>Повторить</Button>
           </Card>
+        )}
 
-          <aside className="users-aside">
-            <Card className="users-filter-card">
-              <h2>{s.filtersTitle}</h2>
-              <FilterLabel label={s.filterSearch}><div className="users-filter-search"><Search size={13} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={s.filterSearchPlaceholder} /></div></FilterLabel>
-              <FilterLabel label={s.filterRole}><CustomSelect size="sm" fullWidth value={roleFilter} onValueChange={(value) => { setRoleFilter(value); setPage(1); }} options={[{ value: "all", label: s.filterAllRoles }, ...roleOptions]} /></FilterLabel>
-              <FilterLabel label={s.filterStatus}><CustomSelect size="sm" fullWidth value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }} options={[{ value: "all", label: s.filterAllStatuses }, { value: "active", label: s.filterActiveStatus }, { value: "inactive", label: s.filterInactiveStatus }, { value: "blocked", label: s.filterBlockedStatus }]} /></FilterLabel>
-              <FilterLabel label={s.filterRegisteredDate}><div className="users-date-range"><CalendarDays size={13} /><input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /><span>–</span><input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></div></FilterLabel>
-              <div className="users-filter-actions"><Button size="sm" onClick={() => setPage(1)}>{s.filterApply}</Button><Button size="sm" variant="secondary" onClick={resetFilters}>{s.filterReset}</Button></div>
-            </Card>
+        {loadState === "loading" && (
+          <Card className="users-table-card" style={{ padding: 40, textAlign: "center" }}>
+            <Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} />
+          </Card>
+        )}
 
-            <Card className="users-role-card">
-              <h2>{s.roleDistributionTitle}</h2>
-              <div className="users-role-content">
-                <div className="users-role-donut" aria-label={s.roleDistributionTitle} />
-                <ul>
-                  {roleDistribution.map((entry) => (
-                    <li key={entry.role}><i className={ROLE_CLASS_NAME[entry.role]} /><span className="users-role-label" title={entry.label}>{entry.label}</span> <b>{entry.count} ({entry.percent.toFixed(1)}%)</b></li>
-                  ))}
-                </ul>
+        {loadState === "ready" && (
+          <div className="users-content-grid">
+            <Card className="users-table-card">
+              {filteredUsers.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "var(--color-ink-muted)" }}>Пользователи не найдены</div>
+              ) : (
+                <div className="users-table-scroll">
+                  <table>
+                    <thead><tr><th>Пользователь</th><th>Роль</th><th>Телефон</th><th>Статус</th><th>Действия</th></tr></thead>
+                    <tbody>
+                      {visibleUsers.map((user) => (
+                        <tr key={user.id}>
+                          <td><div className="users-person"><UserAvatar user={user} /><div><strong>{user.fullName}</strong>{user.forcePasswordChange && <span title="Ожидает смены пароля">· временный пароль</span>}</div></div></td>
+                          <td><span className={`user-role ${ROLE_CLASS_NAME[user.role] ?? ""}`}>{ROLE_LABEL[user.role]}</span></td>
+                          <td className="nowrap">{user.phone}</td>
+                          <td><span className={`user-status ${user.isActive ? "active" : "inactive"}`}>{user.isActive ? "Активен" : "Неактивен"}</span></td>
+                          <td>
+                            <div className="user-row-actions">
+                              <button type="button" aria-label="Просмотреть" onClick={() => setViewUser(user)}><Eye size={14} /></button>
+                              <button
+                                type="button"
+                                aria-label="Изменить роль"
+                                title={user.id === currentUser?.id ? "Нельзя изменить свою роль" : "Изменить роль"}
+                                disabled={user.id === currentUser?.id}
+                                onClick={() => openRoleChange(user)}
+                              >
+                                <ShieldCheck size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Сбросить пароль"
+                                title="Сбросить пароль"
+                                onClick={() => openReset(user)}
+                              >
+                                <KeyRound size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Изменить статус"
+                                title={user.id === currentUser?.id ? "Нельзя изменить статус своей учётной записи" : "Изменить статус"}
+                                disabled={user.id === currentUser?.id || busyUserId === user.id}
+                                onClick={() => void toggleStatus(user)}
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="users-pagination">
+                <span>Показано {visibleUsers.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filteredUsers.length)} из {filteredUsers.length} пользователей</span>
+                <div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))}>‹</button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} className={page === index + 1 ? "active" : ""} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>›</button></div>
+                <label>
+                  Показывать по:{" "}
+                  <CustomSelect
+                    size="sm"
+                    value={String(pageSize)}
+                    onValueChange={(value) => { setPageSize(Number(value)); setPage(1); }}
+                    options={[{ value: "10", label: "10" }, { value: "25", label: "25" }, { value: "50", label: "50" }]}
+                  />
+                </label>
               </div>
             </Card>
-          </aside>
-        </div>
+
+            <aside className="users-aside">
+              <Card className="p-5">
+                <h2 className="text-[15px] font-bold text-ink">Фильтры</h2>
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FilterLabel label="Поиск" className="sm:col-span-2">
+                    <div className="relative">
+                      <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+                      <input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Имя или телефон"
+                        className="h-11 w-full rounded-[10px] border border-border-strong bg-white pl-10 pr-3.5 text-sm text-ink placeholder:text-ink-muted outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+                      />
+                    </div>
+                  </FilterLabel>
+                  <FilterLabel label="Роль">
+                    <CustomSelect
+                      size="md"
+                      fullWidth
+                      className="h-11"
+                      value={roleFilter}
+                      onValueChange={(value) => { setRoleFilter(value); setPage(1); }}
+                      options={[{ value: "all", label: "Все роли" }, ...ROLE_OPTIONS.map((o) => ({ value: mapToBackendRoleReverseLabel(o.value), label: o.label }))]}
+                      aria-label="Роль"
+                    />
+                  </FilterLabel>
+                  <FilterLabel label="Статус">
+                    <CustomSelect
+                      size="md"
+                      fullWidth
+                      className="h-11"
+                      value={tab}
+                      onValueChange={(value) => { setTab(value as UserTab); setPage(1); }}
+                      options={STATUS_OPTIONS}
+                      aria-label="Статус"
+                    />
+                  </FilterLabel>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <Button size="md" className="h-11 w-full" onClick={() => setPage(1)}>Применить</Button>
+                  <Button size="md" variant="secondary" className="h-11 w-full" onClick={resetFilters}>Сбросить</Button>
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <h2 className="text-[15px] font-bold text-ink">Пользователи по ролям</h2>
+                {roleDistribution.length === 0 ? (
+                  <p className="mt-4 text-sm text-ink-muted">Пользователей пока нет</p>
+                ) : (
+                  <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+                    <DonutChart
+                      data={roleDistribution}
+                      centerLabel="всего"
+                      centerValue={String(roleDistribution.reduce((sum, entry) => sum + entry.amount, 0))}
+                      size={168}
+                      valueFormatter={(value) => `${value}`}
+                    />
+                    <CategoryLegend data={roleDistribution} />
+                  </div>
+                )}
+              </Card>
+            </aside>
+          </div>
+        )}
       </div>
 
-      <UserModal s={s} roleOptions={roleOptions} mode={modalMode} selected={selected} form={form} error={formError} setForm={setForm} onSubmit={submitUser} onClose={() => setModalMode(null)} />
+      <CreateUserModal
+        open={createOpen}
+        form={createForm}
+        error={createError}
+        submitting={creating}
+        setForm={setCreateForm}
+        onSubmit={submitCreate}
+        onClose={() => setCreateOpen(false)}
+      />
+
+      <ViewUserModal user={viewUser} onClose={() => setViewUser(null)} />
+
+      <RoleChangeModal
+        user={roleTarget}
+        value={roleChangeValue}
+        error={roleChangeError}
+        submitting={savingRole}
+        onChange={setRoleChangeValue}
+        onSubmit={submitRoleChange}
+        onClose={() => setRoleTarget(null)}
+      />
+
+      <TemporaryPasswordModal
+        result={revealedPassword}
+        copyConfirmed={copyConfirmed}
+        onCopy={() => setCopyConfirmed(true)}
+        onClose={() => setRevealedPassword(null)}
+      />
+
+      <ResetPasswordModal
+        user={resetTarget}
+        newPassword={resetNewPassword}
+        confirmPassword={resetConfirmPassword}
+        error={resetError}
+        submitting={resettingPassword}
+        onNewPasswordChange={setResetNewPassword}
+        onConfirmPasswordChange={setResetConfirmPassword}
+        onSubmit={submitReset}
+        onClose={closeReset}
+      />
     </AppLayout>
   );
 }
@@ -307,41 +545,212 @@ function UserKpi({ icon: Icon, tone, label, value, suffix }: { icon: typeof User
   return <Card className="user-kpi"><span className={`user-kpi-icon ${tone}`}><Icon size={20} /></span><div><p>{label}</p><strong>{value}</strong><span>{suffix}</span></div></Card>;
 }
 
-function UserAvatar({ user }: { user: UserAccount }) {
+function UserAvatar({ user }: { user: AppUser }) {
   const src = resolvePersonPhoto(user.fullName);
   return src ? (
-    <AppImage className="users-row-avatar rounded-full" src={src} alt={user.fullName} loading="lazy" />
+    <img className="users-row-avatar" src={src} alt={user.fullName} loading="lazy" decoding="async" />
   ) : (
     <Avatar name={user.fullName} size="sm" />
   );
 }
 
-function FilterLabel({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="users-filter-label"><span>{label}</span>{children}</label>;
+function FilterLabel({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1.5 ${className ?? ""}`}>
+      <span className="text-xs font-medium text-ink-secondary">{label}</span>
+      {children}
+    </label>
+  );
 }
 
-function UserModal({ s, roleOptions, mode, selected, form, error, setForm, onSubmit, onClose }: {
-  s: UsersStrings;
-  roleOptions: { value: UserRole; label: string }[];
-  mode: "add" | "edit" | "view" | null;
-  selected: UserAccount | null;
-  form: typeof EMPTY_FORM;
+function CreateUserModal({
+  open,
+  form,
+  error,
+  submitting,
+  setForm,
+  onSubmit,
+  onClose,
+}: {
+  open: boolean;
+  form: typeof CREATE_FORM_INITIAL;
   error: string;
-  setForm: React.Dispatch<React.SetStateAction<typeof EMPTY_FORM>>;
+  submitting: boolean;
+  setForm: React.Dispatch<React.SetStateAction<typeof CREATE_FORM_INITIAL>>;
   onSubmit: (event: FormEvent) => void;
   onClose: () => void;
 }) {
-  const readOnly = mode === "view";
-  return <Modal open={mode !== null} onClose={onClose} title={mode === "add" ? s.modalAddTitle : mode === "edit" ? s.modalEditTitle : s.modalViewTitle} description={selected ? `@${selected.login}` : s.modalAddDescription} size="md">
-    <form className="users-modal-form" onSubmit={onSubmit}>
-      <label><span>{s.fieldFullName}</span><input readOnly={readOnly} value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder={s.fieldFullNamePlaceholder} /></label>
-      <label><span>{s.fieldLogin}</span><input readOnly={readOnly} value={form.login} onChange={(event) => setForm((current) => ({ ...current, login: event.target.value }))} placeholder={s.fieldLoginPlaceholder} /></label>
-      <label><span>{s.fieldEmail}</span><input readOnly={readOnly} type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} placeholder={s.fieldEmailPlaceholder} /></label>
-      <label><span>{s.fieldPhone}</span><input readOnly={readOnly} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder={s.fieldPhonePlaceholder} /></label>
-      <label><span>{s.fieldRole}</span><CustomSelect fullWidth value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as UserRole }))} disabled={readOnly} options={roleOptions} /></label>
-      <label><span>{s.fieldStatus}</span><CustomSelect fullWidth value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as UserAccountStatus }))} disabled={readOnly} options={[{ value: "active", label: s.statusActive }, { value: "inactive", label: s.statusInactive }, { value: "blocked", label: s.statusBlocked }]} /></label>
-      {error && <p className="users-modal-error" role="alert">{error}</p>}
-      <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={onClose}>{readOnly ? s.buttonClose : s.buttonCancel}</Button>{!readOnly && <Button type="submit">{mode === "add" ? s.buttonAdd : s.buttonSave}</Button>}</div>
-    </form>
-  </Modal>;
+  return (
+    <Modal open={open} onClose={onClose} title="Добавить пользователя" description="Пароль будет сгенерирован автоматически" size="md">
+      <form className="users-modal-form" onSubmit={onSubmit}>
+        <label><span>ФИО</span><input value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} placeholder="Имя и фамилия" autoFocus /></label>
+        <label><span>Телефон</span><input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+992 00 000 00 00" autoComplete="tel" /></label>
+        <label><span>Роль</span><CustomSelect fullWidth value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as BackendRole }))} options={ROLE_OPTIONS} /></label>
+        {error && <p className="users-modal-error" role="alert">{error}</p>}
+        <div className="users-modal-actions">
+          <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button type="submit" disabled={submitting}>{submitting ? "Создание..." : "Создать"}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ViewUserModal({ user, onClose }: { user: AppUser | null; onClose: () => void }) {
+  return (
+    <Modal open={user !== null} onClose={onClose} title="Профиль пользователя" description={user?.phone} size="sm">
+      {user && (
+        <div className="users-modal-form">
+          <label><span>ФИО</span><input readOnly value={user.fullName} /></label>
+          <label><span>Телефон</span><input readOnly value={user.phone} /></label>
+          <label><span>Роль</span><input readOnly value={ROLE_LABEL[user.role]} /></label>
+          <label><span>Статус</span><input readOnly value={user.isActive ? "Активен" : "Неактивен"} /></label>
+          <label><span>Смена пароля при входе</span><input readOnly value={user.forcePasswordChange ? "Требуется" : "Не требуется"} /></label>
+          <div className="users-modal-actions"><Button type="button" variant="secondary" onClick={onClose}>Закрыть</Button></div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function RoleChangeModal({
+  user,
+  value,
+  error,
+  submitting,
+  onChange,
+  onSubmit,
+  onClose,
+}: {
+  user: AppUser | null;
+  value: BackendRole;
+  error: string;
+  submitting: boolean;
+  onChange: (value: BackendRole) => void;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open={user !== null} onClose={onClose} title="Изменить роль" description={user?.fullName} size="sm">
+      <form className="users-modal-form" onSubmit={onSubmit}>
+        <label><span>Новая роль</span><CustomSelect fullWidth value={value} onValueChange={(v) => onChange(v as BackendRole)} options={ROLE_OPTIONS} /></label>
+        {error && <p className="users-modal-error" role="alert">{error}</p>}
+        <div className="users-modal-actions">
+          <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button type="submit" disabled={submitting}>{submitting ? "Сохранение..." : "Сохранить"}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ResetPasswordModal({
+  user,
+  newPassword,
+  confirmPassword,
+  error,
+  submitting,
+  onNewPasswordChange,
+  onConfirmPasswordChange,
+  onSubmit,
+  onClose,
+}: {
+  user: AppUser | null;
+  newPassword: string;
+  confirmPassword: string;
+  error: string;
+  submitting: boolean;
+  onNewPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal open={user !== null} onClose={onClose} title="Сбросить пароль" description={user?.fullName} size="sm">
+      <form className="users-modal-form" onSubmit={onSubmit}>
+        <label>
+          <span>Новый пароль</span>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(event) => onNewPasswordChange(event.target.value)}
+            autoComplete="new-password"
+            aria-invalid={error ? true : undefined}
+            autoFocus
+          />
+        </label>
+        <label>
+          <span>Повторите новый пароль</span>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => onConfirmPasswordChange(event.target.value)}
+            autoComplete="new-password"
+            aria-invalid={error ? true : undefined}
+          />
+        </label>
+        {error && <p className="users-modal-error" role="alert">{error}</p>}
+        <div className="users-modal-actions">
+          <Button type="button" variant="secondary" onClick={onClose}>Отмена</Button>
+          <Button type="submit" disabled={submitting}>{submitting ? "Сохранение..." : "Сбросить"}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function TemporaryPasswordModal({
+  result,
+  copyConfirmed,
+  onCopy,
+  onClose,
+}: {
+  result: CreatedUser | null;
+  copyConfirmed: boolean;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(result?.temporaryPassword ?? "");
+    } catch {
+      // clipboard API unavailable — the password is still selectable/visible in the field below
+    }
+    onCopy();
+  }
+
+  return (
+    <Modal
+      open={result !== null}
+      onClose={copyConfirmed ? onClose : () => {}}
+      title="Временный пароль создан"
+      description={result ? `${result.user.fullName} — ${result.user.phone}` : undefined}
+      size="sm"
+    >
+      {result && (
+        <div className="users-modal-form">
+          <div className="flex items-start gap-2 rounded-[10px] bg-[#FFF4E5] p-3 text-sm text-ink-secondary">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>Пароль показывается только один раз. Передайте его пользователю сейчас — после закрытия этого окна увидеть его снова будет нельзя.</span>
+          </div>
+          <label>
+            <span>Временный пароль</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input readOnly value={result.temporaryPassword} style={{ fontFamily: "monospace", fontSize: 16, letterSpacing: 1 }} onFocus={(e) => e.target.select()} />
+              <Button type="button" variant="secondary" onClick={() => void handleCopy()}><Copy size={14} /></Button>
+            </div>
+          </label>
+          <label className="users-filter-search" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={copyConfirmed} onChange={onCopy} />
+            <span>Я сохранил(а) или передал(а) пароль</span>
+          </label>
+          <div className="users-modal-actions">
+            <Button type="button" disabled={!copyConfirmed} onClick={onClose}>
+              {copyConfirmed ? <><Check size={14} /> Закрыть</> : "Закрыть"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
 }

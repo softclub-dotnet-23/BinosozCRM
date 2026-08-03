@@ -1,0 +1,1 @@
+import{p as e}from"./index-hjT6rogh.js";function t(t,n){return e(`/api/v1/individual-tasks?page=${t}&pageSize=${n}`)}function n(t){return e(`/api/v1/individual-tasks/${t}/start`,{method:`POST`})}function r(t,n){return e(`/api/v1/individual-tasks/${t}/complete`,{method:`POST`,body:n?{bonusAmount:n}:void 0})}export{t as n,n as r,r as t};

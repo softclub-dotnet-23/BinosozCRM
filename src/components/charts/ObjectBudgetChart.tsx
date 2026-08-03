@@ -2,8 +2,6 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { ChartTooltip } from "./ChartTooltip";
 import { formatCompact } from "../../utils/format";
 import { computeNiceTicks } from "../../utils/chart";
-import { useLanguage } from "../../context/LanguageContext";
-import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 interface ObjectBudgetPoint {
   objectName: string;
@@ -11,42 +9,41 @@ interface ObjectBudgetPoint {
   spent: number;
 }
 
+const SERIES = [
+  { key: "budget", label: "Бюджет", color: "#2869C9" },
+  { key: "spent", label: "Потрачено", color: "#FF6B00" },
+];
+
 export function ObjectBudgetChart({ data }: { data: ObjectBudgetPoint[] }) {
-  const { strings } = useLanguage();
-  const chartAnim = useChartAnimation();
-  const SERIES = [
-    { key: "budget", label: strings.objects.colBudget, color: "#2869C9" },
-    { key: "spent", label: strings.common.spentLabel, color: "#FF6B00" },
-  ];
   const maxValue = Math.max(0, ...data.map((d) => Math.max(d.budget, d.spent)));
   const ticks = computeNiceTicks(maxValue);
   const niceMax = ticks[ticks.length - 1];
 
   return (
-    <ResponsiveContainer width="100%" height={420}>
-      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barGap={6} barCategoryGap="26%">
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barGap={4} barCategoryGap="24%">
         <CartesianGrid vertical={false} stroke="#EFEFED" strokeDasharray="3 3" />
-        <XAxis dataKey="objectName" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#9CA3AF" }} interval={0} tickMargin={10} />
+        <XAxis dataKey="objectName" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} interval={0} tickMargin={8} />
         <YAxis
           tickLine={false}
           axisLine={false}
           domain={[0, niceMax]}
           ticks={ticks}
           tickFormatter={(v: number) => formatCompact(v)}
-          tick={{ fontSize: 12, fill: "#9CA3AF" }}
-          width={58}
+          tick={{ fontSize: 11, fill: "#9CA3AF" }}
+          width={54}
         />
         <Tooltip cursor={{ fill: "#F5F5F4" }} content={(props) => <ChartTooltip {...props} series={SERIES} />} />
         <Legend
           verticalAlign="top"
           align="left"
-          height={40}
+          height={36}
           iconType="circle"
-          iconSize={9}
-          formatter={(value) => <span className="text-sm text-ink-secondary">{value}</span>}
+          iconSize={8}
+          formatter={(value) => <span className="text-xs text-ink-secondary">{value}</span>}
         />
-        <Bar dataKey="budget" name={strings.objects.colBudget} fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={30} {...chartAnim} />
-        <Bar dataKey="spent" name={strings.common.spentLabel} fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={30} {...chartAnim} />
+        <Bar dataKey="budget" name="Бюджет" fill="#2869C9" radius={[3, 3, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="spent" name="Потрачено" fill="#FF6B00" radius={[3, 3, 0, 0]} maxBarSize={22} />
       </BarChart>
     </ResponsiveContainer>
   );

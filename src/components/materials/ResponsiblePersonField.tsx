@@ -47,7 +47,7 @@ export function ResponsiblePersonSelect({ employees, value, onChange, error }: R
           <Avatar name={previewName} size="sm" />
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-ink">{previewName}</p>
-            {resolved?.specialty && <p className="truncate text-xs text-ink-secondary">{resolved.specialty}</p>}
+            {resolved?.specialty && <p className="truncate text-[11px] text-ink-secondary">{resolved.specialty}</p>}
           </div>
         </div>
       )}

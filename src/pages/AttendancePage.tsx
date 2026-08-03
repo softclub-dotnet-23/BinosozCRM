@@ -1,443 +1,211 @@
-import { useMemo, useState } from "react";
-import { CalendarCheck, CalendarClock, CalendarX2, Download, Eye, MoreVertical, Pencil, Plus, RefreshCw, Trash2, UserCheck } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, CalendarCheck, Loader2, Plus } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
-import { StaggeredGrid } from "../components/ui/StaggeredGrid";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
-import { Avatar } from "../components/ui/Avatar";
+import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
-import { Pagination } from "../components/ui/Pagination";
-import { DropdownMenu } from "../components/ui/DropdownMenu";
-import { EmptyState } from "../components/ui/EmptyState";
-import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { AttendanceStatusBadge } from "../components/attendance/AttendanceStatusBadge";
-import { AttendanceFormModal } from "../components/attendance/AttendanceFormModal";
-import { AttendanceDetailDrawer } from "../components/attendance/AttendanceDetailDrawer";
 import { CustomSelect } from "../components/ui/CustomSelect";
-import { ATTENDANCE_BRIGADES, ATTENDANCE_EMPLOYEES, ATTENDANCE_OBJECTS } from "../data/mockAttendance";
-import { attendanceRepository } from "../data/repositories";
-import { useRepositoryState } from "../hooks/useRepositoryState";
-import { usePersistentState } from "../hooks/usePersistentState";
-import { computeAttendanceKpis } from "../utils/attendanceAnalytics";
+import { EmptyState } from "../components/ui/EmptyState";
+import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
-import { formatDateShort, formatWeekdayShort } from "../utils/date";
-import type { AttendanceFilters, AttendanceRecord, AttendanceStatus } from "../types";
 import { useAuth } from "../context/AuthContext";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { approveTimesheet, createManualTimesheet, listTimesheets, type Timesheet } from "../api/timesheetsApi";
+import { listObjects, type ConstructionObject } from "../api/objectsApi";
+import { listBrigades } from "../api/brigadesApi";
+import { listAllWorkers, type Worker } from "../api/workersApi";
+import { formatDushanbeTime } from "../utils/dushanbeTime";
 import BrigadirAttendancePage from "./BrigadirAttendancePage";
+import WorkerAttendancePage from "./WorkerAttendancePage";
 
-const DEFAULT_FILTERS: AttendanceFilters = {
-  objectName: "all",
-  brigadeName: "all",
-  employeeName: "all",
-  status: "all",
-  dateFrom: "2026-07-01",
-  dateTo: "2026-07-30",
-};
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) return error.message || fallback;
+  return fallback;
+}
 
-const STATUS_FILTER_OPTIONS: { value: AttendanceStatus | "all"; label: string }[] = [
-  { value: "all", label: "Статус: Все" },
-  { value: "present", label: "Присутствовал" },
-  { value: "late", label: "Опоздание" },
-  { value: "absent", label: "Отсутствовал" },
-];
+const CREATE_FORM_INITIAL = { workerId: "", objectId: "", date: "", checkInAt: "", checkOutAt: "" };
 
 export default function AttendancePage() {
   const { user } = useAuth();
   if (user?.role === "brigadir") return <BrigadirAttendancePage />;
+  if (user?.role === "worker") return <WorkerAttendancePage />;
   return <CompanyAttendancePage />;
 }
 
 function CompanyAttendancePage() {
+  const { user } = useAuth();
   const { showToast } = useToast();
+  const canApprove = user?.role === "prorab";
 
-  const [records, setRecords] = useRepositoryState(attendanceRepository);
-  const [search, setSearch] = usePersistentState("filters.attendance.search", "");
-  const [filters, setFilters] = usePersistentState<AttendanceFilters>("filters.attendance.filters", DEFAULT_FILTERS);
-  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [objects, setObjects] = useState<ConstructionObject[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(CREATE_FORM_INITIAL);
+  const [createError, setCreateError] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const [formRecord, setFormRecord] = useState<AttendanceRecord | null | undefined>(undefined);
-  const [viewRecord, setViewRecord] = useState<AttendanceRecord | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
-
-  const kpis = useMemo(() => computeAttendanceKpis(records), [records]);
-
-  const filteredRecords = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return records.filter((r) => {
-      if (query) {
-        const haystack = `${r.employeeName} ${r.objectName}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (filters.objectName !== "all" && r.objectName !== filters.objectName) return false;
-      if (filters.brigadeName !== "all" && r.brigadeName !== filters.brigadeName) return false;
-      if (filters.employeeName !== "all" && r.employeeName !== filters.employeeName) return false;
-      if (filters.status !== "all" && r.status !== filters.status) return false;
-      if (filters.dateFrom && r.date < filters.dateFrom) return false;
-      if (filters.dateTo && r.date > filters.dateTo) return false;
-      return true;
-    });
-  }, [records, filters, search]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageRows = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const allPageSelected = pageRows.length > 0 && pageRows.every((r) => selectedRowIds.has(r.id));
-
-  function toggleRowSelected(id: string) {
-    setSelectedRowIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [timesheetsResult, brigadesResult, objectsResult] = await Promise.all([
+        listTimesheets(1, 100),
+        listBrigades(1, 100),
+        listObjects(1, 100),
+      ]);
+      setTimesheets(timesheetsResult.items);
+      setObjects(objectsResult.items);
+      setWorkers(await listAllWorkers(brigadesResult.items.map((b) => b.id)));
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить табели"));
+      setLoadState("error");
+    }
   }
 
-  function toggleAllOnPage() {
-    setSelectedRowIds((prev) => {
-      const next = new Set(prev);
-      if (allPageSelected) pageRows.forEach((r) => next.delete(r.id));
-      else pageRows.forEach((r) => next.add(r.id));
-      return next;
-    });
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const workerNameById = useMemo(() => new Map(workers.map((w) => [w.id, w.fullName])), [workers]);
+  const objectNameById = useMemo(() => new Map(objects.map((o) => [o.id, o.name])), [objects]);
+
+  const kpis = useMemo(() => ({
+    total: timesheets.length,
+    pendingApproval: timesheets.filter((t) => !t.approvedAt).length,
+    late: timesheets.filter((t) => (t.lateMinutes ?? 0) > 0).length,
+  }), [timesheets]);
+
+  function openCreate() {
+    setCreateForm({ ...CREATE_FORM_INITIAL, workerId: workers[0]?.id ?? "", objectId: objects[0]?.id ?? "" });
+    setCreateError("");
+    setCreateOpen(true);
   }
 
-  function resetFilters() {
-    setFilters(DEFAULT_FILTERS);
-    setPage(1);
+  async function submitCreate(event: FormEvent) {
+    event.preventDefault();
+    if (creating) return;
+    const { workerId, objectId, date, checkInAt } = createForm;
+    if (!workerId || !objectId || !date || !checkInAt) {
+      setCreateError("Заполните работника, объект, дату и время прихода");
+      return;
+    }
+    setCreating(true);
+    setCreateError("");
+    try {
+      const created = await createManualTimesheet({
+        workerId,
+        objectId,
+        date,
+        checkInAt: new Date(checkInAt).toISOString(),
+        checkOutAt: createForm.checkOutAt ? new Date(createForm.checkOutAt).toISOString() : undefined,
+      });
+      setTimesheets((current) => [created, ...current]);
+      setCreateOpen(false);
+      showToast("Табель добавлен");
+    } catch (error) {
+      setCreateError(describeError(error, "Не удалось добавить табель"));
+    } finally {
+      setCreating(false);
+    }
   }
 
-  function handleSaveRecord(record: AttendanceRecord) {
-    setRecords((prev) => {
-      const exists = prev.some((r) => r.id === record.id);
-      return exists ? prev.map((r) => (r.id === record.id ? record : r)) : [record, ...prev];
-    });
-    setFormRecord(undefined);
-    showToast(formRecord ? "Запись обновлена" : "Посещение добавлено");
+  async function handleApprove(timesheet: Timesheet) {
+    if (busyId) return;
+    setBusyId(timesheet.id);
+    try {
+      const updated = await approveTimesheet(timesheet.id);
+      setTimesheets((current) => current.map((t) => (t.id === updated.id ? updated : t)));
+      showToast("Табель утверждён");
+    } catch (error) {
+      showToast(describeError(error, "Не удалось утвердить табель"), "error");
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  function handleDeleteConfirmed() {
-    if (!deleteTarget) return;
-    setRecords((prev) => prev.filter((r) => r.id !== deleteTarget.id));
-    showToast("Запись удалена", "info");
-    setDeleteTarget(null);
-  }
-
-  function handleExport() {
-    const header = ["Дата", "Сотрудник", "Бригада", "Объект", "Приход", "Уход", "Статус"];
-    const rows = filteredRecords.map((r) => [
-      formatDateShort(r.date),
-      r.employeeName,
-      r.brigadeName ?? r.department ?? "",
-      r.objectName,
-      r.arrivalTime ?? "",
-      r.departureTime ?? "",
-      r.status,
-    ]);
-    const csv = [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "poseshaemost.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-    showToast("Посещаемость экспортирована");
-  }
-
-  const columns: DataTableColumn<AttendanceRecord>[] = [
-    {
-      key: "checkbox",
-      sticky: "left",
-      width: "36px",
-      header: (
-        <input
-          type="checkbox"
-          checked={allPageSelected}
-          onChange={toggleAllOnPage}
-          onClick={(e) => e.stopPropagation()}
-          className="h-4 w-4 rounded border-border-strong accent-primary"
-          aria-label="Выбрать все строки"
-        />
-      ),
-      render: (row) => (
-        <input
-          type="checkbox"
-          checked={selectedRowIds.has(row.id)}
-          onChange={() => toggleRowSelected(row.id)}
-          onClick={(e) => e.stopPropagation()}
-          className="h-4 w-4 rounded border-border-strong accent-primary"
-          aria-label={`Выбрать запись ${row.employeeName}`}
-        />
-      ),
-    },
-    {
-      key: "employee",
-      header: "Сотрудник",
-      sticky: "left",
-      width: "216px",
-      render: (row) => (
-        <div className="flex items-center gap-2.5">
-          <Avatar name={row.employeeName} size="sm" />
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-ink" title={row.employeeName}>{row.employeeName}</p>
-            <p className="truncate text-xs text-ink-muted" title={row.position}>{row.position}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "date",
-      header: "Дата",
-      render: (row) => (
-        <div className="whitespace-nowrap">
-          <p className="text-ink">{formatDateShort(row.date)}</p>
-          <p className="text-xs text-ink-muted">{formatWeekdayShort(row.date)}</p>
-        </div>
-      ),
-    },
-    {
-      key: "brigade",
-      header: "Бригада",
-      render: (row) => (
-        <div>
-          <p className="whitespace-nowrap text-ink">{row.brigadeName ?? row.department ?? "—"}</p>
-          {row.brigadeSpecialization && <p className="whitespace-nowrap text-xs text-ink-muted">{row.brigadeSpecialization}</p>}
-        </div>
-      ),
-    },
-    {
-      key: "object",
-      header: "Объект",
-      render: (row) => (
-        <div>
-          <p className="whitespace-nowrap text-ink">{row.objectName}</p>
-          <p className="whitespace-nowrap text-xs text-ink-muted">{row.city}</p>
-        </div>
-      ),
-    },
-    {
-      key: "arrival",
-      header: "Приход",
-      render: (row) => (
-        <span className={`tabular whitespace-nowrap font-semibold ${row.arrivalTime ? (row.status === "late" ? "text-warning" : "text-green") : "text-ink-muted"}`}>
-          {row.arrivalTime ?? "—"}
-        </span>
-      ),
-    },
-    {
-      key: "departure",
-      header: "Уход",
-      render: (row) => (
-        <span className={`tabular whitespace-nowrap font-semibold ${row.departureTime ? "text-red" : "text-ink-muted"}`}>
-          {row.departureTime ?? "—"}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Статус",
-      render: (row) => <AttendanceStatusBadge status={row.status} />,
-    },
+  const columns: DataTableColumn<Timesheet>[] = [
+    { key: "worker", header: "Работник", render: (row) => <span className="font-semibold text-ink">{workerNameById.get(row.workerId) ?? "—"}</span> },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
+    { key: "date", header: "Дата", render: (row) => <span className="text-ink-secondary">{row.date}</span> },
+    { key: "checkIn", header: "Приход", render: (row) => <span className="text-ink-secondary">{row.checkInAt ? formatDushanbeTime(row.checkInAt) : "—"}</span> },
+    { key: "checkOut", header: "Уход", render: (row) => <span className="text-ink-secondary">{row.checkOutAt ? formatDushanbeTime(row.checkOutAt) : "—"}</span> },
+    { key: "late", header: "Опоздание", render: (row) => (row.lateMinutes ? <Badge tone="red">{row.lateMinutes} мин</Badge> : <span className="text-ink-muted">—</span>) },
+    { key: "hours", header: "Часов", render: (row) => <span className="text-ink-secondary">{row.hoursWorked ?? "—"}</span> },
+    { key: "approved", header: "Статус", render: (row) => <Badge tone={row.approvedAt ? "green" : "orange"}>{row.approvedAt ? "Утверждён" : "Ожидает"}</Badge> },
     {
       key: "actions",
       header: "Действия",
-      sticky: "right",
-      width: "56px",
       headerClassName: "text-right",
       className: "text-right",
-      render: (row) => (
-        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu
-            trigger={<MoreVertical size={16} />}
-            items={[
-              { label: "Просмотреть", icon: <Eye size={14} />, onClick: () => setViewRecord(row) },
-              { label: "Редактировать", icon: <Pencil size={14} />, onClick: () => setFormRecord(row) },
-              { label: "Удалить", icon: <Trash2 size={14} />, onClick: () => setDeleteTarget(row), danger: true },
-            ]}
-          />
-        </div>
-      ),
+      render: (row) =>
+        canApprove && !row.approvedAt ? (
+          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" disabled={busyId === row.id} onClick={() => void handleApprove(row)}>Утвердить</Button>
+          </div>
+        ) : null,
     },
   ];
 
   return (
     <AppLayout
-      title="Посещаемость"
-      subtitle="Учет посещений сотрудников на объектах"
-      search={{
-        value: search,
-        onChange: (value) => {
-          setSearch(value);
-          setPage(1);
-        },
-        placeholder: "Поиск по сотрудникам, объектам...",
-      }}
+      title="Явка"
+      subtitle="Табели учёта рабочего времени"
+      action={<Button onClick={openCreate} disabled={workers.length === 0 || objects.length === 0}><Plus size={15} /> Добавить табель</Button>}
     >
-      <div className="flex min-w-0 flex-col gap-4">
-        <StaggeredGrid className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <MetricCard label="Всего посещений" value={String(kpis.total)} icon={CalendarCheck} tone="green" footer="За выбранный период" />
-          <MetricCard
-            label="Присутствовали"
-            value={String(kpis.present)}
-            icon={UserCheck}
-            tone="blue"
-            footer={`${kpis.presentPercent}% от общего`}
-          />
-          <MetricCard
-            label="Отсутствовали"
-            value={String(kpis.absent)}
-            icon={CalendarX2}
-            tone="orange"
-            footer={`${kpis.absentPercent}% от общего`}
-          />
-          <MetricCard
-            label="Опоздали"
-            value={String(kpis.late)}
-            icon={CalendarClock}
-            tone="purple"
-            footer={`${kpis.latePercent}% от общего`}
-          />
-        </StaggeredGrid>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex h-9 items-center gap-1.5 rounded-[10px] border border-border-strong bg-card px-2.5">
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, dateFrom: e.target.value }));
-                setPage(1);
-              }}
-              className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
-            />
-            <span className="text-ink-muted">–</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => {
-                setFilters((f) => ({ ...f, dateTo: e.target.value }));
-                setPage(1);
-              }}
-              className="border-0 bg-transparent p-0 text-sm text-ink focus:outline-none"
-            />
-          </div>
-          <CustomSelect
-            size="sm"
-            searchable
-            aria-label="Объект"
-            value={filters.objectName}
-            onValueChange={(v) => {
-              setFilters((f) => ({ ...f, objectName: v }));
-              setPage(1);
-            }}
-            options={[{ value: "all", label: "Объект: Все" }, ...ATTENDANCE_OBJECTS.map((o) => ({ value: o, label: o }))]}
-          />
-          <CustomSelect
-            size="sm"
-            searchable
-            aria-label="Сотрудник"
-            value={filters.employeeName}
-            onValueChange={(v) => {
-              setFilters((f) => ({ ...f, employeeName: v }));
-              setPage(1);
-            }}
-            options={[
-              { value: "all", label: "Сотрудник: Все" },
-              ...ATTENDANCE_EMPLOYEES.map((name) => ({ value: name, label: name })),
-            ]}
-          />
-          <CustomSelect
-            size="sm"
-            searchable
-            aria-label="Бригада"
-            value={filters.brigadeName}
-            onValueChange={(v) => {
-              setFilters((f) => ({ ...f, brigadeName: v }));
-              setPage(1);
-            }}
-            options={[
-              { value: "all", label: "Бригада: Все" },
-              ...ATTENDANCE_BRIGADES.map((name) => ({ value: name, label: name })),
-            ]}
-          />
-          <CustomSelect
-            size="sm"
-            aria-label="Статус"
-            value={filters.status}
-            onValueChange={(v) => {
-              setFilters((f) => ({ ...f, status: v as AttendanceStatus | "all" }));
-              setPage(1);
-            }}
-            options={STATUS_FILTER_OPTIONS}
-          />
-          <Button variant="outline" size="sm" className="h-9" onClick={resetFilters}>
-            <RefreshCw size={14} /> Сбросить фильтры
-          </Button>
-          <Button size="sm" className="h-9" onClick={() => setFormRecord(null)}>
-            <Plus size={14} /> Добавить посещение
-          </Button>
-          <Button variant="outline" size="sm" className="h-9" onClick={handleExport}>
-            <Download size={14} /> Экспорт
-          </Button>
-        </div>
-
-        <Card>
-          {pageRows.length > 0 ? (
-            <DataTable
-              columns={columns}
-              rows={pageRows}
-              rowKey={(row) => row.id}
-              onRowClick={(row) => setViewRecord(row)}
-            />
-          ) : (
-            <EmptyState
-              icon={CalendarX2}
-              title="Записи не найдены"
-              description="Измените параметры поиска или сбросьте фильтры"
-              action={
-                <Button variant="outline" size="sm" onClick={resetFilters}>
-                  Сбросить фильтры
-                </Button>
-              }
-            />
-          )}
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            total={filteredRecords.length}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
-            itemLabel="записей"
-          />
-        </Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Всего записей" value={String(kpis.total)} icon={CalendarCheck} tone="orange" footer="За всё время" />
+        <MetricCard label="Ожидают утверждения" value={String(kpis.pendingApproval)} icon={CalendarCheck} tone="blue" footer="Требуют решения прораба" />
+        <MetricCard label="С опозданием" value={String(kpis.late)} icon={CalendarCheck} tone="red" footer="Записей с опозданием" />
       </div>
 
-      <AttendanceFormModal
-        open={formRecord !== undefined}
-        record={formRecord ?? null}
-        onClose={() => setFormRecord(undefined)}
-        onSave={handleSaveRecord}
-      />
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
 
-      <AttendanceDetailDrawer record={viewRecord} onClose={() => setViewRecord(null)} />
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        title="Удалить запись?"
-        description={deleteTarget ? `Запись о посещении «${deleteTarget.employeeName}» за ${formatDateShort(deleteTarget.date)} будет удалена.` : undefined}
-        confirmLabel="Удалить"
-        danger
-        onConfirm={handleDeleteConfirmed}
-      />
+      {loadState === "ready" && (
+        <Card className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+            <h2 className="text-[17px] font-bold text-ink">Табели</h2>
+          </div>
+          <div className="mt-4">
+            {timesheets.length > 0 ? (
+              <DataTable columns={columns} rows={timesheets} rowKey={(row) => row.id} />
+            ) : (
+              <EmptyState icon={CalendarCheck} title="Табели не найдены" description="Добавьте первую запись явки" />
+            )}
+          </div>
+        </Card>
+      )}
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Добавить табель" description="Ручная запись (например, задним числом)" size="md">
+        <form className="users-modal-form" onSubmit={submitCreate}>
+          <label><span>Работник</span><CustomSelect fullWidth value={createForm.workerId} onValueChange={(v) => setCreateForm((f) => ({ ...f, workerId: v }))} options={workers.map((w) => ({ value: w.id, label: w.fullName }))} /></label>
+          <label><span>Объект</span><CustomSelect fullWidth value={createForm.objectId} onValueChange={(v) => setCreateForm((f) => ({ ...f, objectId: v }))} options={objects.map((o) => ({ value: o.id, label: o.name }))} /></label>
+          <label><span>Дата</span><input type="date" value={createForm.date} onChange={(e) => setCreateForm((f) => ({ ...f, date: e.target.value }))} /></label>
+          <label><span>Время прихода</span><input type="datetime-local" value={createForm.checkInAt} onChange={(e) => setCreateForm((f) => ({ ...f, checkInAt: e.target.value }))} /></label>
+          <label><span>Время ухода</span><input type="datetime-local" value={createForm.checkOutAt} onChange={(e) => setCreateForm((f) => ({ ...f, checkOutAt: e.target.value }))} /></label>
+          {createError && <p className="users-modal-error" role="alert">{createError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Отмена</Button>
+            <Button type="submit" disabled={creating}>{creating ? "Сохранение..." : "Добавить"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
   );
 }

@@ -1,4 +1,4 @@
-import type { CategorySpend, Estimate, ObjectType } from "../types";
+import type { CategorySpend, Estimate, ObjectType, RiskItem } from "../types";
 
 interface EstimateObjectMeta {
   objectType: ObjectType;
@@ -300,4 +300,39 @@ export const estimateBudgetDynamics = [
   { objectName: "Склад «Логистика»", planned: 15200000, spent: 6800000 },
   { objectName: "Школа №25", planned: 4000000, spent: 3200000 },
   { objectName: "Клиника «Шифо»", planned: 7500000, spent: 2100000 },
+];
+
+export const estimateRiskItems: RiskItem[] = [
+  {
+    id: "est-risk-1",
+    title: "Бизнес-центр «Ватан»",
+    description: "Превышение на 450 000 сомони",
+    badgeLabel: "Превышение",
+    severity: "red",
+    icon: "trend",
+  },
+  {
+    id: "est-risk-2",
+    title: "Школа №25",
+    description: "Превышение на 120 000 сомони",
+    badgeLabel: "Превышение",
+    severity: "red",
+    icon: "trend",
+  },
+  {
+    id: "est-risk-3",
+    title: "Складской комплекс",
+    description: "Не подтверждены затраты на 310 000 сомони",
+    badgeLabel: "Ожидает проверки",
+    severity: "orange",
+    icon: "clock",
+  },
+  {
+    id: "est-risk-4",
+    title: "Медицинская клиника «Шифо»",
+    description: "Смета не утверждена",
+    badgeLabel: "Черновик",
+    severity: "blue",
+    icon: "file",
+  },
 ];

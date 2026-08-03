@@ -77,7 +77,7 @@ export function GroupedMoneyChart({
         ))}
       </div>
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 4 }} barGap={3} barCategoryGap="18%">
+        <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }} barGap={3} barCategoryGap="18%">
           <CartesianGrid vertical={false} stroke="#EFEFED" strokeDasharray="3 3" />
           <XAxis
             dataKey={categoryKey}
@@ -94,7 +94,7 @@ export function GroupedMoneyChart({
             ticks={ticks}
             tickFormatter={(v: number) => valueFormatter(v)}
             tick={{ fontSize: 11, fill: "#9CA3AF" }}
-            width={62}
+            width={50}
           />
           <Tooltip
             cursor={{ fill: "#F5F5F4" }}

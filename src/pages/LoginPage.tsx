@@ -6,7 +6,6 @@ import { LanguageSelector } from "../components/auth/LanguageSelector";
 import { ForgotPasswordModal } from "../components/auth/ForgotPasswordModal";
 import { QrLoginModal } from "../components/auth/QrLoginModal";
 import { LOGIN_STRINGS, type LoginLanguage } from "../components/auth/loginTranslations";
-import { AppLogo } from "../components/common/AppLogo";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { cn } from "../utils/cn";
 import "../styles/login.css";
@@ -60,7 +59,7 @@ export default function LoginPage() {
     setSubmitting(false);
 
     if (!result.ok) {
-      setFormError(result.error);
+      setFormError(strings[result.errorCode]);
       setPassword("");
       passwordRef.current?.focus();
       return;
@@ -77,7 +76,8 @@ export default function LoginPage() {
 
         <div className="login-form-container">
           <div className="mobile-brand">
-            <AppLogo className="app-logo" />
+            <img src="/images/binosoz-mark.svg" alt="BINOSOZ" className="h-9 w-9" />
+            <span>BINOSOZ</span>
           </div>
 
           <header className="form-heading">
@@ -93,8 +93,8 @@ export default function LoginPage() {
                 <input
                   id="login-input"
                   ref={loginRef}
-                  type="text"
-                  autoComplete="username"
+                  type="tel"
+                  autoComplete="tel"
                   value={loginValue}
                   onChange={(e) => {
                     setLoginValue(e.target.value);

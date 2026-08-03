@@ -11,7 +11,7 @@ export function CategoryLegend({ data, secondaryOrder = "amount-first", unitSuff
   const total = data.reduce((sum, entry) => sum + entry.amount, 0);
 
   return (
-    <ul className="min-w-40 flex-1 space-y-3">
+    <ul className="min-w-0 flex-1 space-y-3">
       {data.map((entry) => {
         const percent = total > 0 ? Math.round((entry.amount / total) * 100) : 0;
         const amountText = `${formatNumber(entry.amount)}${unitSuffix}`;

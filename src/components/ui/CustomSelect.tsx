@@ -12,7 +12,6 @@ import {
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { cn } from "../../utils/cn";
-import { useLanguage } from "../../context/LanguageContext";
 
 export interface SelectOption {
   value: string;
@@ -92,7 +91,7 @@ export function CustomSelect({
   value,
   onValueChange,
   options,
-  placeholder,
+  placeholder = "Выберите...",
   disabled = false,
   loading = false,
   error = false,
@@ -103,15 +102,10 @@ export function CustomSelect({
   className,
   id,
   name,
-  emptyText,
-  searchPlaceholder,
+  emptyText = "Ничего не найдено",
+  searchPlaceholder = "Поиск...",
   ...ariaProps
 }: CustomSelectProps) {
-  const { strings } = useLanguage();
-  const c = strings.common;
-  const resolvedPlaceholder = placeholder ?? c.selectPlaceholder;
-  const resolvedEmptyText = emptyText ?? c.selectEmpty;
-  const resolvedSearchPlaceholder = searchPlaceholder ?? c.selectSearch;
   const resolvedFullWidth = fullWidth ?? size !== "sm";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -303,7 +297,7 @@ export function CustomSelect({
     open && !searchable && flatOptions[activeIndex] ? `${listboxId}-opt-${activeIndex}` : undefined;
 
   return (
-    <div className={cn(resolvedFullWidth ? "w-full" : "inline-block", className)}>
+    <div className={cn(resolvedFullWidth ? "w-full" : "inline-block")}>
       {name && <input type="hidden" name={name} value={value} />}
       <div
         ref={triggerRef}
@@ -314,6 +308,7 @@ export function CustomSelect({
         aria-controls={listboxId}
         aria-disabled={disabled || undefined}
         aria-busy={loading || undefined}
+        aria-invalid={error || undefined}
         aria-activedescendant={activeOptionId}
         aria-label={ariaProps["aria-label"]}
         aria-labelledby={ariaProps["aria-labelledby"]}
@@ -332,9 +327,10 @@ export function CustomSelect({
               : "border-red"
             : open
               ? "border-primary ring-2 ring-primary/15"
-              : "border-border-strong hover:border-border-hover",
-          disabled && "cursor-not-allowed bg-surface-1 text-ink-muted",
+              : "border-border-strong hover:border-[#d4d4d2]",
+          disabled && "cursor-not-allowed bg-app-bg text-ink-muted",
           loading && "cursor-wait",
+          className,
         )}
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -343,20 +339,20 @@ export function CustomSelect({
             className={cn("truncate", !selectedOption && "font-normal text-ink-muted")}
             title={selectedOption?.label}
           >
-            {selectedOption ? selectedOption.label : resolvedPlaceholder}
+            {selectedOption ? selectedOption.label : placeholder}
           </span>
         </span>
-        <span className="flex flex-shrink-0 items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
           {clearable && value && isInteractive && (
             <button
               type="button"
               tabIndex={-1}
-              aria-label={c.selectClear}
+              aria-label="Очистить"
               onClick={(e) => {
                 e.stopPropagation();
                 onValueChange("");
               }}
-              className="rounded p-0.5 text-ink-muted transition-colors hover:bg-surface-4 hover:text-ink"
+              className="rounded p-0.5 text-ink-muted transition-colors hover:bg-[#F0F0EF] hover:text-ink"
             >
               <X size={13} />
             </button>
@@ -379,8 +375,8 @@ export function CustomSelect({
             ref={panelRef}
             role="listbox"
             id={listboxId}
-            aria-label={ariaProps["aria-label"] ?? resolvedPlaceholder}
-            className="fixed z-[1000] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-popover)]"
+            aria-label={ariaProps["aria-label"] ?? placeholder}
+            className="fixed z-[1000] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-(--shadow-popover)"
             style={{
               left: rect.left,
               minWidth: rect.width,
@@ -390,7 +386,7 @@ export function CustomSelect({
           >
             {searchable && (
               <div className="flex items-center gap-2 border-b border-border px-2.5 py-2">
-                <Search size={14} className="flex-shrink-0 text-ink-muted" />
+                <Search size={14} className="shrink-0 text-ink-muted" />
                 <input
                   ref={searchRef}
                   value={query}
@@ -399,7 +395,7 @@ export function CustomSelect({
                     setActiveIndex(0);
                   }}
                   onKeyDown={handleSearchKeyDown}
-                  placeholder={resolvedSearchPlaceholder}
+                  placeholder={searchPlaceholder}
                   role="combobox"
                   aria-expanded={open}
                   aria-autocomplete="list"
@@ -411,12 +407,12 @@ export function CustomSelect({
             )}
             <div className="overflow-y-auto py-1" style={{ maxHeight }}>
               {flatOptions.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-ink-muted">{resolvedEmptyText}</p>
+                <p className="px-3 py-6 text-center text-sm text-ink-muted">{emptyText}</p>
               ) : (
                 renderGroups.map((group) => (
                   <div key={group.key}>
                     {group.label && (
-                      <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
                         {group.label}
                       </p>
                     )}
@@ -443,7 +439,7 @@ export function CustomSelect({
                           className={cn(
                             "mx-1 flex cursor-pointer items-center gap-2 rounded-lg text-ink transition-colors",
                             SIZE_OPTION_CLASSNAMES[size],
-                            isActive && !option.disabled && "bg-surface-3",
+                            isActive && !option.disabled && "bg-[#F5F5F4]",
                             isSelected && "bg-primary-soft font-medium text-primary",
                             option.disabled && "cursor-not-allowed opacity-40",
                           )}
@@ -457,7 +453,7 @@ export function CustomSelect({
                               <span className="block truncate text-xs text-ink-secondary">{option.description}</span>
                             )}
                           </span>
-                          {isSelected && <Check size={14} className="flex-shrink-0 text-primary" />}
+                          {isSelected && <Check size={14} className="shrink-0 text-primary" />}
                         </div>
                       );
                     })}

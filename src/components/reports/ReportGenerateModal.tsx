@@ -159,7 +159,7 @@ export function ReportGenerateModal({ open, reportLabel, periodLabel, hasData, p
         </div>
       </div>
 
-      <div className="mt-4 rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
+      <div className="mt-4 rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
         <p className="mb-2 text-xs font-semibold text-ink-secondary">Предпросмотр по текущим фильтрам</p>
         {hasData ? (
           <dl className="space-y-1.5">

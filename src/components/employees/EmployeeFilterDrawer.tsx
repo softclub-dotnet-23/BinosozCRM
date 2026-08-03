@@ -2,16 +2,12 @@ import type { StaffCategory, StaffFilters } from "../../types";
 import { Drawer } from "../ui/Drawer";
 import { Button } from "../ui/Button";
 import { cn } from "../../utils/cn";
-import { useLanguage } from "../../context/LanguageContext";
-import type { AppStrings } from "../../lib/i18n/appStrings";
 
-function buildCategoryOptions(e: AppStrings["employees"]): { value: StaffCategory; label: string }[] {
-  return [
-    { value: "worker", label: e.categoryWorkers },
-    { value: "engineer", label: e.categoryEngineers },
-    { value: "admin", label: e.categoryAdmin },
-  ];
-}
+const CATEGORY_OPTIONS: { value: StaffCategory; label: string }[] = [
+  { value: "worker", label: "Рабочие" },
+  { value: "engineer", label: "Инженеры и ИТР" },
+  { value: "admin", label: "Администрация" },
+];
 
 const inputClass =
   "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
@@ -26,11 +22,6 @@ interface EmployeeFilterDrawerProps {
 }
 
 export function EmployeeFilterDrawer({ open, onClose, filters, onChange, onApply, onReset }: EmployeeFilterDrawerProps) {
-  const { strings } = useLanguage();
-  const e = strings.employees;
-  const c = strings.common;
-  const CATEGORY_OPTIONS = buildCategoryOptions(e);
-
   function toggleCategory(category: StaffCategory) {
     const active = filters.categories.includes(category);
     onChange({
@@ -43,11 +34,11 @@ export function EmployeeFilterDrawer({ open, onClose, filters, onChange, onApply
     <Drawer
       open={open}
       onClose={onClose}
-      title={c.filtersButton}
+      title="Фильтры"
       footer={
         <>
           <Button variant="secondary" className="flex-1" onClick={onReset}>
-            {c.resetButton}
+            Сбросить
           </Button>
           <Button
             className="flex-1"
@@ -56,14 +47,14 @@ export function EmployeeFilterDrawer({ open, onClose, filters, onChange, onApply
               onClose();
             }}
           >
-            {c.applyButton}
+            Применить
           </Button>
         </>
       }
     >
       <div className="space-y-5">
         <div>
-          <p className="text-sm font-semibold text-ink">{e.filterCategoryTitle}</p>
+          <p className="text-sm font-semibold text-ink">Категория персонала</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {CATEGORY_OPTIONS.map((opt) => (
               <button
@@ -74,7 +65,7 @@ export function EmployeeFilterDrawer({ open, onClose, filters, onChange, onApply
                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                   filters.categories.includes(opt.value)
                     ? "border-primary bg-primary-soft text-primary"
-                    : "border-border-strong text-ink-secondary hover:bg-surface-3",
+                    : "border-border-strong text-ink-secondary hover:bg-[#F5F5F4]",
                 )}
               >
                 {opt.label}
@@ -85,20 +76,20 @@ export function EmployeeFilterDrawer({ open, onClose, filters, onChange, onApply
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-medium text-ink">
-            {e.hireDateFromLabel}
+            Дата принятия с
             <input
               type="date"
               value={filters.hireDateFrom}
-              onChange={(ev) => onChange({ ...filters, hireDateFrom: ev.target.value })}
+              onChange={(e) => onChange({ ...filters, hireDateFrom: e.target.value })}
               className={inputClass}
             />
           </label>
           <label className="block text-sm font-medium text-ink">
-            {e.hireDateToLabel}
+            Дата принятия по
             <input
               type="date"
               value={filters.hireDateTo}
-              onChange={(ev) => onChange({ ...filters, hireDateTo: ev.target.value })}
+              onChange={(e) => onChange({ ...filters, hireDateTo: e.target.value })}
               className={inputClass}
             />
           </label>

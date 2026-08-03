@@ -1,363 +1,213 @@
-import { useState, type FormEvent } from "react";
-import { AlertCircle, Ban, Check, PackageSearch, Plus, XOctagon } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, Loader2, PackageCheck } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
+import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/StatusBadge";
 import { DataTable, type DataTableColumn } from "../components/tables/DataTable";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
-import { Pagination } from "../components/ui/Pagination";
 import { Modal } from "../components/ui/Modal";
-import { TableRowSkeleton } from "../components/ui/Skeleton";
-import { BackendSessionRequired } from "../components/auth/BackendSessionRequired";
-import { useAuth } from "../context/AuthContext";
+import { useToast } from "../hooks/useToast";
+import { ApiError, NetworkError } from "../api/apiClient";
 import {
-  useApproveMaterialRequest,
-  useCreateMaterialRequest,
-  useForceCloseMaterialRequest,
-  useMaterialRequests,
-  useRejectMaterialRequest,
-} from "../hooks/api/useMaterialRequests";
-import { normalizeApiError } from "../services/apiError";
-import { MATERIAL_REQUEST_STATUS_LABEL, MaterialRequestStatus } from "../services/types";
-import type { MaterialRequestDto } from "../services/materialRequestsApi";
-import { formatDateShort } from "../utils/date";
+  approveMaterialRequest,
+  forceCloseMaterialRequest,
+  listMaterialRequests,
+  markMaterialRequestOrdered,
+  rejectMaterialRequest,
+  type MaterialRequest,
+  type MaterialRequestStatus,
+} from "../api/materialRequestsApi";
+import { listObjects, type ConstructionObject } from "../api/objectsApi";
+import { listBrigades, type Brigade } from "../api/brigadesApi";
 
-const PAGE_SIZE = 10;
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) return error.message || fallback;
+  return fallback;
+}
 
-const STATUS_TONE: Record<MaterialRequestStatus, "blue" | "orange" | "green" | "purple" | "red"> = {
-  [MaterialRequestStatus.Requested]: "orange",
-  [MaterialRequestStatus.Approved]: "blue",
-  [MaterialRequestStatus.Ordered]: "purple",
-  [MaterialRequestStatus.PartiallyDelivered]: "orange",
-  [MaterialRequestStatus.Delivered]: "green",
-  [MaterialRequestStatus.Rejected]: "red",
+const STATUS_LABEL: Record<MaterialRequestStatus, string> = {
+  Requested: "Запрошено", Approved: "Одобрено", Ordered: "Заказано", PartiallyDelivered: "Частично доставлено", Delivered: "Доставлено", Rejected: "Отклонено",
+};
+const STATUS_TONE: Record<MaterialRequestStatus, "blue" | "green" | "orange" | "purple" | "red"> = {
+  Requested: "blue", Approved: "orange", Ordered: "purple", PartiallyDelivered: "orange", Delivered: "green", Rejected: "red",
 };
 
-/**
- * Dedicated page for MaterialRequestsController (api/v1/material-requests). No existing frontend
- * page represented this concept (MaterialsPage.tsx is a catalog/stock view with no backend CRUD
- * at all; ReceiptsPage/WriteOffsPage are structurally different — multi-line documents vs this
- * backend's one-material-per-record model), so this is new rather than a retrofit.
- */
+/** Create is Brigadir-only (Telegram bot) — this page only reads and acts on requests already raised there. */
 export default function MaterialRequestsPage() {
-  const { user } = useAuth();
-  const isBackendSession = user?.isBackendSession ?? false;
-  const isBrigadir = isBackendSession && user?.role === "brigadir";
-  const canDecide = isBackendSession && (user?.role === "owner" || user?.role === "prorab");
+  const { showToast } = useToast();
 
-  const [page, setPage] = useState(1);
-  // GET /material-requests is [Authorize(Roles = "Owner,Prorab")] — Brigadir gets a real 403, so
-  // the query only fires for canDecide roles; Brigadir sees a create-only panel instead. Gated on
-  // isBackendSession too: a mock session has no JWT at all, so the request must never fire even if
-  // the mock role string happens to also be "owner"/"prorab" (see SessionUser.isBackendSession).
-  const { data, isLoading, isError, error, refetch } = useMaterialRequests({ page, pageSize: PAGE_SIZE }, canDecide);
+  const [requests, setRequests] = useState<MaterialRequest[]>([]);
+  const [objects, setObjects] = useState<ConstructionObject[]>([]);
+  const [brigades, setBrigades] = useState<Brigade[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | MaterialRequestStatus>("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [forceCloseTarget, setForceCloseTarget] = useState<MaterialRequestDto | null>(null);
+  const [forceCloseTarget, setForceCloseTarget] = useState<MaterialRequest | null>(null);
+  const [forceCloseComment, setForceCloseComment] = useState("");
+  const [forceCloseError, setForceCloseError] = useState("");
+  const [forceClosing, setForceClosing] = useState(false);
 
-  const createMutation = useCreateMaterialRequest();
-  const approveMutation = useApproveMaterialRequest();
-  const rejectMutation = useRejectMaterialRequest();
-  const forceCloseMutation = useForceCloseMaterialRequest();
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const [requestsResult, objectsResult, brigadesResult] = await Promise.all([
+        listMaterialRequests(1, 100),
+        listObjects(1, 100),
+        listBrigades(1, 100),
+      ]);
+      setRequests(requestsResult.items);
+      setObjects(objectsResult.items);
+      setBrigades(brigadesResult.items);
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить заявки"));
+      setLoadState("error");
+    }
+  }
 
-  const columns: DataTableColumn<MaterialRequestDto>[] = [
-    {
-      key: "material",
-      header: "Материал",
-      sticky: "left",
-      width: "180px",
-      render: (row) => (
-        <div>
-          <p className="truncate font-semibold text-ink">{row.materialName}</p>
-          <p className="text-xs text-ink-secondary">
-            {row.qty} {row.unit}
-            {row.qtyDelivered > 0 && ` (доставлено: ${row.qtyDelivered})`}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "status",
-      header: "Статус",
-      render: (row) => (
-        <div className="flex items-center gap-1.5">
-          <Badge tone={STATUS_TONE[row.status]}>{MATERIAL_REQUEST_STATUS_LABEL[row.status]}</Badge>
-          {row.isOverDelivered && <Badge tone="orange">перепоставка</Badge>}
-        </div>
-      ),
-    },
-    {
-      key: "requestedAt",
-      header: "Запрошено",
-      render: (row) => <span className="whitespace-nowrap text-ink-secondary">{formatDateShort(row.requestedAt)}</span>,
-    },
-    {
-      key: "comment",
-      header: "Комментарий",
-      render: (row) => <span className="text-ink-secondary">{row.comment || "—"}</span>,
-    },
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const objectNameById = useMemo(() => new Map(objects.map((o) => [o.id, o.name])), [objects]);
+  const brigadeNameById = useMemo(() => new Map(brigades.map((b) => [b.id, b.name])), [brigades]);
+
+  const filteredRequests = useMemo(
+    () => (statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter)),
+    [requests, statusFilter],
+  );
+
+  const kpis = useMemo(() => ({
+    total: requests.length,
+    pending: requests.filter((r) => r.status === "Requested").length,
+    overDelivered: requests.filter((r) => r.isOverDelivered).length,
+  }), [requests]);
+
+  async function runAction(request: MaterialRequest, action: (id: string) => Promise<MaterialRequest>, successMessage: string) {
+    if (busyId) return;
+    setBusyId(request.id);
+    try {
+      const updated = await action(request.id);
+      setRequests((current) => current.map((r) => (r.id === updated.id ? updated : r)));
+      showToast(successMessage);
+    } catch (error) {
+      showToast(describeError(error, "Не удалось выполнить действие"), "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function openForceClose(request: MaterialRequest) {
+    setForceCloseTarget(request);
+    setForceCloseComment("");
+    setForceCloseError("");
+  }
+
+  async function submitForceClose(event: FormEvent) {
+    event.preventDefault();
+    if (!forceCloseTarget || forceClosing) return;
+    if (!forceCloseComment.trim()) {
+      setForceCloseError("Комментарий обязателен при принудительном закрытии");
+      return;
+    }
+    setForceClosing(true);
+    setForceCloseError("");
+    try {
+      const updated = await forceCloseMaterialRequest(forceCloseTarget.id, forceCloseComment.trim());
+      setRequests((current) => current.map((r) => (r.id === updated.id ? updated : r)));
+      setForceCloseTarget(null);
+      showToast("Заявка закрыта");
+    } catch (error) {
+      setForceCloseError(describeError(error, "Не удалось закрыть заявку"));
+    } finally {
+      setForceClosing(false);
+    }
+  }
+
+  const columns: DataTableColumn<MaterialRequest>[] = [
+    { key: "material", header: "Материал", render: (row) => <span className="font-semibold text-ink">{row.materialName}</span> },
+    { key: "object", header: "Объект", render: (row) => <span className="text-ink-secondary">{objectNameById.get(row.objectId) ?? "—"}</span> },
+    { key: "brigade", header: "Бригада", render: (row) => <span className="text-ink-secondary">{brigadeNameById.get(row.brigadeId) ?? "—"}</span> },
+    { key: "qty", header: "Кол-во", render: (row) => <span className="text-ink-secondary">{row.qty} {row.unit}{row.qtyDelivered > 0 ? ` (доставлено ${row.qtyDelivered})` : ""}</span> },
+    { key: "status", header: "Статус", render: (row) => <Badge tone={STATUS_TONE[row.status]}>{STATUS_LABEL[row.status]}</Badge> },
     {
       key: "actions",
       header: "Действия",
-      sticky: "right",
-      width: "260px",
       headerClassName: "text-right",
       className: "text-right",
       render: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          {canDecide && row.status === MaterialRequestStatus.Requested && (
+        <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {row.status === "Requested" && (
             <>
-              <Button size="sm" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(row.id)}>
-                <Check size={13} /> Одобрить
-              </Button>
-              <Button size="sm" variant="outline" disabled={rejectMutation.isPending} onClick={() => rejectMutation.mutate(row.id)}>
-                <Ban size={13} /> Отклонить
-              </Button>
+              <Button size="sm" disabled={busyId === row.id} onClick={() => void runAction(row, approveMaterialRequest, "Заявка одобрена")}>Одобрить</Button>
+              <Button size="sm" variant="danger" disabled={busyId === row.id} onClick={() => void runAction(row, rejectMaterialRequest, "Заявка отклонена")}>Отклонить</Button>
             </>
           )}
-          {canDecide && (row.status === MaterialRequestStatus.Approved || row.status === MaterialRequestStatus.Ordered || row.status === MaterialRequestStatus.PartiallyDelivered) && (
-            <Button size="sm" variant="outline" onClick={() => setForceCloseTarget(row)}>
-              <XOctagon size={13} /> Закрыть принудительно
-            </Button>
+          {row.status === "Approved" && <Button size="sm" disabled={busyId === row.id} onClick={() => void runAction(row, markMaterialRequestOrdered, "Отмечено как заказано")}>Заказано</Button>}
+          {(row.status === "PartiallyDelivered" || row.status === "Ordered") && (
+            <Button size="sm" variant="secondary" disabled={busyId === row.id} onClick={() => openForceClose(row)}>Закрыть принудительно</Button>
           )}
         </div>
       ),
     },
   ];
 
-  const rows = data?.items ?? [];
-  const pageCount = data ? Math.max(1, Math.ceil(data.totalCount / data.pageSize)) : 1;
-
   return (
-    <AppLayout
-      title="Заявки на материалы"
-      subtitle={isBrigadir ? "Заявки вашей бригады" : "Заявки по вашим объектам"}
-      action={
-        isBrigadir ? (
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus size={15} /> Новая заявка
-          </Button>
-        ) : undefined
-      }
-    >
-      {!isBackendSession ? (
-        <BackendSessionRequired roleHint="Owner или Prorab" />
-      ) : canDecide ? (
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-lg font-bold text-ink">Список заявок</h2>
-          </div>
+    <AppLayout title="Заявки на материалы" subtitle="Заявки бригад на материалы, ожидающие решения">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Всего заявок" value={String(kpis.total)} icon={PackageCheck} tone="orange" footer="За всё время" />
+        <MetricCard label="Ожидают решения" value={String(kpis.pending)} icon={PackageCheck} tone="blue" footer="Новые заявки" />
+        <MetricCard label="Перепоставки" value={String(kpis.overDelivered)} icon={AlertCircle} tone="red" footer="Доставлено больше запрошенного" />
+      </div>
 
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
+        </Card>
+      )}
+
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
+
+      {loadState === "ready" && (
+        <Card className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
+            <h2 className="text-[17px] font-bold text-ink">Заявки</h2>
+            <CustomSelect
+              size="sm"
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+              options={[{ value: "all", label: "Все статусы" }, ...(Object.keys(STATUS_LABEL) as MaterialRequestStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
+            />
+          </div>
           <div className="mt-4">
-            {isLoading ? (
-              <div className="px-5 sm:px-6">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <TableRowSkeleton key={i} columns={5} />
-                ))}
-              </div>
-            ) : isError ? (
-              <EmptyState
-                icon={AlertCircle}
-                title="Не удалось загрузить заявки"
-                description={normalizeApiError(error).message}
-                action={
-                  <Button variant="outline" size="sm" onClick={() => refetch()}>
-                    Повторить
-                  </Button>
-                }
-              />
-            ) : rows.length > 0 ? (
-              <DataTable columns={columns} rows={rows} rowKey={(row) => row.id} />
+            {filteredRequests.length > 0 ? (
+              <DataTable columns={columns} rows={filteredRequests} rowKey={(row) => row.id} />
             ) : (
-              <EmptyState icon={PackageSearch} title="Заявок пока нет" description="Заявки появятся после создания бригадиром" />
+              <EmptyState icon={PackageCheck} title="Заявок не найдено" description="Заявки появятся здесь после того, как бригадир запросит материалы" />
             )}
           </div>
-
-          {data && data.totalCount > 0 && (
-            <Pagination
-              page={page}
-              pageCount={pageCount}
-              pageSize={PAGE_SIZE}
-              total={data.totalCount}
-              itemLabel="заявок"
-              onPageChange={setPage}
-              onPageSizeChange={() => {}}
-            />
-          )}
-        </Card>
-      ) : (
-        <Card className="p-5 sm:p-6">
-          <p className="text-sm text-ink-secondary">
-            Backend не предоставляет вашей роли список заявок (GET /material-requests доступен только Owner/Prorab) — используйте
-            кнопку «Новая заявка», чтобы создать заявку для вашей бригады.
-          </p>
         </Card>
       )}
 
-      {isBrigadir && (
-        <CreateRequestModal
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
-          onSubmit={(request) => createMutation.mutate(request, { onSuccess: () => setCreateOpen(false) })}
-          submitting={createMutation.isPending}
-        />
-      )}
-
-      <ForceCloseModal
-        target={forceCloseTarget}
-        onClose={() => setForceCloseTarget(null)}
-        onSubmit={(comment) =>
-          forceCloseTarget &&
-          forceCloseMutation.mutate(
-            { materialRequestId: forceCloseTarget.id, request: { comment } },
-            { onSuccess: () => setForceCloseTarget(null) },
-          )
-        }
-        submitting={forceCloseMutation.isPending}
-      />
+      <Modal open={forceCloseTarget !== null} onClose={() => setForceCloseTarget(null)} title="Закрыть заявку принудительно" description={forceCloseTarget?.materialName} size="sm">
+        <form className="users-modal-form" onSubmit={submitForceClose}>
+          <label><span>Комментарий (обязательно)</span><input value={forceCloseComment} onChange={(e) => setForceCloseComment(e.target.value)} autoFocus /></label>
+          {forceCloseError && <p className="users-modal-error" role="alert">{forceCloseError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setForceCloseTarget(null)}>Отмена</Button>
+            <Button type="submit" disabled={forceClosing}>{forceClosing ? "Сохранение..." : "Закрыть"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
-  );
-}
-
-function CreateRequestModal({
-  open,
-  onClose,
-  onSubmit,
-  submitting,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (request: { objectId: string; materialName: string; unit: string; qty: number }) => void;
-  submitting: boolean;
-}) {
-  const [objectId, setObjectId] = useState("");
-  const [materialName, setMaterialName] = useState("");
-  const [unit, setUnit] = useState("");
-  const [qty, setQty] = useState("");
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (submitting || !objectId.trim() || !materialName.trim() || !unit.trim() || !qty.trim()) return;
-    onSubmit({ objectId: objectId.trim(), materialName: materialName.trim(), unit: unit.trim(), qty: Number(qty) });
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title="Новая заявка на материалы">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium text-ink" htmlFor="mr-object-id">
-            ID объекта
-          </label>
-          <input
-            id="mr-object-id"
-            required
-            value={objectId}
-            onChange={(e) => setObjectId(e.target.value)}
-            placeholder="GUID объекта"
-            className="mt-1.5 h-10 w-full rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-ink" htmlFor="mr-material">
-            Название материала
-          </label>
-          <input
-            id="mr-material"
-            required
-            value={materialName}
-            onChange={(e) => setMaterialName(e.target.value)}
-            className="mt-1.5 h-10 w-full rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium text-ink" htmlFor="mr-unit">
-              Единица измерения
-            </label>
-            <input
-              id="mr-unit"
-              required
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              placeholder="кг, шт, м³..."
-              className="mt-1.5 h-10 w-full rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-ink" htmlFor="mr-qty">
-              Количество
-            </label>
-            <input
-              id="mr-qty"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              className="mt-1.5 h-10 w-full rounded-[10px] border border-border-strong bg-card px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Создание..." : "Создать"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function ForceCloseModal({
-  target,
-  onClose,
-  onSubmit,
-  submitting,
-}: {
-  target: MaterialRequestDto | null;
-  onClose: () => void;
-  onSubmit: (comment: string) => void;
-  submitting: boolean;
-}) {
-  const [comment, setComment] = useState("");
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (submitting || !comment.trim()) return;
-    onSubmit(comment.trim());
-    setComment("");
-  }
-
-  return (
-    <Modal open={Boolean(target)} onClose={onClose} title={`Закрыть принудительно${target ? `: ${target.materialName}` : ""}`}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-sm font-medium text-ink" htmlFor="force-close-comment">
-            Комментарий (обязательно)
-          </label>
-          <textarea
-            id="force-close-comment"
-            required
-            rows={3}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="mt-1.5 w-full rounded-[10px] border border-border-strong bg-card px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
-          />
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button type="submit" variant="danger" disabled={submitting}>
-            {submitting ? "Закрытие..." : "Закрыть"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }

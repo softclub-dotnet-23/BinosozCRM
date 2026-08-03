@@ -1,0 +1,1 @@
+import{r as e}from"./Card-CirA8tNS.js";import{t}from"./localStorageEngine-uQRvK9bN.js";function n(){let n=e(`(prefers-reduced-motion: reduce)`),r=t(`app.settings.v1`)?.animations===!1;return n||r}export{n as t};

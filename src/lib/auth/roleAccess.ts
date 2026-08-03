@@ -1,17 +1,32 @@
-import type { UserRole } from "../../types";
+import type { UserRole } from '../../types';
+
+/**
+ * `administrator` and `storekeeper` are UI-only placeholders: the backend's
+ * Role enum (Domain/Enums/Role.cs) only has Owner/Prorab/Brigadir/Accountant/
+ * Worker, and mapBackendRole() (api/authApi.ts) can never produce either of
+ * them from a real login. They stay in this type/map for pages that already
+ * reference them, but no authenticated session will ever carry one until/
+ * unless the backend adds a matching role — a decision this frontend
+ * integration explicitly did not make on its own (see 2026-07-31 frontend-
+ * integration checkpoint notes in docs/PROGRESS.md).
+ *
+ * `worker` (added with the Worker-role checkpoint) IS a real backend role —
+ * see docs/PROGRESS.md's Worker-role entry for the MASTER §4 decision it
+ * overturns (regular workers now get a real, scoped web login).
+ */
 
 /** Landing route right after login, and where a role gets bounced back to if it opens a route it can't use. */
 export const ROLE_HOME: Record<UserRole, string> = {
-  owner: "/dashboard",
-  administrator: "/dashboard",
-  accountant: "/payroll",
-  prorab: "/works",
-  brigadir: "/brigades",
-  worker: "/worker/dashboard",
-  storekeeper: "/inventory/materials",
+  owner: '/dashboard',
+  administrator: '/dashboard',
+  accountant: '/payroll',
+  prorab: '/works',
+  brigadir: '/brigades',
+  storekeeper: '/inventory/materials',
+  worker: '/dashboard',
 };
 
-const FULL_ACCESS = "*" as const;
+const FULL_ACCESS = '*' as const;
 
 /**
  * Routes each role may open. An entry ending in "/*" allows that path and every
@@ -32,42 +47,36 @@ const FULL_ACCESS = "*" as const;
 const ROLE_ALLOWED_PREFIXES: Record<UserRole, string[] | typeof FULL_ACCESS> = {
   owner: FULL_ACCESS,
   administrator: FULL_ACCESS,
-  accountant: [
-    "/dashboard", "/payroll", "/payroll-entries", "/payroll-advances", "/absences", "/reports", "/budgets", "/estimates", "/objects",
-  ],
-  // NOTE: /payroll-advances (PayrollAdvancesController) is class-level
-  // [Authorize(Roles="Owner,Accountant")] — Prorab and Brigadir are both excluded here, live-
-  // verified via curl (both get a real 403), even though the GET method also carries a
-  // "...,Brigadir" override that looks like it should admit Brigadir. It doesn't: ASP.NET Core
-  // combines multiple [Authorize] attributes on one action with AND, not "most specific wins", so
-  // Brigadir still fails the class-level check. Do not re-add either role without re-verifying live.
+  accountant: ['/dashboard', '/payroll', '/budgets', '/estimates', '/objects'],
   prorab: [
-    "/dashboard", "/objects", "/works", "/individual-tasks", "/timesheets", "/brigades/*", "/attendance", "/inventory/*", "/reports",
-    "/material-requests", "/material-consumption-reports", "/material-deliveries", "/absences", "/payroll",
+    '/dashboard',
+    '/objects',
+    '/works',
+    '/brigades/*',
+    '/attendance',
+    '/inventory/*',
+    '/reports',
   ],
-  brigadir: [
-    "/dashboard", "/works", "/individual-tasks", "/timesheets", "/brigades", "/attendance", "/inventory/materials", "/reports", "/payroll", "/profile",
-    "/material-requests", "/material-consumption-reports", "/payroll-entries", "/work-orders",
-  ],
-  worker: ["/worker/*"],
-  storekeeper: ["/dashboard", "/inventory/*", "/reports"],
+  brigadir: ['/dashboard', '/works', '/brigades', '/attendance'],
+  storekeeper: ['/dashboard', '/inventory/*', '/reports'],
+  worker: ['/dashboard', '/tasks', '/attendance', '/inventory/materials', '/photo-reports', '/profile'],
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  owner: "Владелец",
-  administrator: "Администратор",
-  accountant: "Бухгалтер",
-  prorab: "Прораб",
-  brigadir: "Бригадир",
-  worker: "Работник",
-  storekeeper: "Снабженец",
+  owner: 'Владелец',
+  administrator: 'Администратор',
+  accountant: 'Бухгалтер',
+  prorab: 'Прораб',
+  brigadir: 'Бригадир',
+  storekeeper: 'Снабженец',
+  worker: 'Рабочий',
 };
 
 export function isRouteAllowed(role: UserRole, pathname: string): boolean {
   const rule = ROLE_ALLOWED_PREFIXES[role];
   if (rule === FULL_ACCESS) return true;
   return rule.some((entry) => {
-    if (entry.endsWith("/*")) {
+    if (entry.endsWith('/*')) {
       const base = entry.slice(0, -2);
       return pathname === base || pathname.startsWith(`${base}/`);
     }

@@ -1,9 +1,7 @@
-import { Mail, Phone, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Phone, ShieldCheck } from "lucide-react";
 import { Modal } from "../ui/Modal";
 import { Avatar } from "../ui/Avatar";
-import { useRepositorySnapshot } from "../../hooks/useRepositoryState";
-import { usersRepository } from "../../data/repositories";
-import { useLanguage } from "../../context/LanguageContext";
+import { ROLE_LABEL } from "../../lib/auth/roleAccess";
 import type { SessionUser } from "../../types";
 
 interface ProfileModalProps {
@@ -12,14 +10,19 @@ interface ProfileModalProps {
   user: SessionUser;
 }
 
+/**
+ * `user` is the real authenticated session (AuthContext, backed by
+ * /auth/login + /auth/me — see api/authApi.ts's CurrentUser). It carries
+ * exactly what the backend confirms for an account: id, login (the phone
+ * number used to sign in), fullName, role — no email or registration date
+ * field exists on CurrentUserDto, so those rows are omitted rather than
+ * invented. Previously this looked the user up by id in the mock
+ * `usersRepository`, which never matched a real backend-issued id (2026-07-31
+ * remediation).
+ */
 export function ProfileModal({ open, onClose, user }: ProfileModalProps) {
-  const { strings } = useLanguage();
-  const c = strings.common;
-  const accounts = useRepositorySnapshot(usersRepository);
-  const account = accounts.find((a) => a.id === user.id);
-
   return (
-    <Modal open={open} onClose={onClose} title={c.profileTitle} size="sm">
+    <Modal open={open} onClose={onClose} title="Профиль" size="sm">
       <div className="flex items-center gap-3">
         <Avatar name={user.fullName} size="md" />
         <div>
@@ -28,10 +31,8 @@ export function ProfileModal({ open, onClose, user }: ProfileModalProps) {
         </div>
       </div>
       <div className="mt-5 space-y-3 border-t border-border pt-4">
-        <Row icon={ShieldCheck} label={c.profileRole} value={c.roleLabels[user.role]} />
-        {account?.phone && <Row icon={Phone} label={c.profilePhone} value={account.phone} />}
-        {account?.email && <Row icon={Mail} label={c.profileEmail} value={account.email} />}
-        {account?.registeredAt && <Row icon={UserIcon} label={c.profileRegisteredAt} value={account.registeredAt} />}
+        <Row icon={ShieldCheck} label="Роль" value={ROLE_LABEL[user.role]} />
+        <Row icon={Phone} label="Телефон" value={user.login} />
       </div>
     </Modal>
   );

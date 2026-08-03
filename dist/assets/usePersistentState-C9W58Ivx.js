@@ -1,0 +1,1 @@
+import{E as e,k as t}from"./index-hjT6rogh.js";import{n,t as r}from"./localStorageEngine-uQRvK9bN.js";var i=t(e(),1);function a(e,t){let[a,o]=(0,i.useState)(()=>{let n=r(e);return n===void 0?t:n});return(0,i.useEffect)(()=>{n(e,a)},[e,a]),[a,o]}export{a as t};

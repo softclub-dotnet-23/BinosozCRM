@@ -42,42 +42,6 @@ export interface UpcomingTask {
   objectId: string;
 }
 
-export type AlertSeverity = "red" | "orange" | "blue";
-export type AlertIcon = "clock" | "bolt" | "box" | "users";
-
-export interface AttentionItem {
-  id: string;
-  title: string;
-  objectName: string;
-  responsible: string;
-  alertLabel: string;
-  severity: AlertSeverity;
-  icon: AlertIcon;
-}
-
-export interface ObjectSummaryRow {
-  id: string;
-  name: string;
-  foreman: string;
-  progress: number;
-  budget: number;
-  status: ObjectStatus;
-}
-
-export interface BudgetPoint {
-  date: string;
-  planned: number;
-  spent: number;
-}
-
-export interface ObjectProgressPoint {
-  objectName: string;
-  planned: number;
-  actual: number;
-}
-
-export type PeriodFilter = "week" | "month" | "quarter" | "year";
-
 export interface PayrollSummary {
   period: string;
   employeeCount: number;
@@ -223,27 +187,6 @@ export interface Employee {
   shift: WorkShift;
   status: EmployeeStatus;
   assignedDate: string;
-  /** Personnel-record fields — optional because only a handful of featured employees (so far
-   * just employee-1, the worker demo account) have them seeded; the other ~130 generated staff
-   * rows don't need them for anything currently in the app. */
-  birthDate?: string;
-  address?: string;
-  passportNumber?: string;
-  hiredAt?: string;
-  currentSection?: string;
-  emergencyContact?: string;
-  skills?: string[];
-  avatarUrl?: string | null;
-}
-
-export interface CompositionChange {
-  id: string;
-  date: string;
-  employeeId: string;
-  employeeName: string;
-  fromBrigadeName: string;
-  toBrigadeName: string;
-  changeType: "transfer" | "assignment" | "replacement";
 }
 
 export type AssignmentStatus = "active" | "completed" | "cancelled" | "overdue";
@@ -309,11 +252,6 @@ export interface Work {
   progressHistory: WorkProgressHistoryEntry[];
 }
 
-export interface CriticalWork {
-  work: Work;
-  overdueDays: number;
-}
-
 export interface WorkAnalytics {
   total: number;
   completed: number;
@@ -341,10 +279,6 @@ export type StaffStatus = "active" | "vacation" | "dismissed";
 
 export interface StaffMember {
   id: string;
-  /** The real Employee (data/mockEmployees.ts) this payroll/HR profile belongs to — the stable
-   * identity used to match attendance and cross-module data. Every StaffMember maps to exactly
-   * one real Employee; there is no independent fictional payroll roster. */
-  employeeId: string;
   fullName: string;
   position: string;
   category: StaffCategory;
@@ -375,7 +309,6 @@ export type AttendanceStatus = "present" | "late" | "absent";
 export interface AttendanceRecord {
   id: string;
   date: string;
-  employeeId: string;
   employeeName: string;
   position: string;
   brigadeName: string | null;
@@ -531,30 +464,6 @@ export interface TransferFilters {
   dateTo: string;
 }
 
-export type MaterialRequestStatus = "new" | "approved" | "in_transit" | "issued" | "rejected";
-
-export interface MaterialRequest {
-  id: string;
-  number: number;
-  documentNumber: string;
-  date: string;
-  materialName: string;
-  quantity: number;
-  unit: string;
-  objectName: string;
-  brigadeName: string;
-  requestedBy: string;
-  status: MaterialRequestStatus;
-  note: string;
-  createdDate: string;
-  createdBy: string;
-}
-
-export interface MaterialRequestFilters {
-  search: string;
-  status: MaterialRequestStatus | "all";
-}
-
 export interface MaterialStockRow {
   id: string;
   materialName: string;
@@ -643,10 +552,6 @@ export interface PayrollRecord {
   id: string;
   number: number;
   staffId: string;
-  /** Stable Employee identity (data/mockEmployees.ts) — the primary relationship used for
-   * attendance matching and cross-module checks. staffId/employeeName remain for the HR
-   * profile and display, but must never be used to match records across modules. */
-  employeeId: string;
   employeeName: string;
   position: string;
   category: StaffCategory;
@@ -683,11 +588,6 @@ export interface PayrollRecord {
   returnReason: string | null;
   paidAt: string | null;
   note: string;
-  /** True when this record's attendance-based figures (workedDays/absenceDeduction) could not
-   * be computed because no attendance history exists for this employeeId within the period —
-   * e.g. an unassigned free-pool employee. Never silently treated as full attendance; the
-   * record is generated with status "needs_review" instead so it's explicitly flagged. */
-  attendanceDataMissing: boolean;
   createdAt: string;
   updatedAt: string;
   statusHistory: PayrollStatusHistoryEntry[];
@@ -705,7 +605,7 @@ export interface PayrollFilters {
 // Auth / accounts
 // ---------------------------------------------------------------------------
 
-export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "worker" | "accountant" | "storekeeper";
+export type UserRole = "owner" | "administrator" | "prorab" | "brigadir" | "accountant" | "storekeeper" | "worker";
 
 export type UserAccountStatus = "active" | "inactive" | "blocked";
 
@@ -718,11 +618,6 @@ export interface UserAccount {
   phone: string;
   email: string;
   registeredAt: string;
-  /** Real Employee (data/mockEmployees.ts) this account's field identity resolves through —
-   * the stable, ID-based link for Brigadir/Prorab-style accounts whose own brigade/crew scope
-   * depends on knowing who they are in the Employees/Brigades data. Null for accounts with no
-   * field-employee counterpart (e.g. Owner, Accountant, admin-only roles). */
-  employeeId: string | null;
 }
 
 /** Safe, non-sensitive subset of UserAccount persisted in the session (no status, no password). */
@@ -731,127 +626,6 @@ export interface SessionUser {
   login: string;
   fullName: string;
   role: UserRole;
-  employeeId: string | null;
-  /** True only when this session came from a real POST /auth/login round trip against the
-   * backend (real JWT tokens saved in tokenStorage). False for the local mock/demo login —
-   * backend-connected pages must gate protected requests on this, not on `role` alone, since
-   * mock roles like "administrator"/"worker"/"storekeeper" have no backend counterpart at all
-   * and a mock "owner"-adjacent role must never be treated as a real backend Owner. */
-  isBackendSession: boolean;
 }
 
 export type PayrollRole = "accountant" | "owner" | "prorab";
-
-// ---------------------------------------------------------------------------
-// Worker role — rank-and-file crew member (Employee.memberRole "worker"/"helper"),
-// distinct from Brigadir (crew lead). Adds a few small, purpose-built collections
-// that didn't exist anywhere else in the app: notifications, documents, problem
-// reports, messages to the Прораб, and photo reports.
-// ---------------------------------------------------------------------------
-
-export type WorkerNotificationType =
-  | "task_assigned"
-  | "materials_delivered"
-  | "task_completed"
-  | "task_review"
-  | "problem_update"
-  | "schedule_change"
-  | "photo_report_approved"
-  | "photo_report_rejected"
-  | "reminder"
-  | "system";
-
-export type WorkerNotificationPriority = "normal" | "important" | "system";
-
-export interface WorkerNotification {
-  id: string;
-  userId: string;
-  type: WorkerNotificationType;
-  title: string;
-  description: string;
-  date: string;
-  read: boolean;
-  priority: WorkerNotificationPriority;
-  relatedWorkId: string | null;
-  relatedPhotoReportId: string | null;
-  relatedMaterialRequestId: string | null;
-}
-
-export type WorkerDocumentType = "pdf" | "spreadsheet" | "drawing" | "image";
-
-export interface WorkerDocument {
-  id: string;
-  objectId: string;
-  title: string;
-  fileName: string;
-  fileType: WorkerDocumentType;
-  sizeLabel: string;
-  uploadedDate: string;
-}
-
-export type EmployeeDocumentType = "identity" | "safetyInstruction" | "contract";
-
-/** Personnel/HR documents tied to one employee (ID card, safety-training certificate, contract) —
- * a distinct real concept from WorkerDocument above, which is project/object-scoped paperwork. */
-export interface EmployeeDocument {
-  id: string;
-  employeeId: string;
-  type: EmployeeDocumentType;
-  title: string;
-  fileName: string;
-  uploadedDate: string;
-  validUntil: string | null;
-}
-
-export type ProblemReportPriority = "low" | "medium" | "high";
-export type ProblemReportStatus = "new" | "in_review" | "resolved";
-
-export interface ProblemReport {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  category: string;
-  relatedWorkId: string | null;
-  relatedWorkTitle: string | null;
-  description: string;
-  priority: ProblemReportPriority;
-  status: ProblemReportStatus;
-  createdDate: string;
-}
-
-export interface WorkerMessage {
-  id: string;
-  fromEmployeeId: string;
-  fromEmployeeName: string;
-  toRole: "prorab";
-  text: string;
-  createdDate: string;
-}
-
-export type PhotoReportStatus = "pending" | "approved" | "rejected";
-
-export interface PhotoReport {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  workId: string;
-  workTitle: string;
-  objectName: string;
-  sectionName: string;
-  images: string[];
-  comment: string;
-  status: PhotoReportStatus;
-  reviewerComment: string | null;
-  createdDate: string;
-}
-
-/** A prorab's note on a specific PhotoReport — the review-side counterpart to the worker→prorab
- * WorkerMessage channel above, which only flows the other direction. */
-export interface PhotoReportComment {
-  id: string;
-  photoReportId: string;
-  authorName: string;
-  authorRole: "prorab";
-  text: string;
-  createdDate: string;
-}

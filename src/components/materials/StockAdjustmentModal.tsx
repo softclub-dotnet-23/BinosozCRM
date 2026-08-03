@@ -140,7 +140,7 @@ export function StockAdjustmentModal({ open, row, onClose, onSave }: StockAdjust
         </>
       }
     >
-      <div className="rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
+      <div className="rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-ink-secondary">Текущий системный остаток</span>
           <span className="font-bold text-ink tabular">

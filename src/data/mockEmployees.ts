@@ -213,21 +213,6 @@ const FREE_POOL_RAW: RawEmployee[] = Array.from({ length: 8 }, (_, i) => {
 
 const ALL_RAW: RawEmployee[] = [...FEATURED_RAW, ...GENERATED_RAW, ...FREE_POOL_RAW];
 
-// Personnel-record fields (birth date, address, passport, hire date, current section, emergency
-// contact, skills) only matter for the worker demo account's own Profile page — index 0 is
-// employee-1 (Рустам Саидов). No other employee record needs these yet.
-const PERSONNEL_OVERRIDES: Record<number, Partial<Employee>> = {
-  0: {
-    birthDate: "1991-07-22",
-    address: "г. Душанбе, ул. Рудаки, 118",
-    passportNumber: "AD 7734190",
-    hiredAt: "2019-04-03",
-    currentSection: "Секция А · 3-й этаж",
-    emergencyContact: "Отец: +992 91 234 56 78",
-    skills: ["Заливка бетона", "Опалубка", "Армирование", "Техника безопасности", "Фотоотчёт", "Материалы"],
-  },
-};
-
 export const mockEmployees: Employee[] = ALL_RAW.map((raw, index) => {
   const brigade = raw.brigadeId ? findBrigade(raw.brigadeId) : null;
   return {
@@ -246,6 +231,5 @@ export const mockEmployees: Employee[] = ALL_RAW.map((raw, index) => {
     shift: raw.shift,
     status: raw.status,
     assignedDate: raw.assignedDate,
-    ...PERSONNEL_OVERRIDES[index],
   };
 });

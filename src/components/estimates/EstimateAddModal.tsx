@@ -4,7 +4,6 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { ESTIMATE_OBJECT_META } from "../../data/mockEstimates";
-import { useLanguage } from "../../context/LanguageContext";
 import type { Estimate, EstimateStatus } from "../../types";
 
 interface FormState {
@@ -25,6 +24,12 @@ const EMPTY_FORM: FormState = {
   responsible: "",
 };
 
+const STATUS_OPTIONS: { value: EstimateStatus; label: string }[] = [
+  { value: "draft", label: "Черновик" },
+  { value: "pending_review", label: "На рассмотрении" },
+  { value: "approved", label: "Утверждена" },
+];
+
 const inputClass =
   "mt-1.5 w-full rounded-[10px] border border-border-strong px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15";
 const errorInputClass = "border-red focus:border-red focus:ring-red/15";
@@ -37,17 +42,8 @@ interface EstimateAddModalProps {
 }
 
 export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: EstimateAddModalProps) {
-  const { strings } = useLanguage();
-  const s = strings.estimates;
-  const c = strings.common;
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-
-  const STATUS_OPTIONS: { value: EstimateStatus; label: string }[] = [
-    { value: "draft", label: s.statusDraft },
-    { value: "pending_review", label: s.statusPendingReview },
-    { value: "approved", label: s.statusApproved },
-  ];
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -56,9 +52,9 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.amount || Number(form.amount) <= 0) nextErrors.amount = s.errorAmountPositive;
-    if (!form.date) nextErrors.date = s.errorDateRequired;
-    if (!form.responsible.trim()) nextErrors.responsible = s.errorResponsibleRequired;
+    if (!form.amount || Number(form.amount) <= 0) nextErrors.amount = "Укажите сумму больше нуля";
+    if (!form.date) nextErrors.date = "Укажите дату сметы";
+    if (!form.responsible.trim()) nextErrors.responsible = "Укажите ответственного";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -91,19 +87,19 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
     <Modal
       open={open}
       onClose={onClose}
-      title={s.addModalTitle}
-      description={s.addModalDescription(nextNumber)}
+      title="Новая смета"
+      description={`Номер сметы будет присвоен автоматически: ${nextNumber}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            {c.cancelLabel}
+            Отмена
           </Button>
-          <Button onClick={handleSubmit}>{s.newEstimateButton}</Button>
+          <Button onClick={handleSubmit}>Создать смету</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label={c.colObject}>
+        <Field label="Объект">
           <CustomSelect
             searchable
             className="mt-1.5"
@@ -113,7 +109,7 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
           />
         </Field>
 
-        <Field label={s.fieldVersion}>
+        <Field label="Версия">
           <input
             type="text"
             value={form.version}
@@ -123,7 +119,7 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
           />
         </Field>
 
-        <Field label={s.fieldAmount} error={errors.amount}>
+        <Field label="Сумма, сомони" error={errors.amount}>
           <input
             type="number"
             min={0}
@@ -134,7 +130,7 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
           />
         </Field>
 
-        <Field label={s.fieldDate} error={errors.date}>
+        <Field label="Дата" error={errors.date}>
           <input
             type="date"
             value={form.date}
@@ -143,7 +139,7 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
           />
         </Field>
 
-        <Field label={c.colStatus}>
+        <Field label="Статус">
           <CustomSelect
             className="mt-1.5"
             value={form.status}
@@ -152,12 +148,12 @@ export function EstimateAddModal({ open, onClose, onCreate, nextNumber }: Estima
           />
         </Field>
 
-        <Field label={s.colResponsible} error={errors.responsible}>
+        <Field label="Ответственный" error={errors.responsible}>
           <input
             type="text"
             value={form.responsible}
             onChange={(e) => update("responsible", e.target.value)}
-            placeholder={s.fieldResponsiblePlaceholder}
+            placeholder="ФИО прораба"
             className={cn(inputClass, errors.responsible && errorInputClass)}
           />
         </Field>

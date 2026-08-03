@@ -1,307 +1,190 @@
-import { useMemo, useState } from "react";
-import { Gauge, Plus, UserRoundCheck, UserRoundIcon, UsersRound } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { AlertCircle, Loader2, Plus, UsersRound } from "lucide-react";
 import { AppLayout } from "../components/layout/AppLayout";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/StatusBadge";
+import { CustomSelect } from "../components/ui/CustomSelect";
 import { EmptyState } from "../components/ui/EmptyState";
-import { Pagination } from "../components/ui/Pagination";
-import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { BrigadeCompositionTable } from "../components/brigades/BrigadeCompositionTable";
-import {
-  CompositionFilters,
-  DEFAULT_COMPOSITION_FILTERS,
-  type CompositionFiltersState,
-} from "../components/brigades/CompositionFilters";
-import { SpecializationDonut, SpecializationLegend } from "../components/brigades/SpecializationDonut";
-import { UpcomingCompositionChanges } from "../components/brigades/UpcomingCompositionChanges";
-import { BrigadeCompletenessChart } from "../components/brigades/BrigadeCompletenessChart";
-import { AddEmployeeModal } from "../components/brigades/AddEmployeeModal";
-import { TransferEmployeeModal } from "../components/brigades/TransferEmployeeModal";
-import { EmployeeDetailsDrawer } from "../components/brigades/EmployeeDetailsDrawer";
-import type { EmployeeActionKind } from "../components/brigades/EmployeeActionMenu";
-import { mockCompositionChanges } from "../data/mockCompositionChanges";
-import { brigadesRepository, employeesRepository } from "../data/repositories";
-import { useRepositoryState, useRepositorySnapshot } from "../hooks/useRepositoryState";
-import { usePersistentState } from "../hooks/usePersistentState";
-import { computeSpecializationDistribution } from "../utils/brigadeAnalytics";
-import { computeCompositionKpis } from "../utils/compositionAnalytics";
-import { completenessPercent } from "../utils/brigadeAnalytics";
+import { Modal } from "../components/ui/Modal";
 import { useToast } from "../hooks/useToast";
-import { useLanguage } from "../context/LanguageContext";
-import type { BrigadeMemberRole, Employee, EmployeeStatus, WorkShift } from "../types";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { listBrigades, type Brigade } from "../api/brigadesApi";
+import { createWorker, listAllWorkers, type PayRateType, type Worker } from "../api/workersApi";
 
+function describeError(error: unknown, fallback: string): string {
+  if (error instanceof NetworkError) return "Не удалось подключиться к серверу";
+  if (error instanceof ApiError) return error.message || fallback;
+  return fallback;
+}
+
+const ADD_FORM_INITIAL = { fullName: "", phone: "", birthDate: "", payRateType: "Hourly" as PayRateType, payRate: "", hireDate: "", specialty: "" };
+
+/**
+ * "Transfer between brigades" has no backend counterpart — Domain.Worker has
+ * no method to change BrigadeId (only Create/Terminate/ChangePayRate), so
+ * that action is left out here rather than faked.
+ */
 export default function BrigadeCompositionPage() {
   const { showToast } = useToast();
-  const { strings } = useLanguage();
-  const s = strings.brigades;
-  const c = strings.common;
 
-  const [employees, setEmployees] = useRepositoryState(employeesRepository);
-  const brigades = useRepositorySnapshot(brigadesRepository);
-  const [loading] = useState(false);
-  const [search, setSearch] = usePersistentState("filters.brigadeComposition.search", "");
-  const [filters, setFilters] = usePersistentState<CompositionFiltersState>(
-    "filters.brigadeComposition.filters",
-    DEFAULT_COMPOSITION_FILTERS,
-  );
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [brigades, setBrigades] = useState<Brigade[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = useState("");
 
-  const [addOpen, setAddOpen] = useState(false);
-  const [transferTarget, setTransferTarget] = useState<Employee | null>(null);
-  const [drawerTarget, setDrawerTarget] = useState<Employee | null>(null);
-  const [removeTarget, setRemoveTarget] = useState<Employee | null>(null);
+  const [addTarget, setAddTarget] = useState<Brigade | null>(null);
+  const [addForm, setAddForm] = useState(ADD_FORM_INITIAL);
+  const [addError, setAddError] = useState("");
+  const [adding, setAdding] = useState(false);
 
-  const averageCompleteness = useMemo(() => {
-    if (brigades.length === 0) return 0;
-    return Math.round(brigades.reduce((sum, b) => sum + completenessPercent(b), 0) / brigades.length);
-  }, [brigades]);
-
-  const kpis = useMemo(() => computeCompositionKpis(employees, averageCompleteness), [employees, averageCompleteness]);
-  const specialization = useMemo(() => computeSpecializationDistribution(employees), [employees]);
-  const specialties = useMemo(() => Array.from(new Set(employees.map((e) => e.specialty))).sort(), [employees]);
-
-  const filteredEmployees = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return employees.filter((e) => {
-      if (query) {
-        const haystack = `${e.fullName} ${e.brigadeName ?? ""} ${e.specialty} ${e.objectName ?? ""} ${e.phone}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (filters.brigadeId !== "all" && e.brigadeId !== filters.brigadeId) return false;
-      if (filters.specialty !== "all" && e.specialty !== filters.specialty) return false;
-      if (filters.objectId !== "all" && e.objectId !== filters.objectId) return false;
-      if (filters.status !== "all" && e.status !== filters.status) return false;
-      return true;
-    });
-  }, [employees, search, filters]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageRows = filteredEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
+  async function loadAll() {
+    setLoadState("loading");
+    try {
+      const brigadesResult = await listBrigades(1, 100);
+      setBrigades(brigadesResult.items);
+      const allWorkers = await listAllWorkers(brigadesResult.items.map((b) => b.id));
+      setWorkers(allWorkers);
+      setLoadState("ready");
+    } catch (error) {
+      setLoadError(describeError(error, "Не удалось загрузить состав бригад"));
+      setLoadState("error");
+    }
   }
 
-  function updateFilters(next: CompositionFiltersState) {
-    setFilters(next);
-    setPage(1);
+  useEffect(() => {
+    void loadAll();
+  }, []);
+
+  const workersByBrigade = useMemo(() => {
+    const map = new Map<string, Worker[]>();
+    for (const worker of workers) {
+      if (!worker.isActive) continue;
+      const list = map.get(worker.brigadeId) ?? [];
+      list.push(worker);
+      map.set(worker.brigadeId, list);
+    }
+    return map;
+  }, [workers]);
+
+  const kpis = useMemo(() => ({
+    brigades: brigades.length,
+    workers: workers.filter((w) => w.isActive).length,
+    unstaffed: brigades.filter((b) => (workersByBrigade.get(b.id)?.length ?? 0) === 0).length,
+  }), [brigades, workers, workersByBrigade]);
+
+  function openAdd(brigade: Brigade) {
+    setAddTarget(brigade);
+    setAddForm(ADD_FORM_INITIAL);
+    setAddError("");
   }
 
-  function handleResetFilters() {
-    setFilters(DEFAULT_COMPOSITION_FILTERS);
-    setSearch("");
-    setPage(1);
-  }
-
-  function handleAddEmployee(employee: Employee) {
-    setEmployees((prev) => [employee, ...prev]);
-    setAddOpen(false);
-    showToast(s.toastEmployeeAdded);
-  }
-
-  function handleChangeShift(id: string, shift: WorkShift) {
-    setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, shift } : e)));
-    setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, shift } : prev));
-    showToast(s.toastShiftUpdated);
-  }
-
-  function handleChangeStatus(id: string, status: EmployeeStatus) {
-    setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
-    setDrawerTarget((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
-    showToast(s.toastStatusUpdated);
-  }
-
-  function handleTransferConfirmed(employeeId: string, toBrigadeId: string, newRole: BrigadeMemberRole) {
-    const brigade = brigades.find((b) => b.id === toBrigadeId);
-    if (!brigade) return;
-    setEmployees((prev) =>
-      prev.map((e) =>
-        e.id === employeeId
-          ? { ...e, brigadeId: brigade.id, brigadeName: brigade.name, objectId: brigade.objectId, objectName: brigade.objectName, memberRole: newRole }
-          : e,
-      ),
-    );
-    setTransferTarget(null);
-    showToast(s.toastEmployeeTransferred);
-  }
-
-  function handleRemoveConfirmed() {
-    if (!removeTarget) return;
-    setEmployees((prev) =>
-      prev.map((e) => (e.id === removeTarget.id ? { ...e, brigadeId: null, brigadeName: null, objectId: null, objectName: null, status: "available" } : e)),
-    );
-    if (drawerTarget?.id === removeTarget.id) setDrawerTarget(null);
-    showToast(s.toastEmployeeRemoved, "info");
-    setRemoveTarget(null);
-  }
-
-  function handleAction(action: EmployeeActionKind, employee: Employee) {
-    switch (action) {
-      case "open":
-      case "changeRole":
-        setDrawerTarget(employee);
-        break;
-      case "edit":
-        showToast(c.editUnavailableInDemo, "info");
-        break;
-      case "transfer":
-        setTransferTarget(employee);
-        break;
-      case "changeShift":
-        handleChangeShift(employee.id, employee.shift === "day" ? "evening" : "day");
-        break;
-      case "changeStatus":
-        setDrawerTarget(employee);
-        break;
-      case "remove":
-        setRemoveTarget(employee);
-        break;
+  async function submitAdd(event: FormEvent) {
+    event.preventDefault();
+    if (!addTarget || adding) return;
+    const { fullName, phone, birthDate, hireDate, payRate } = addForm;
+    if (!fullName.trim() || !phone.trim() || !birthDate || !hireDate) {
+      setAddError("Заполните ФИО, телефон, дату рождения и дату найма");
+      return;
+    }
+    setAdding(true);
+    setAddError("");
+    try {
+      const created = await createWorker(addTarget.id, {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        birthDate,
+        payRateType: addForm.payRateType,
+        payRate: Number(payRate) || 0,
+        hireDate,
+        specialty: addForm.specialty.trim() || undefined,
+      });
+      setWorkers((current) => [created, ...current]);
+      setAddTarget(null);
+      showToast("Сотрудник добавлен в бригаду");
+    } catch (error) {
+      setAddError(describeError(error, "Не удалось добавить сотрудника"));
+    } finally {
+      setAdding(false);
     }
   }
 
   return (
-    <AppLayout
-      title={s.compositionPageTitle}
-      subtitle={s.compositionPageSubtitle}
-      search={{ value: search, onChange: handleSearchChange, placeholder: s.compositionSearchPlaceholder }}
-    >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label={s.kpiTotalInBrigades}
-          value={String(kpis.totalEmployees)}
-          icon={UsersRound}
-          tone="blue"
-          footer={s.kpiWorkersFooter(employees.filter((e) => e.brigadeId !== null && e.memberRole !== "helper").length)}
-        />
-        <MetricCard
-          label={s.kpiActiveOnShift}
-          value={String(kpis.activeOnShift)}
-          icon={UserRoundCheck}
-          tone="green"
-          footer={s.kpiActiveOnShiftFooter(kpis.activeOnShiftPercent)}
-        />
-        <MetricCard
-          label={s.kpiFreeSpecialists}
-          value={String(kpis.freeSpecialists)}
-          icon={UserRoundIcon}
-          tone="orange"
-          footer={s.kpiReadyToAssign}
-        />
-        <MetricCard
-          label={s.kpiAverageCompleteness}
-          value={`${kpis.averageCompleteness}%`}
-          icon={Gauge}
-          tone="purple"
-          footer={s.kpiAllBrigadesFooter}
-        />
+    <AppLayout title="Состав бригад" subtitle="Работники в разрезе бригад">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Бригад" value={String(kpis.brigades)} icon={UsersRound} tone="orange" footer="Всего в компании" />
+        <MetricCard label="Работников" value={String(kpis.workers)} icon={UsersRound} tone="green" footer="Активных во всех бригадах" />
+        <MetricCard label="Без состава" value={String(kpis.unstaffed)} icon={AlertCircle} tone="red" footer="Бригады без работников" />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_260px]">
-        <Card className="min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 sm:px-6">
-            <h2 className="text-lg font-bold text-ink">{s.compositionPageTitle}</h2>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-5 sm:px-6">
-            <CompositionFilters filters={filters} onChange={updateFilters} onReset={handleResetFilters} specialties={specialties} />
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus size={15} /> {s.addEmployeeButton}
-            </Button>
-          </div>
-
-          <div className="mt-4">
-            {pageRows.length > 0 || loading ? (
-              <BrigadeCompositionTable
-                employees={pageRows}
-                loading={loading}
-                onRowClick={(e) => setDrawerTarget(e)}
-                onAction={handleAction}
-              />
-            ) : (
-              <EmptyState
-                icon={UsersRound}
-                title={s.compositionEmptyTitle}
-                description={c.emptyStateHint}
-                action={
-                  <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                    {c.resetFiltersButton}
-                  </Button>
-                }
-              />
-            )}
-          </div>
-
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            total={filteredEmployees.length}
-            itemLabel={s.compositionPaginationItemLabel}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
-          />
+      {loadState === "error" && (
+        <Card style={{ marginTop: 16, padding: 24 }}>
+          <div className="flex items-center gap-2 text-red"><AlertCircle size={18} /><span>{loadError}</span></div>
+          <Button size="sm" variant="secondary" onClick={() => void loadAll()} style={{ marginTop: 12 }}>Повторить</Button>
         </Card>
+      )}
 
-        <div className="flex flex-col gap-4">
-          <Card className="p-5 sm:p-6">
-            <h2 className="text-lg font-bold text-ink">{s.distributionByRoleTitle}</h2>
-            <div className="mt-4 flex flex-col items-center gap-5">
-              <SpecializationDonut slices={specialization} total={kpis.totalEmployees} />
-              <SpecializationLegend slices={specialization} />
-            </div>
-          </Card>
+      {loadState === "loading" && (
+        <Card style={{ marginTop: 16, padding: 40, textAlign: "center" }}><Loader2 size={22} className="animate-spin" style={{ margin: "0 auto" }} /></Card>
+      )}
 
-          <UpcomingCompositionChanges
-            changes={mockCompositionChanges}
-            onSeeAll={() => showToast(s.toastFullChangesListUnavailable, "info")}
-          />
-        </div>
-      </div>
+      {loadState === "ready" && (
+        brigades.length === 0 ? (
+          <Card className="mt-4"><EmptyState icon={UsersRound} title="Бригады не найдены" description="Сначала создайте бригаду на странице «Бригады»" /></Card>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {brigades.map((brigade) => {
+              const members = workersByBrigade.get(brigade.id) ?? [];
+              return (
+                <Card key={brigade.id} className="p-5 sm:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-ink">{brigade.name}</h3>
+                      <span className="text-xs text-ink-muted">{members.length} {members.length === 1 ? "работник" : "работников"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={brigade.isActive ? "green" : "red"}>{brigade.isActive ? "Активна" : "Неактивна"}</Badge>
+                      <Button size="sm" variant="secondary" onClick={() => openAdd(brigade)}><Plus size={13} /> Добавить</Button>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    {members.length > 0 ? (
+                      <ul className="flex flex-col gap-2">
+                        {members.map((worker) => (
+                          <li key={worker.id} className="flex items-center justify-between rounded-lg bg-[#F5F5F4] px-3 py-2 text-sm">
+                            <span className="font-medium text-ink">{worker.fullName}</span>
+                            <span className="text-ink-muted">{worker.specialty ?? "—"}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-ink-muted">Нет работников в этой бригаде</p>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      )}
 
-      <div className="mt-4">
-        <BrigadeCompletenessChart brigades={brigades} />
-      </div>
-
-      <AddEmployeeModal open={addOpen} onClose={() => setAddOpen(false)} onSave={handleAddEmployee} />
-
-      <TransferEmployeeModal
-        open={Boolean(transferTarget)}
-        onClose={() => setTransferTarget(null)}
-        employee={transferTarget}
-        allEmployees={employees}
-        onConfirm={handleTransferConfirmed}
-      />
-
-      <EmployeeDetailsDrawer
-        open={Boolean(drawerTarget)}
-        onClose={() => setDrawerTarget(null)}
-        employee={drawerTarget}
-        onEdit={() => showToast(c.editUnavailableInDemo, "info")}
-        onTransfer={(e) => {
-          setDrawerTarget(null);
-          setTransferTarget(e);
-        }}
-        onChangeShift={handleChangeShift}
-        onChangeStatus={handleChangeStatus}
-        onRemove={(e) => setRemoveTarget(e)}
-      />
-
-      <ConfirmDialog
-        open={Boolean(removeTarget)}
-        onClose={() => setRemoveTarget(null)}
-        title={s.removeConfirmTitle}
-        description={removeTarget ? s.removeConfirmDescription(removeTarget.fullName, removeTarget.brigadeName ?? "") : undefined}
-        confirmLabel={c.delete}
-        danger
-        onConfirm={handleRemoveConfirmed}
-      />
+      <Modal open={addTarget !== null} onClose={() => setAddTarget(null)} title="Добавить в бригаду" description={addTarget?.name} size="md">
+        <form className="users-modal-form" onSubmit={submitAdd}>
+          <label><span>ФИО</span><input value={addForm.fullName} onChange={(e) => setAddForm((f) => ({ ...f, fullName: e.target.value }))} autoFocus /></label>
+          <label><span>Телефон</span><input value={addForm.phone} onChange={(e) => setAddForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+992 00 000 00 00" /></label>
+          <label><span>Дата рождения</span><input type="date" value={addForm.birthDate} onChange={(e) => setAddForm((f) => ({ ...f, birthDate: e.target.value }))} /></label>
+          <label><span>Дата найма</span><input type="date" value={addForm.hireDate} onChange={(e) => setAddForm((f) => ({ ...f, hireDate: e.target.value }))} /></label>
+          <label><span>Тип оплаты</span><CustomSelect fullWidth value={addForm.payRateType} onValueChange={(v) => setAddForm((f) => ({ ...f, payRateType: v as PayRateType }))} options={[{ value: "Hourly", label: "Почасовая" }, { value: "Piecework", label: "Сдельная" }]} /></label>
+          <label><span>Ставка</span><input type="number" min="0" step="0.01" value={addForm.payRate} onChange={(e) => setAddForm((f) => ({ ...f, payRate: e.target.value }))} /></label>
+          <label><span>Специальность</span><input value={addForm.specialty} onChange={(e) => setAddForm((f) => ({ ...f, specialty: e.target.value }))} /></label>
+          {addError && <p className="users-modal-error" role="alert">{addError}</p>}
+          <div className="users-modal-actions">
+            <Button type="button" variant="secondary" onClick={() => setAddTarget(null)}>Отмена</Button>
+            <Button type="submit" disabled={adding}>{adding ? "Добавление..." : "Добавить"}</Button>
+          </div>
+        </form>
+      </Modal>
     </AppLayout>
   );
 }

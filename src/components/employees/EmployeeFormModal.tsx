@@ -4,8 +4,6 @@ import { Button } from "../ui/Button";
 import { CustomSelect } from "../ui/CustomSelect";
 import { cn } from "../../utils/cn";
 import { BRIGADE_OPTIONS, DEPARTMENT_OPTIONS } from "../../data/mockStaff";
-import { useLanguage } from "../../context/LanguageContext";
-import type { AppStrings } from "../../lib/i18n/appStrings";
 import type { StaffCategory, StaffMember, StaffStatus } from "../../types";
 
 type UnitType = "brigade" | "department";
@@ -28,21 +26,17 @@ interface FormState {
   inn: string;
 }
 
-function buildCategoryOptions(e: AppStrings["employees"]): { value: StaffCategory; label: string }[] {
-  return [
-    { value: "worker", label: e.categoryWorker },
-    { value: "engineer", label: e.categoryEngineer },
-    { value: "admin", label: e.categoryAdminOpt },
-  ];
-}
+const CATEGORY_OPTIONS: { value: StaffCategory; label: string }[] = [
+  { value: "worker", label: "Рабочий" },
+  { value: "engineer", label: "Инженер / ИТР" },
+  { value: "admin", label: "Администрация" },
+];
 
-function buildStatusOptions(e: AppStrings["employees"]): { value: StaffStatus; label: string }[] {
-  return [
-    { value: "active", label: e.statusActive },
-    { value: "vacation", label: e.statusVacation },
-    { value: "dismissed", label: e.statusDismissed },
-  ];
-}
+const STATUS_OPTIONS: { value: StaffStatus; label: string }[] = [
+  { value: "active", label: "Активен" },
+  { value: "vacation", label: "Отпуск" },
+  { value: "dismissed", label: "Уволен" },
+];
 
 function emptyForm(): FormState {
   return {
@@ -96,11 +90,6 @@ interface EmployeeFormModalProps {
 }
 
 export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeFormModalProps) {
-  const { strings } = useLanguage();
-  const e = strings.employees;
-  const c = strings.common;
-  const CATEGORY_OPTIONS = buildCategoryOptions(e);
-  const STATUS_OPTIONS = buildStatusOptions(e);
   const [form, setForm] = useState<FormState>(() => (employee ? toForm(employee) : emptyForm()));
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
@@ -118,13 +107,13 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
 
   function validate(): boolean {
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.fullName.trim()) nextErrors.fullName = e.errorFullNameRequired;
-    if (!form.position.trim()) nextErrors.position = e.errorPositionRequired;
-    if (!form.phone.trim()) nextErrors.phone = e.errorPhoneRequired;
-    if (!form.hireDate) nextErrors.hireDate = e.errorHireDateRequired;
-    if (!form.email.trim()) nextErrors.email = e.errorEmailRequired;
-    if (!form.birthDate) nextErrors.birthDate = e.errorBirthDateRequired;
-    if (!form.salary || Number(form.salary) <= 0) nextErrors.salary = e.errorSalaryPositive;
+    if (!form.fullName.trim()) nextErrors.fullName = "Укажите ФИО";
+    if (!form.position.trim()) nextErrors.position = "Укажите должность";
+    if (!form.phone.trim()) nextErrors.phone = "Укажите телефон";
+    if (!form.hireDate) nextErrors.hireDate = "Укажите дату принятия";
+    if (!form.email.trim()) nextErrors.email = "Укажите email";
+    if (!form.birthDate) nextErrors.birthDate = "Укажите дату рождения";
+    if (!form.salary || Number(form.salary) <= 0) nextErrors.salary = "Укажите оклад больше нуля";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -134,9 +123,6 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
     const brigade = BRIGADE_OPTIONS.find((b) => b.name === form.brigadeName);
     const saved: StaffMember = {
       id: employee?.id ?? `EMP-${String(9000 + Math.floor(Math.random() * 999)).padStart(4, "0")}`,
-      // This legacy free-text form has no real Employee picker, so a brand-new entry created
-      // here has nothing real to link — known gap, see EmployeeFormModal in the audit report.
-      employeeId: employee?.employeeId ?? "",
       fullName: form.fullName.trim(),
       position: form.position.trim(),
       category: form.category,
@@ -162,40 +148,40 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
     <Modal
       open={open}
       onClose={onClose}
-      title={employee ? e.formEditTitle : e.formAddTitle}
-      description={e.formDescription}
+      title={employee ? "Редактировать сотрудника" : "Добавить сотрудника"}
+      description="Заполните основные данные сотрудника"
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            {c.cancelLabel}
+            Отмена
           </Button>
-          <Button onClick={handleSubmit}>{employee ? strings.works.saveChanges : e.addEmployeeButton}</Button>
+          <Button onClick={handleSubmit}>{employee ? "Сохранить изменения" : "Добавить сотрудника"}</Button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label={e.fieldFullName} error={errors.fullName}>
+        <Field label="ФИО" error={errors.fullName}>
           <input
             type="text"
             value={form.fullName}
-            onChange={(ev) => update("fullName", ev.target.value)}
-            placeholder={e.fieldFullNamePlaceholder}
+            onChange={(e) => update("fullName", e.target.value)}
+            placeholder="Например, Мирзоев Шахром"
             className={cn(inputClass, errors.fullName && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.fieldPositionInput} error={errors.position}>
+        <Field label="Должность" error={errors.position}>
           <input
             type="text"
             value={form.position}
-            onChange={(ev) => update("position", ev.target.value)}
-            placeholder={e.fieldPositionPlaceholder}
+            onChange={(e) => update("position", e.target.value)}
+            placeholder="Например, Прораб"
             className={cn(inputClass, errors.position && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.fieldCategory}>
+        <Field label="Категория">
           <CustomSelect
             className="mt-1.5"
             value={form.category}
@@ -204,7 +190,7 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
           />
         </Field>
 
-        <Field label={c.colStatus}>
+        <Field label="Статус">
           <CustomSelect
             className="mt-1.5"
             value={form.status}
@@ -213,20 +199,20 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
           />
         </Field>
 
-        <Field label={e.unitTypeLabel}>
+        <Field label="Тип подразделения">
           <CustomSelect
             className="mt-1.5"
             value={form.unitType}
             onValueChange={(v) => update("unitType", v as UnitType)}
             options={[
-              { value: "brigade", label: e.unitTypeBrigade },
-              { value: "department", label: e.unitTypeDepartment },
+              { value: "brigade", label: "Бригада" },
+              { value: "department", label: "Отдел" },
             ]}
           />
         </Field>
 
         {form.unitType === "brigade" ? (
-          <Field label={c.colBrigade}>
+          <Field label="Бригада">
             <CustomSelect
               searchable
               className="mt-1.5"
@@ -236,7 +222,7 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
             />
           </Field>
         ) : (
-          <Field label={e.fieldDepartment}>
+          <Field label="Отдел">
             <CustomSelect
               searchable
               className="mt-1.5"
@@ -247,80 +233,80 @@ export function EmployeeFormModal({ open, employee, onClose, onSave }: EmployeeF
           </Field>
         )}
 
-        <Field label={c.colPhone} error={errors.phone}>
+        <Field label="Телефон" error={errors.phone}>
           <input
             type="text"
             value={form.phone}
-            onChange={(ev) => update("phone", ev.target.value)}
-            placeholder={e.fieldPhonePlaceholder}
+            onChange={(e) => update("phone", e.target.value)}
+            placeholder="+992 90 000 00 00"
             className={cn(inputClass, errors.phone && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.fieldEmail} error={errors.email}>
+        <Field label="Email" error={errors.email}>
           <input
             type="email"
             value={form.email}
-            onChange={(ev) => update("email", ev.target.value)}
-            placeholder={e.fieldEmailPlaceholder}
+            onChange={(e) => update("email", e.target.value)}
+            placeholder="name@example.com"
             className={cn(inputClass, errors.email && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.fieldBirthDate} error={errors.birthDate}>
+        <Field label="Дата рождения" error={errors.birthDate}>
           <input
             type="date"
             value={form.birthDate}
-            onChange={(ev) => update("birthDate", ev.target.value)}
+            onChange={(e) => update("birthDate", e.target.value)}
             className={cn(inputClass, errors.birthDate && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.colHireDate} error={errors.hireDate}>
+        <Field label="Дата принятия" error={errors.hireDate}>
           <input
             type="date"
             value={form.hireDate}
-            onChange={(ev) => update("hireDate", ev.target.value)}
+            onChange={(e) => update("hireDate", e.target.value)}
             className={cn(inputClass, errors.hireDate && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.fieldAddress}>
+        <Field label="Адрес">
           <input
             type="text"
             value={form.address}
-            onChange={(ev) => update("address", ev.target.value)}
-            placeholder={e.fieldAddressPlaceholder}
+            onChange={(e) => update("address", e.target.value)}
+            placeholder="г. Душанбе, ул. Рудаки 123"
             className={inputClass}
           />
         </Field>
 
-        <Field label={e.fieldSalaryForm} error={errors.salary}>
+        <Field label="Оклад, сомони" error={errors.salary}>
           <input
             type="number"
             min={0}
             value={form.salary}
-            onChange={(ev) => update("salary", ev.target.value)}
+            onChange={(e) => update("salary", e.target.value)}
             placeholder="5000"
             className={cn(inputClass, errors.salary && errorInputClass)}
           />
         </Field>
 
-        <Field label={e.fieldPassport}>
+        <Field label="Паспорт">
           <input
             type="text"
             value={form.passportNumber}
-            onChange={(ev) => update("passportNumber", ev.target.value)}
+            onChange={(e) => update("passportNumber", e.target.value)}
             placeholder="AA1234567"
             className={inputClass}
           />
         </Field>
 
-        <Field label={e.fieldInn}>
+        <Field label="ИНН">
           <input
             type="text"
             value={form.inn}
-            onChange={(ev) => update("inn", ev.target.value)}
+            onChange={(e) => update("inn", e.target.value)}
             placeholder="1234567890123"
             className={inputClass}
           />

@@ -138,7 +138,7 @@ export function StockDetailDrawer({ row, onClose, onAdjust, onReserve, onRelease
             </Row>
           </dl>
 
-          <div className="flex items-center justify-between rounded-[10px] bg-surface-3 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between rounded-[10px] bg-[#F5F5F4] px-4 py-3 text-sm">
             <span className="text-ink-secondary">
               Цена: <span className="font-semibold text-ink tabular">{formatCurrency(row.price)}</span>
             </span>

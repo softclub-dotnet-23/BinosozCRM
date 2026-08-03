@@ -1,99 +1,100 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { authenticate, type AuthResult } from "../lib/auth/authService";
-import { clearSession, onSessionStorageChange, readSession, saveSession } from "../lib/auth/session";
-import { clearTokens, readRefreshToken, saveTokens } from "../services/tokenStorage";
-import { setSessionExpiredHandler } from "../services/apiClient";
-import { authApi } from "../services/authApi";
+import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { getCurrentUser, login as loginApi, logout as logoutApi, mapBackendRole } from "../api/authApi";
+import { ApiError, NetworkError } from "../api/apiClient";
+import { clearSession, getForcePasswordChange, getRefreshToken, readUser, saveSession, subscribe } from "../lib/auth/session";
 import type { SessionUser } from "../types";
 
-const FORCE_PASSWORD_CHANGE_KEY = "binosoz:auth-force-password-change";
+/** Category of a failed login, for the caller to localize — AuthContext doesn't own presentation strings. Matches keys on LoginStrings (loginTranslations.ts). */
+export type LoginErrorCode = "invalidCredentials" | "accountDeactivated" | "networkError" | "serverError";
 
-function readForcePasswordChange(): boolean {
-  try {
-    return sessionStorage.getItem(FORCE_PASSWORD_CHANGE_KEY) === "true" || localStorage.getItem(FORCE_PASSWORD_CHANGE_KEY) === "true";
-  } catch {
-    return false;
-  }
+export interface AuthSuccess {
+  ok: true;
 }
 
-function writeForcePasswordChange(value: boolean): void {
-  try {
-    if (value) {
-      sessionStorage.setItem(FORCE_PASSWORD_CHANGE_KEY, "true");
-    } else {
-      sessionStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
-      localStorage.removeItem(FORCE_PASSWORD_CHANGE_KEY);
-    }
-  } catch {
-    // storage unavailable — forcePasswordChange just won't survive a reload, not fatal
-  }
+export interface AuthFailure {
+  ok: false;
+  errorCode: LoginErrorCode;
 }
+
+export type AuthResult = AuthSuccess | AuthFailure;
 
 interface AuthContextValue {
   user: SessionUser | null;
   forcePasswordChange: boolean;
-  login: (login: string, password: string, remember: boolean) => Promise<AuthResult>;
-  logout: () => void;
-  completePasswordChange: () => void;
+  login: (phone: string, password: string, remember: boolean) => Promise<AuthResult>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function mapLoginError(error: unknown): LoginErrorCode {
+  if (error instanceof NetworkError) return "networkError";
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case "AUTH_INVALID_CREDENTIALS":
+        return "invalidCredentials";
+      case "AUTH_ACCOUNT_DEACTIVATED":
+        return "accountDeactivated";
+      default:
+        return "serverError";
+    }
+  }
+  return "serverError";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(() => readSession());
-  const [forcePasswordChange, setForcePasswordChange] = useState(() => readForcePasswordChange());
+  const user = useSyncExternalStore(subscribe, readUser, readUser);
+  const forcePasswordChange = useSyncExternalStore(subscribe, getForcePasswordChange, getForcePasswordChange);
 
-  const logout = useCallback(() => {
-    const refreshToken = readRefreshToken();
-    clearSession();
-    clearTokens();
-    writeForcePasswordChange(false);
-    setUser(null);
-    setForcePasswordChange(false);
-    // Best-effort — the session is already torn down locally either way, and there's no UI
-    // waiting on this (unlike login, nothing should block on the server round-trip to sign out).
+  const login = useCallback(async (phone: string, password: string, remember: boolean): Promise<AuthResult> => {
+    try {
+      const tokens = await loginApi(phone, password);
+      const role = mapBackendRole(tokens.role);
+
+      const persist = (identity: SessionUser) =>
+        saveSession(
+          {
+            user: identity,
+            accessToken: tokens.accessToken,
+            accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+            refreshToken: tokens.refreshToken,
+            forcePasswordChange: tokens.forcePasswordChange,
+          },
+          remember,
+        );
+
+      // Placeholder identity first — apiClient reads the access token from the
+      // saved session, so /auth/me (below) needs a session to already exist.
+      persist({ id: "", login: phone, fullName: phone, role });
+
+      if (!tokens.forcePasswordChange) {
+        try {
+          const me = await getCurrentUser();
+          persist({ id: me.id, login: me.phone, fullName: me.fullName, role: mapBackendRole(me.role) });
+        } catch {
+          // /auth/me failed — keep the phone-only placeholder identity, not fatal
+        }
+      }
+
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, errorCode: mapLoginError(error) };
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    const refreshToken = getRefreshToken();
     if (refreshToken) {
-      authApi.logout({ refreshToken }).catch(() => {});
+      try {
+        await logoutApi(refreshToken);
+      } catch {
+        // best-effort — the session is cleared locally regardless of server outcome
+      }
     }
+    clearSession();
   }, []);
 
-  useEffect(() => onSessionStorageChange(() => setUser(readSession())), []);
-
-  // The apiClient interceptor calls this when a refresh attempt fails (refresh token expired,
-  // reused, or revoked) — it has no React context of its own, so this is how it reaches back in
-  // to actually tear down the session instead of leaving stale tokens the UI still trusts.
-  useEffect(() => {
-    setSessionExpiredHandler(logout);
-    return () => setSessionExpiredHandler(null);
-  }, [logout]);
-
-  const login = useCallback(async (loginValue: string, password: string, remember: boolean) => {
-    const result = await authenticate(loginValue, password);
-    if (result.ok) {
-      saveSession(result.user, remember);
-      // Mock/demo accounts (see authService.authenticate) carry no tokens — nothing to save,
-      // and forcePasswordChange is simply false so ProtectedRoute never routes through the
-      // real-backend-only /change-password-required flow.
-      if (result.tokens) saveTokens(result.tokens, remember);
-      writeForcePasswordChange(result.forcePasswordChange ?? false);
-      setUser(result.user);
-      setForcePasswordChange(result.forcePasswordChange ?? false);
-    }
-    return result;
-  }, []);
-
-  // Called once PUT /auth/change-password has succeeded. The access token issued at login still
-  // carries the old force_password_change=true claim (JWTs aren't mutable server-side), so the
-  // caller must refresh before this — otherwise every subsequent request keeps 403ing against
-  // ForcePasswordChangeMiddleware even though the password was actually changed.
-  const completePasswordChange = useCallback(() => {
-    writeForcePasswordChange(false);
-    setForcePasswordChange(false);
-  }, []);
-
-  return (
-    <AuthContext.Provider value={{ user, forcePasswordChange, login, logout, completePasswordChange }}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, forcePasswordChange, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

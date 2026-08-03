@@ -31,21 +31,20 @@ interface AvatarProps {
   name: string;
   size?: "sm" | "md";
   className?: string;
-  /** Explicit photo override (e.g. a real uploaded/data-URL avatar) — takes precedence over the
-   * name-based resolvePersonPhoto lookup when provided. */
-  src?: string | null;
 }
 
-export function Avatar({ name, size = "md", className, src }: AvatarProps) {
+export function Avatar({ name, size = "md", className }: AvatarProps) {
   const [photoFailed, setPhotoFailed] = useState(false);
   const sizeClass = size === "md" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs";
-  const photoSrc = src ?? resolvePersonPhoto(name);
+  const photoSrc = resolvePersonPhoto(name);
 
   if (photoSrc && !photoFailed) {
     return (
       <img
         src={photoSrc}
         alt={name}
+        loading="lazy"
+        decoding="async"
         onError={() => setPhotoFailed(true)}
         className={cn("shrink-0 rounded-full object-cover", sizeClass, className)}
       />
@@ -61,8 +60,8 @@ export function Avatar({ name, size = "md", className, src }: AvatarProps) {
         TONE_CLASSNAMES[tone],
         className,
       )}
-      title={name}
-      aria-hidden="true"
+      role="img"
+      aria-label={name}
     >
       {getInitials(name)}
     </div>

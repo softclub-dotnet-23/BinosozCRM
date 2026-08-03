@@ -22,7 +22,3 @@ export function computeMaterialKpis(materials: Material[]): MaterialKpis {
   const totalValue = materials.reduce((sum, m) => sum + getMaterialTotalValue(m), 0);
   return { totalCount, totalStock, totalValue };
 }
-
-export function getCriticalMaterials(materials: Material[]): Material[] {
-  return materials.filter((m) => getMaterialStatus(m) !== "normal");
-}

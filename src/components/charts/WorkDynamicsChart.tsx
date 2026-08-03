@@ -1,7 +1,6 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import type { WorkDynamicsPoint } from "../../data/mockWorkDynamics";
-import { useChartAnimation } from "../../hooks/useChartAnimation";
 
 function DynamicsTooltip({ active, payload, label }: TooltipContentProps) {
   if (!active || !payload || payload.length === 0) return null;
@@ -37,7 +36,6 @@ function DynamicsTooltip({ active, payload, label }: TooltipContentProps) {
 }
 
 export function WorkDynamicsChart({ data }: { data: WorkDynamicsPoint[] }) {
-  const chartAnim = useChartAnimation();
   return (
     <div className="min-w-0">
       <div className="mb-3 flex items-center gap-5">
@@ -74,8 +72,8 @@ export function WorkDynamicsChart({ data }: { data: WorkDynamicsPoint[] }) {
             wrapperStyle={{ zIndex: 30, outline: "none" }}
             content={(props) => <DynamicsTooltip {...props} />}
           />
-          <Line type="monotone" dataKey="planned" name="План" stroke="#2869C9" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} {...chartAnim} />
-          <Line type="monotone" dataKey="actual" name="Факт" stroke="#FF6B00" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} {...chartAnim} />
+          <Line type="monotone" dataKey="planned" name="План" stroke="#2869C9" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+          <Line type="monotone" dataKey="actual" name="Факт" stroke="#FF6B00" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
