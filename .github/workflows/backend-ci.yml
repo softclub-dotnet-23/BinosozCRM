@@ -1,0 +1,48 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-test-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore backend/backend.slnx
+
+      # Zero-warnings is enforced mechanically, not by this workflow: every
+      # project pulls TreatWarningsAsErrors=true from backend/Directory.Build.props,
+      # so a single compiler warning fails this step on its own.
+      - name: Build
+        run: dotnet build backend/backend.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test backend/backend.slnx --configuration Release --no-build
+
+      # dotnet list package --vulnerable exits 0 even when it finds
+      # vulnerabilities — it's a report, not a gate — so the gate has to be
+      # built here. Uses the locale-independent JSON schema (a project only
+      # gains a "frameworks" key when it has something vulnerable to report)
+      # rather than grepping the human-readable text, which is printed in
+      # whatever locale the runner defaults to.
+      - name: Check for vulnerable packages (MASTER §11.8)
+        run: |
+          set -euo pipefail
+          result=$(dotnet list backend/backend.slnx package --vulnerable --include-transitive --format json)
+          echo "$result"
+          if echo "$result" | jq -e 'any(.projects[]; has("frameworks"))' > /dev/null; then
+            echo "::error::Vulnerable NuGet packages found — see the report above."
+            exit 1
+          fi

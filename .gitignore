@@ -11,6 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
 
 # Editor directories and files
 .vscode/*
@@ -23,3 +31,6 @@ dist-ssr
 *.sln
 *.sw?
 payroll-verify*.mjs
+
+# Claude Code worktrees / scratch — never part of the tracked project tree
+.claude/worktrees/
