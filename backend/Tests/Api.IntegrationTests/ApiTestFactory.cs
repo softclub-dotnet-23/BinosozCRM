@@ -20,7 +20,7 @@ namespace Api.IntegrationTests;
 // PostgreSQL container. ObjectsController is a public type from Api, so the
 // test host can discover that assembly without exposing Program solely for
 // tests.
-public sealed class ApiTestFactory(PostgresFixture fixture) : WebApplicationFactory<ObjectsController>
+public sealed class ApiTestFactory(PostgresFixture fixture, string environmentName = "Testing") : WebApplicationFactory<ObjectsController>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -29,8 +29,12 @@ public sealed class ApiTestFactory(PostgresFixture fixture) : WebApplicationFact
         // point, so put every required test setting on the host builder before
         // Program runs. This keeps the tests independent of developer/CI
         // environment variables without committing a real connection string.
+        // environmentName defaults to "Testing" (same posture as production for
+        // Development-only gating: neither IsDevelopment()) — pass "Production"
+        // to prove something behaves identically under the real deployment
+        // environment name, not just "not literally Development".
         builder
-            .UseEnvironment("Testing")
+            .UseEnvironment(environmentName)
             .UseSetting("ConnectionStrings:Default", fixture.ConnectionString)
             .UseSetting("Jwt:SecretKey", AuthTestOptions.Jwt.Value.SecretKey)
             .UseSetting("Jwt:Issuer", AuthTestOptions.Jwt.Value.Issuer)

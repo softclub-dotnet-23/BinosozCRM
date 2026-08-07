@@ -50,7 +50,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // tests call handlers directly, in-process). Found while wiring the first
 // enum-typed request DTO a real frontend actually calls
 // (Api/Contracts/Users/CreateUserRequest.cs's Role field).
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        // [DevelopmentOnly] actions (currently just QrLoginController.DevApprove)
+        // never get a route at all outside Development — see
+        // DevelopmentOnlyActionConvention's own comment.
+        options.Conventions.Add(new Api.Common.DevelopmentOnlyActionConvention(builder.Environment));
+    })
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 
 var fileStorageOptions = builder.Configuration.GetSection(FileStorageOptions.SectionName).Get<FileStorageOptions>()
@@ -229,6 +235,22 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = 3,
             Window = TimeSpan.FromHours(1),
+            QueueLimit = 0
+        });
+    });
+
+    // QR login start — anonymous, so IP is the only partition key available
+    // (no phone in the body to key on, unlike login/forgot-password).
+    // Generous enough for a real user re-opening/refreshing the QR modal a
+    // few times, bounded against scripted QrLoginSessions-table flooding.
+    options.AddPolicy(RateLimitPolicies.AuthQrStart, httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(5),
             QueueLimit = 0
         });
     });

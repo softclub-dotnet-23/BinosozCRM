@@ -14,6 +14,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<QrLoginSession> QrLoginSessions => Set<QrLoginSession>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<ConstructionObject> ConstructionObjects => Set<ConstructionObject>();
     public DbSet<EstimateItem> EstimateItems => Set<EstimateItem>();
