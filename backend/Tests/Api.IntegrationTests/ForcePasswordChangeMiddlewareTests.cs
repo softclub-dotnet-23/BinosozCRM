@@ -61,7 +61,8 @@ public sealed class ForcePasswordChangeMiddlewareTests
     [Theory]
     [InlineData("/api/v1/auth/change-password")]
     [InlineData("/api/v1/auth/logout")]
-    public async Task Allows_change_password_and_logout_when_force_password_change_is_set(string path)
+    [InlineData("/api/v1/auth/refresh")]
+    public async Task Allows_change_password_logout_and_refresh_when_force_password_change_is_set(string path)
     {
         var context = BuildContext(path, forcePasswordChange: true);
 
