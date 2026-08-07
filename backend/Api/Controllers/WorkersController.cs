@@ -85,4 +85,35 @@ public sealed class WorkersController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetOwnWorkerProfileQuery(), cancellationToken);
         return result.ToActionResult(HttpContext);
     }
+
+    // Frontend-integration: company-wide, unlike GET brigades/{id}/workers above — the
+    // /employees page has no single brigade to scope to. Accountant is added here (not on the
+    // class default) since WorkerDto.FromEntity already grants Accountant the same full-detail
+    // projection as Owner.
+    [HttpGet("workers")]
+    [Authorize(Roles = "Owner,Prorab,Accountant")]
+    public async Task<IActionResult> ListAll(
+        [FromQuery] int page, [FromQuery] int pageSize, [FromQuery] bool includeInactive, [FromQuery] Guid? brigadeId, CancellationToken cancellationToken)
+    {
+        var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
+        var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
+
+        var result = await sender.Send(new ListWorkersQuery(clampedPage, clampedPageSize, includeInactive, brigadeId), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
+
+    // Frontend-integration: a Brigadir's own crew *roster* — distinct from both GET workers/me
+    // (their own single Worker record) and GET brigades/mine (the Brigade record itself). Saves
+    // the frontend a two-call round trip (brigades/mine to learn the id, then
+    // brigades/{id}/workers) since it would otherwise need the brigade id first.
+    [HttpGet("brigades/mine/workers")]
+    [Authorize(Roles = "Brigadir")]
+    public async Task<IActionResult> ListMine([FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+    {
+        var clampedPage = Math.Max(page == 0 ? 1 : page, 1);
+        var clampedPageSize = Math.Clamp(pageSize == 0 ? 20 : pageSize, 1, 100);
+
+        var result = await sender.Send(new ListMyBrigadeWorkersQuery(clampedPage, clampedPageSize), cancellationToken);
+        return result.ToActionResult(HttpContext);
+    }
 }

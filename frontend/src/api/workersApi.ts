@@ -25,14 +25,47 @@ export function listBrigadeWorkers(brigadeId: string, page: number, pageSize: nu
 }
 
 /**
- * There is no company-wide "list all workers" endpoint — only per-brigade
- * (MASTER §9.4). This fans out one call per brigade, bounded by the number
- * of brigades (typically small), not by worker count — a deliberate,
- * disclosed compromise rather than an unbounded N+1.
+ * Frontend-integration: GET /api/v1/workers — company-wide (Owner/Prorab/Accountant), added
+ * because every `listAllWorkers` caller already passed literally every brigade id it had (see
+ * that function below) just to reconstruct "all workers company-wide" via a per-brigade fan-out.
+ * `brigadeId` narrows to one brigade — omit for the whole company.
  */
-export async function listAllWorkers(brigadeIds: string[], includeInactive = false): Promise<Worker[]> {
-  const pages = await Promise.all(brigadeIds.map((id) => listBrigadeWorkers(id, 1, 100, includeInactive)));
-  return pages.flatMap((p) => p.items);
+export function listWorkers(page: number, pageSize: number, includeInactive = false, brigadeId?: string): Promise<PagedResult<Worker>> {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), includeInactive: String(includeInactive) });
+  if (brigadeId) params.set("brigadeId", brigadeId);
+  return request<PagedResult<Worker>>(`/api/v1/workers?${params.toString()}`);
+}
+
+/**
+ * Every caller (AttendancePage, PayrollPage, BrigadeCompositionPage, EmployeesPage) passes every
+ * brigade id it has — i.e. always wants the whole company — so this is now the single real
+ * GET /api/v1/workers call above instead of the one-request-per-brigade fan-out it used to be.
+ * `brigadeIds` is kept for call-site compatibility but no longer used to scope the request.
+ *
+ * WorkersController clamps pageSize server-side to 100 (Math.Clamp(..., 1, 100)) — a single
+ * pageSize=500 request silently comes back truncated to 100 items. Page through in chunks of
+ * 100, using the first response's totalCount to know how many more pages are left.
+ */
+const MAX_PAGE_SIZE = 100;
+
+export async function listAllWorkers(_brigadeIds: string[], includeInactive = false): Promise<Worker[]> {
+  const first = await listWorkers(1, MAX_PAGE_SIZE, includeInactive);
+  const items = [...first.items];
+
+  const pageCount = Math.ceil(first.totalCount / MAX_PAGE_SIZE);
+  for (let page = 2; page <= pageCount; page++) {
+    const next = await listWorkers(page, MAX_PAGE_SIZE, includeInactive);
+    items.push(...next.items);
+  }
+
+  return items;
+}
+
+/** Frontend-integration: GET /api/v1/brigades/mine/workers — a Brigadir's own crew roster.
+ * Distinct from getMyWorkerProfile() (their own single Worker record) and getMyBrigade()
+ * (brigadesApi.ts — the Brigade record itself, not its members). */
+export function listMyBrigadeWorkers(page: number, pageSize: number): Promise<PagedResult<Worker>> {
+  return request<PagedResult<Worker>>(`/api/v1/brigades/mine/workers?page=${page}&pageSize=${pageSize}`);
 }
 
 export interface CreateWorkerInput {
