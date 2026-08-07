@@ -44,6 +44,8 @@ public static class ErrorCodeCatalog
         ["AUTH_REFRESH_TOKEN_INVALID"] = StatusCodes.Status401Unauthorized,
         ["AUTH_REFRESH_TOKEN_REUSED"] = StatusCodes.Status401Unauthorized,
         ["AUTH_RESET_TOKEN_INVALID"] = StatusCodes.Status400BadRequest,
+        ["AUTH_QR_SESSION_NOT_FOUND"] = StatusCodes.Status404NotFound,
+        ["AUTH_QR_SESSION_INVALID"] = StatusCodes.Status400BadRequest,
         ["AUTH_FORBIDDEN"] = StatusCodes.Status403Forbidden,
         ["PASSWORD_CHANGE_REQUIRED"] = StatusCodes.Status403Forbidden,
         ["VALIDATION_FAILED"] = StatusCodes.Status400BadRequest,

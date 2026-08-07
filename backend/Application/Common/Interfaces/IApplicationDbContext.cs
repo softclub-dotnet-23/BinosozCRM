@@ -29,6 +29,7 @@ public interface IApplicationDbContext
     DbSet<PayrollAdvance> PayrollAdvances { get; }
     DbSet<AdminAuditLog> AdminAuditLogs { get; }
     DbSet<PasswordResetToken> PasswordResetTokens { get; }
+    DbSet<QrLoginSession> QrLoginSessions { get; }
     DbSet<TelegramLink> TelegramLinks { get; }
     DbSet<IssueReport> IssueReports { get; }
 
